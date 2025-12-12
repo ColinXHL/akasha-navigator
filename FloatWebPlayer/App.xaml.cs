@@ -33,7 +33,9 @@ namespace FloatWebPlayer
 
             // 显示窗口
             _playerWindow.Show();
-            _controlBarWindow.Show();
+            
+            // 控制栏窗口启动自动显示/隐藏监听（默认隐藏，鼠标移到顶部触发显示）
+            _controlBarWindow.StartAutoShowHide();
         }
 
         /// <summary>

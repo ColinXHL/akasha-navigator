@@ -10,7 +10,7 @@
 ## Phase 2: 控制栏窗口
 
 - [x] 5. 实现 ControlBarWindow（URL栏、导航按钮、收藏按钮、菜单按钮）
-- [ ] 6. 实现 ControlBarWindow 显示/隐藏逻辑（屏幕顶部触发）
+- [x] 6. 实现 ControlBarWindow 显示/隐藏逻辑（屏幕顶部触发）
 - [ ] 7. 实现两窗口 URL 双向同步
 
 ## Phase 3: 快捷键与控制
@@ -47,3 +47,4 @@
 | 2025-12-12 | WebView2 集成 | Cookie 持久化、默认加载 B站 |
 | 2025-12-12 | 控制栏 Overlay | 显示/隐藏动画、窗口按钮、细滚动条样式 |
 | 2025-12-12 | ControlBarWindow | URL栏、导航按钮、收藏/菜单按钮、水平拖动条、双窗口事件绑定 |
+| 2025-12-12 | ControlBarWindow 显示/隐藏逻辑 | 屏幕顶部1/8触发区域、细线→展开→延迟隐藏 |

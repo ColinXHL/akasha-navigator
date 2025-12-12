@@ -85,13 +85,26 @@
         </Style>
     </Window.Resources>
 
-    <!-- 主容器 -->
-    <Border x:Name="MainBorder"
-            Background="#E0202020"
-            BorderBrush="#3A3A3A"
-            BorderThickness="1"
-            CornerRadius="6"
-            Margin="4">
+    <Grid Background="Transparent">
+        <!-- 触发细线（与展开后的拖动横线位置、样式一致） -->
+        <Border x:Name="TriggerLineBorder"
+                Width="80"
+                Height="4"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="#909090"
+                CornerRadius="2"
+                Visibility="Collapsed"
+                Cursor="Hand"/>
+
+        <!-- 主容器（默认隐藏，展开时才显示） -->
+        <Border x:Name="MainBorder"
+                Background="#E0202020"
+                BorderBrush="#3A3A3A"
+                BorderThickness="1"
+                CornerRadius="6"
+                Margin="4"
+                Visibility="Collapsed">
 
         <Border.Effect>
             <DropShadowEffect BlurRadius="8"
@@ -209,4 +222,5 @@
             </DockPanel>
         </Grid>
     </Border>
+    </Grid>
 </Window>

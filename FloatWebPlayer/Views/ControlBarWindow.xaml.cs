@@ -1,6 +1,8 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using FloatWebPlayer.Helpers;
@@ -8,10 +10,46 @@ using FloatWebPlayer.Helpers;
 namespace FloatWebPlayer.Views
 {
     /// <summary>
+    /// 控制栏显示状态
+    /// </summary>
+    public enum ControlBarDisplayState
+    {
+        /// <summary>完全隐藏</summary>
+        Hidden,
+        /// <summary>显示触发细线</summary>
+        TriggerLine,
+        /// <summary>完全展开</summary>
+        Expanded
+    }
+
+    /// <summary>
     /// ControlBarWindow - URL 控制栏窗口
     /// </summary>
     public partial class ControlBarWindow : Window
     {
+        #region Win32 API
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        private const int GWL_EXSTYLE = -20;
+        private const int WS_EX_TOOLWINDOW = 0x00000080;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        #endregion
         #region Events
 
         /// <summary>
@@ -63,6 +101,47 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private double _windowStartLeft;
 
+        /// <summary>
+        /// 当前显示状态
+        /// </summary>
+        private ControlBarDisplayState _displayState = ControlBarDisplayState.Hidden;
+
+        /// <summary>
+        /// 鼠标位置检测定时器
+        /// </summary>
+        private DispatcherTimer? _mouseCheckTimer;
+
+        /// <summary>
+        /// 延迟隐藏定时器
+        /// </summary>
+        private DispatcherTimer? _hideDelayTimer;
+
+        /// <summary>
+        /// 展开时的高度
+        /// </summary>
+        private const double ExpandedHeight = 50;
+
+        /// <summary>
+        /// 触发细线状态的窗口高度（比触发线视觉高度大，方便悬停触发）
+        /// </summary>
+        private const double TriggerLineHeight = 16;
+
+        /// <summary>
+        /// 屏幕顶部触发区域比例
+        /// </summary>
+        private const double TriggerAreaRatio = 1.0 / 4.0;
+
+        /// <summary>
+        /// 延迟隐藏时间（毫秒）
+        /// </summary>
+        private const int HideDelayMs = 400;
+
+        /// <summary>
+        /// 状态切换后的稳定期（防抖）
+        /// </summary>
+        private DateTime _lastStateChangeTime = DateTime.MinValue;
+        private const int StateStabilityMs = 150;
+
         #endregion
 
         #region Constructor
@@ -71,6 +150,7 @@ namespace FloatWebPlayer.Views
         {
             InitializeComponent();
             InitializeWindowPosition();
+            InitializeAutoShowHide();
         }
 
         #endregion
@@ -110,6 +190,26 @@ namespace FloatWebPlayer.Views
             Top = workArea.Top + 2;
         }
 
+        /// <summary>
+        /// 初始化自动显示/隐藏功能
+        /// </summary>
+        private void InitializeAutoShowHide()
+        {
+            // 初始化鼠标位置检测定时器
+            _mouseCheckTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(50)
+            };
+            _mouseCheckTimer.Tick += MouseCheckTimer_Tick;
+
+            // 初始化延迟隐藏定时器
+            _hideDelayTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(HideDelayMs)
+            };
+            _hideDelayTimer.Tick += HideDelayTimer_Tick;
+        }
+
         #endregion
 
         #region Event Handlers
@@ -119,7 +219,10 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private void Window_SourceInitialized(object sender, EventArgs e)
         {
-            // 预留：后续可添加其他初始化逻辑
+            // 设置 WS_EX_TOOLWINDOW 样式，从 Alt+Tab 中隐藏窗口
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
         }
 
         /// <summary>
@@ -272,6 +375,193 @@ namespace FloatWebPlayer.Views
 
         #endregion
 
+        #region Auto Show/Hide Logic
+
+        /// <summary>
+        /// 鼠标位置检测定时器回调
+        /// </summary>
+        private void MouseCheckTimer_Tick(object? sender, EventArgs e)
+        {
+            if (!GetCursorPos(out POINT cursorPos))
+                return;
+
+            // 防抖：状态切换后短暂稳定期内不做处理
+            if ((DateTime.Now - _lastStateChangeTime).TotalMilliseconds < StateStabilityMs)
+                return;
+
+            var workArea = SystemParameters.WorkArea;
+            var triggerAreaHeight = workArea.Height * TriggerAreaRatio;
+
+            // 窗口内容边距（与 XAML 中 MainBorder 的 Margin 一致）
+            const double contentMargin = 4;
+
+            // 检查鼠标是否在窗口范围内（水平方向，考虑边距）
+            bool isInWindowHorizontalRange = cursorPos.X >= Left + contentMargin && 
+                                             cursorPos.X <= Left + Width - contentMargin;
+
+            // 检查鼠标是否在窗口内（考虑边距）
+            bool isMouseOverWindow = isInWindowHorizontalRange &&
+                                     cursorPos.Y >= Top && 
+                                     cursorPos.Y <= Top + Height - contentMargin;
+
+            // 检查鼠标是否在屏幕顶部触发区域（整个屏幕宽度）
+            bool isInTriggerArea = cursorPos.Y >= workArea.Top &&
+                                   cursorPos.Y <= workArea.Top + triggerAreaHeight;
+
+            // 根据当前状态和鼠标位置决定目标状态
+            ControlBarDisplayState targetState = _displayState;
+
+            switch (_displayState)
+            {
+                case ControlBarDisplayState.Hidden:
+                    if (isInTriggerArea)
+                    {
+                        targetState = ControlBarDisplayState.TriggerLine;
+                    }
+                    break;
+
+                case ControlBarDisplayState.TriggerLine:
+                    if (isMouseOverWindow)
+                    {
+                        targetState = ControlBarDisplayState.Expanded;
+                        StopHideDelayTimer();
+                    }
+                    else if (!isInTriggerArea)
+                    {
+                        StartHideDelayTimer();
+                    }
+                    else
+                    {
+                        StopHideDelayTimer();
+                    }
+                    break;
+
+                case ControlBarDisplayState.Expanded:
+                    if (isMouseOverWindow)
+                    {
+                        StopHideDelayTimer();
+                    }
+                    else
+                    {
+                        // 不在窗口上，启动延迟隐藏
+                        StartHideDelayTimer();
+                    }
+                    break;
+            }
+
+            // 应用状态变化
+            if (targetState != _displayState)
+            {
+                SetDisplayState(targetState);
+            }
+        }
+
+        /// <summary>
+        /// 延迟隐藏定时器回调
+        /// </summary>
+        private void HideDelayTimer_Tick(object? sender, EventArgs e)
+        {
+            _hideDelayTimer?.Stop();
+
+            // 再次检查鼠标位置，确保真的要隐藏
+            if (!GetCursorPos(out POINT cursorPos))
+            {
+                SetDisplayState(ControlBarDisplayState.Hidden);
+                return;
+            }
+
+            // 窗口内容边距
+            const double contentMargin = 4;
+
+            // 检查鼠标是否在窗口内（考虑边距）
+            bool isInWindowHorizontalRange = cursorPos.X >= Left + contentMargin && 
+                                             cursorPos.X <= Left + Width - contentMargin;
+            bool isMouseOverWindow = isInWindowHorizontalRange &&
+                                     cursorPos.Y >= Top && 
+                                     cursorPos.Y <= Top + Height - contentMargin;
+
+            // 只要不在窗口上就隐藏（不考虑触发区域）
+            if (!isMouseOverWindow)
+            {
+                SetDisplayState(ControlBarDisplayState.Hidden);
+            }
+        }
+
+        /// <summary>
+        /// 启动延迟隐藏定时器
+        /// </summary>
+        private void StartHideDelayTimer()
+        {
+            if (_hideDelayTimer != null && !_hideDelayTimer.IsEnabled)
+            {
+                _hideDelayTimer.Start();
+            }
+        }
+
+        /// <summary>
+        /// 停止延迟隐藏定时器
+        /// </summary>
+        private void StopHideDelayTimer()
+        {
+            _hideDelayTimer?.Stop();
+        }
+
+        /// <summary>
+        /// 设置显示状态
+        /// </summary>
+        private void SetDisplayState(ControlBarDisplayState state)
+        {
+            if (_displayState == state)
+                return;
+
+            _displayState = state;
+            _lastStateChangeTime = DateTime.Now;
+
+            switch (state)
+            {
+                case ControlBarDisplayState.Hidden:
+                    // 重置为 TriggerLine 状态的视觉效果，避免下次显示时闪烁
+                    MainBorder.Opacity = 0;
+                    MainBorder.Visibility = Visibility.Collapsed;
+                    TriggerLineBorder.Visibility = Visibility.Collapsed;
+                    Height = TriggerLineHeight;
+                    Hide();
+                    break;
+
+                case ControlBarDisplayState.TriggerLine:
+                    // 先确保主容器不可见（使用 Opacity 立即生效）
+                    MainBorder.Opacity = 0;
+                    MainBorder.Visibility = Visibility.Collapsed;
+                    TriggerLineBorder.Visibility = Visibility.Collapsed;
+                    // 设置高度
+                    Height = TriggerLineHeight;
+                    // 显示触发线
+                    TriggerLineBorder.Visibility = Visibility.Visible;
+                    if (!IsVisible)
+                    {
+                        Show();
+                    }
+                    break;
+
+                case ControlBarDisplayState.Expanded:
+                    // 先隐藏触发线
+                    TriggerLineBorder.Visibility = Visibility.Collapsed;
+                    // 设置高度
+                    Height = ExpandedHeight;
+                    // 显示主容器（先设置 Opacity 为 0，再设置 Visibility，最后恢复 Opacity）
+                    MainBorder.Opacity = 0;
+                    MainBorder.Visibility = Visibility.Visible;
+                    MainBorder.Opacity = 1;
+                    if (!IsVisible)
+                    {
+                        Show();
+                    }
+                    break;
+            }
+        }
+
+        #endregion
+
         #region Public Methods
 
         /// <summary>
@@ -301,6 +591,28 @@ namespace FloatWebPlayer.Views
             {
                 textBlock.Text = isBookmarked ? "★" : "☆";
             }
+        }
+
+        #endregion
+
+        #region Public Control Methods
+
+        /// <summary>
+        /// 启动自动显示/隐藏监听
+        /// </summary>
+        public void StartAutoShowHide()
+        {
+            SetDisplayState(ControlBarDisplayState.Hidden);
+            _mouseCheckTimer?.Start();
+        }
+
+        /// <summary>
+        /// 停止自动显示/隐藏监听
+        /// </summary>
+        public void StopAutoShowHide()
+        {
+            _mouseCheckTimer?.Stop();
+            _hideDelayTimer?.Stop();
         }
 
         #endregion
