@@ -5,7 +5,6 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
-using FloatWebPlayer.Helpers;
 
 namespace FloatWebPlayer.Views
 {
@@ -50,6 +49,7 @@ namespace FloatWebPlayer.Views
         }
 
         #endregion
+
         #region Events
 
         /// <summary>
@@ -141,6 +141,11 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private DateTime _lastStateChangeTime = DateTime.MinValue;
         private const int StateStabilityMs = 150;
+
+        /// <summary>
+        /// 窗口内容边距（与 XAML 中 MainBorder 的 Margin 一致）
+        /// </summary>
+        private const double ContentMargin = 4;
 
         #endregion
 
@@ -291,22 +296,7 @@ namespace FloatWebPlayer.Views
         {
             if (e.Key == Key.Enter)
             {
-                var url = UrlTextBox.Text.Trim();
-                
-                if (!string.IsNullOrEmpty(url))
-                {
-                    // 自动补全 URL scheme
-                    if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                        !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                    {
-                        url = "https://" + url;
-                    }
-
-                    NavigateRequested?.Invoke(this, url);
-                }
-
-                // 移除焦点
-                Keyboard.ClearFocus();
+                NavigateToCurrentUrl();
             }
         }
 
@@ -314,6 +304,14 @@ namespace FloatWebPlayer.Views
         /// 前往按钮点击
         /// </summary>
         private void BtnGo_Click(object sender, RoutedEventArgs e)
+        {
+            NavigateToCurrentUrl();
+        }
+
+        /// <summary>
+        /// 导航到当前 URL 地址栏中的地址
+        /// </summary>
+        private void NavigateToCurrentUrl()
         {
             var url = UrlTextBox.Text.Trim();
             
@@ -392,17 +390,14 @@ namespace FloatWebPlayer.Views
             var workArea = SystemParameters.WorkArea;
             var triggerAreaHeight = workArea.Height * TriggerAreaRatio;
 
-            // 窗口内容边距（与 XAML 中 MainBorder 的 Margin 一致）
-            const double contentMargin = 4;
-
             // 检查鼠标是否在窗口范围内（水平方向，考虑边距）
-            bool isInWindowHorizontalRange = cursorPos.X >= Left + contentMargin && 
-                                             cursorPos.X <= Left + Width - contentMargin;
+            bool isInWindowHorizontalRange = cursorPos.X >= Left + ContentMargin && 
+                                             cursorPos.X <= Left + Width - ContentMargin;
 
             // 检查鼠标是否在窗口内（考虑边距）
             bool isMouseOverWindow = isInWindowHorizontalRange &&
                                      cursorPos.Y >= Top && 
-                                     cursorPos.Y <= Top + Height - contentMargin;
+                                     cursorPos.Y <= Top + Height - ContentMargin;
 
             // 检查鼠标是否在屏幕顶部触发区域（整个屏幕宽度）
             bool isInTriggerArea = cursorPos.Y >= workArea.Top &&
@@ -470,15 +465,12 @@ namespace FloatWebPlayer.Views
                 return;
             }
 
-            // 窗口内容边距
-            const double contentMargin = 4;
-
             // 检查鼠标是否在窗口内（考虑边距）
-            bool isInWindowHorizontalRange = cursorPos.X >= Left + contentMargin && 
-                                             cursorPos.X <= Left + Width - contentMargin;
+            bool isInWindowHorizontalRange = cursorPos.X >= Left + ContentMargin && 
+                                             cursorPos.X <= Left + Width - ContentMargin;
             bool isMouseOverWindow = isInWindowHorizontalRange &&
                                      cursorPos.Y >= Top && 
-                                     cursorPos.Y <= Top + Height - contentMargin;
+                                     cursorPos.Y <= Top + Height - ContentMargin;
 
             // 只要不在窗口上就隐藏（不考虑触发区域）
             if (!isMouseOverWindow)
