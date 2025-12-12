@@ -24,11 +24,11 @@
 ## Phase 4: 数据与设置
 
 - [x] 13. 实现边缘吸附功能
-- [ ] 14. 实现 JSON 数据服务（历史记录、收藏夹 CRUD，按 Profile 隔离）
-- [ ] 15. 实现 ProfileManager 服务（加载/切换 Profile，Default 兜底）+ JSON 配置存储
-- [ ] 16. 实现历史记录 UI 窗口
-- [ ] 17. 实现收藏夹 UI
-- [ ] 18. 实现设置窗口
+- [x] 14. 实现 JSON 数据服务（历史记录、收藏夹 CRUD，按 Profile 隔离）
+- [x] 15. 实现 ProfileManager 服务（加载/切换 Profile，Default 兜底）+ JSON 配置存储
+- [x] 16. 实现历史记录 UI 窗口
+- [x] 17. 实现收藏夹 UI
+- [x] 18. 实现设置窗口
 
 ## Phase 5: 测试与优化
 
@@ -54,3 +54,5 @@
 | 2025-12-12 | 代码整理重构 | 统一 Win32 API 到 Win32Helper.cs，创建 AppConstants.cs 集中管理常量，创建 Models 目录和数据模型（AppConfig/WindowState/HistoryItem/BookmarkItem），HotkeyService 添加输入模式检测，移除 UseWindowsForms 依赖 |
 | 2025-12-12 | 快捷键自定义架构 | HotkeyBinding/HotkeyProfile/HotkeyConfig 模型，ActionDispatcher 动作分发器，支持组合键 (Ctrl/Alt/Shift) 和进程过滤，预留多 Profile 和脚本扩展 |
 | 2025-12-12 | 边缘吸附功能 | WM_MOVING/WM_SIZING 消息钩子，10px 阈值吸附到屏幕工作区边缘，使用鼠标意图位置算法确保拖动跟手，支持 DPI 缩放 |
+| 2025-12-13 | Phase 4 数据与设置 | GameProfile 模型、ProfileManager 服务（单例/Profile 加载切换/Default 兜底）、DataService 服务（历史记录/收藏夹 CRUD）、HistoryWindow、BookmarkPopup、SettingsWindow 三个 UI 窗口、菜单集成 |
+| 2025-12-13 | UI 动画与统一 | AnimatedWindow 基类（打开/关闭动画）、SettingsWindow/BookmarkPopup/HistoryWindow 继承统一动画、无边框圆角窗口风格统一、设置窗口添加重置按钮、收藏夹添加清空功能 |

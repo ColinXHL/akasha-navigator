@@ -35,5 +35,15 @@ namespace FloatWebPlayer.Models
         /// 是否最大化
         /// </summary>
         public bool IsMaximized { get; set; }
+
+        /// <summary>
+        /// 最后访问的 URL
+        /// </summary>
+        public string? LastUrl { get; set; }
+
+        /// <summary>
+        /// 是否静音
+        /// </summary>
+        public bool IsMuted { get; set; }
     }
 }

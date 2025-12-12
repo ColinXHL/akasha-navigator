@@ -59,6 +59,21 @@ namespace FloatWebPlayer.Views
         /// </summary>
         public event EventHandler? MenuRequested;
 
+        /// <summary>
+        /// 历史记录请求事件
+        /// </summary>
+        public event EventHandler? HistoryRequested;
+
+        /// <summary>
+        /// 收藏夹请求事件
+        /// </summary>
+        public event EventHandler? BookmarksRequested;
+
+        /// <summary>
+        /// 设置请求事件
+        /// </summary>
+        public event EventHandler? SettingsRequested;
+
         #endregion
 
         #region Fields
@@ -223,7 +238,7 @@ namespace FloatWebPlayer.Views
         }
 
         /// <summary>
-        /// 拖动条鼠标移动：执行水平拖动
+        /// 拖动条鼠标移动：执行水平拖动（带吸附）
         /// </summary>
         private void DragBar_MouseMove(object sender, MouseEventArgs e)
         {
@@ -235,9 +250,33 @@ namespace FloatWebPlayer.Views
                 // 计算新位置
                 var newLeft = _windowStartLeft + deltaX;
 
-                // 限制在屏幕范围内
+                // 获取工作区
                 var workArea = SystemParameters.WorkArea;
+                
+                // 限制在屏幕范围内
                 newLeft = Math.Max(workArea.Left, Math.Min(newLeft, workArea.Right - Width));
+
+                // 水平吸附：左侧、居中、右侧
+                const double snapThreshold = 20;
+                
+                // 计算吸附位置
+                double leftSnapPos = workArea.Left;
+                double centerSnapPos = workArea.Left + (workArea.Width - Width) / 2;
+                double rightSnapPos = workArea.Right - Width;
+
+                // 检查吸附
+                if (Math.Abs(newLeft - leftSnapPos) <= snapThreshold)
+                {
+                    newLeft = leftSnapPos;
+                }
+                else if (Math.Abs(newLeft - centerSnapPos) <= snapThreshold)
+                {
+                    newLeft = centerSnapPos;
+                }
+                else if (Math.Abs(newLeft - rightSnapPos) <= snapThreshold)
+                {
+                    newLeft = rightSnapPos;
+                }
 
                 Left = newLeft;
             }
@@ -340,7 +379,38 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private void BtnMenu_Click(object sender, RoutedEventArgs e)
         {
+            // 显示 ContextMenu
+            if (BtnMenu.ContextMenu != null)
+            {
+                BtnMenu.ContextMenu.PlacementTarget = BtnMenu;
+                BtnMenu.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                BtnMenu.ContextMenu.IsOpen = true;
+            }
             MenuRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// 历史记录菜单点击
+        /// </summary>
+        private void MenuHistory_Click(object sender, RoutedEventArgs e)
+        {
+            HistoryRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// 收藏夹菜单点击
+        /// </summary>
+        private void MenuBookmarks_Click(object sender, RoutedEventArgs e)
+        {
+            BookmarksRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// 设置菜单点击
+        /// </summary>
+        private void MenuSettings_Click(object sender, RoutedEventArgs e)
+        {
+            SettingsRequested?.Invoke(this, EventArgs.Empty);
         }
 
         #endregion
@@ -354,6 +424,9 @@ namespace FloatWebPlayer.Views
         {
             // 防止在窗口关闭后操作
             if (!IsLoaded) return;
+
+            // 拖动过程中不处理
+            if (_isDragging) return;
 
             if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPos))
                 return;
@@ -413,7 +486,10 @@ namespace FloatWebPlayer.Views
                     break;
 
                 case ControlBarDisplayState.Expanded:
-                    if (isMouseOverWindow)
+                    // 检查 ContextMenu 是否打开
+                    bool isContextMenuOpen = BtnMenu.ContextMenu?.IsOpen == true;
+                    
+                    if (isMouseOverWindow || isContextMenuOpen)
                     {
                         StopHideDelayTimer();
                     }

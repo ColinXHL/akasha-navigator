@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using FloatWebPlayer.Models;
 using FloatWebPlayer.Services;
 using FloatWebPlayer.Views;
 
@@ -15,6 +16,7 @@ namespace FloatWebPlayer
         private ControlBarWindow? _controlBarWindow;
         private HotkeyService? _hotkeyService;
         private OsdWindow? _osdWindow;
+        private AppConfig _config = new();
 
         #endregion
 
@@ -25,6 +27,12 @@ namespace FloatWebPlayer
         /// </summary>
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // 初始化 ProfileManager（这会自动创建 Default Profile）
+            _ = ProfileManager.Instance;
+            
+            // 初始化 DataService
+            _ = DataService.Instance;
+
             // 创建主窗口（播放器）
             _playerWindow = new PlayerWindow();
 
@@ -93,6 +101,58 @@ namespace FloatWebPlayer
             {
                 _controlBarWindow.UpdateBackButtonState(_playerWindow.CanGoBack);
                 _controlBarWindow.UpdateForwardButtonState(_playerWindow.CanGoForward);
+            };
+
+            // 收藏按钮点击事件
+            _controlBarWindow.BookmarkRequested += (s, e) =>
+            {
+                var url = _controlBarWindow.CurrentUrl;
+                var title = _playerWindow.CurrentTitle;
+                var isBookmarked = DataService.Instance.ToggleBookmark(url, title);
+                _controlBarWindow.UpdateBookmarkState(isBookmarked);
+                ShowOsd(isBookmarked ? "已添加收藏" : "已取消收藏", "⭐");
+            };
+
+            // 历史记录菜单事件
+            _controlBarWindow.HistoryRequested += (s, e) =>
+            {
+                var historyWindow = new HistoryWindow();
+                historyWindow.HistoryItemSelected += (sender, url) =>
+                {
+                    _playerWindow.Navigate(url);
+                };
+                historyWindow.ShowDialog();
+            };
+
+            // 收藏夹菜单事件
+            _controlBarWindow.BookmarksRequested += (s, e) =>
+            {
+                var bookmarkPopup = new BookmarkPopup();
+                bookmarkPopup.BookmarkItemSelected += (sender, url) =>
+                {
+                    _playerWindow.Navigate(url);
+                };
+                bookmarkPopup.ShowDialog();
+            };
+
+            // 设置菜单事件
+            _controlBarWindow.SettingsRequested += (s, e) =>
+            {
+                var settingsWindow = new SettingsWindow(_config);
+                settingsWindow.SettingsSaved += (sender, config) =>
+                {
+                    _config = config;
+                    // 应用设置变更
+                    ApplySettings();
+                };
+                settingsWindow.ShowDialog();
+            };
+
+            // 播放器 URL 变化时，检查收藏状态
+            _playerWindow.UrlChanged += (s, url) =>
+            {
+                var isBookmarked = DataService.Instance.IsBookmarked(url);
+                _controlBarWindow.UpdateBookmarkState(isBookmarked);
             };
 
         }
@@ -164,6 +224,15 @@ namespace FloatWebPlayer
             // 延迟初始化 OSD 窗口
             _osdWindow ??= new OsdWindow();
             _osdWindow.ShowMessage(message, icon);
+        }
+
+        /// <summary>
+        /// 应用设置变更
+        /// </summary>
+        private void ApplySettings()
+        {
+            // 设置变更后的逻辑（如透明度、快进秒数等）
+            // 可以在这里保存配置到文件
         }
 
         /// <summary>

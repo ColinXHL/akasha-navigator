@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using FloatWebPlayer.Helpers;
+using FloatWebPlayer.Services;
 using Microsoft.Web.WebView2.Core;
 using Cursors = System.Windows.Input.Cursors;
 using MessageBox = System.Windows.MessageBox;
@@ -92,6 +93,9 @@ namespace FloatWebPlayer.Views
             // 窗口关闭时清理
             Closing += (s, e) =>
             {
+                // 保存窗口状态
+                SaveWindowState();
+                
                 // 停止穿透模式定时器
                 StopClickThroughTimer();
                 
@@ -118,31 +122,44 @@ namespace FloatWebPlayer.Views
 
         /// <summary>
         /// 初始化窗口位置和大小
-        /// 默认位置：屏幕左下角
-        /// 默认大小：屏幕宽度的 1/4，16:9 比例
+        /// 从 WindowStateService 加载上次保存的状态
         /// </summary>
         private void InitializeWindowPosition()
         {
-            // 获取主屏幕工作区域
-            var workArea = SystemParameters.WorkArea;
-
-            // 计算默认大小：宽度为屏幕的 1/4，高度按 16:9 比例计算
-            double defaultWidth = Math.Max(workArea.Width / 4, AppConstants.MinWindowWidth);
-            double defaultHeight = defaultWidth * 9 / 16;
+            var state = WindowStateService.Instance.Load();
             
-            // 确保高度不小于最小高度
-            if (defaultHeight < AppConstants.MinWindowHeight)
-            {
-                defaultHeight = AppConstants.MinWindowHeight;
-                defaultWidth = defaultHeight * 16 / 9;
-            }
+            // 应用保存的位置和大小
+            Left = state.Left;
+            Top = state.Top;
+            Width = Math.Max(state.Width, AppConstants.MinWindowWidth);
+            Height = Math.Max(state.Height, AppConstants.MinWindowHeight);
+            
+            // 应用透明度
+            _windowOpacity = state.Opacity;
+            
+            // 确保窗口在屏幕范围内
+            var workArea = SystemParameters.WorkArea;
+            if (Left < workArea.Left) Left = workArea.Left;
+            if (Top < workArea.Top) Top = workArea.Top;
+            if (Left + Width > workArea.Right) Left = workArea.Right - Width;
+            if (Top + Height > workArea.Bottom) Top = workArea.Bottom - Height;
+        }
 
-            Width = defaultWidth;
-            Height = defaultHeight;
-
-            // 定位到屏幕左下角
-            Left = workArea.Left;
-            Top = workArea.Bottom - Height;
+        /// <summary>
+        /// 保存窗口状态
+        /// </summary>
+        private void SaveWindowState()
+        {
+            var state = WindowStateService.Instance.Load();
+            state.Left = Left;
+            state.Top = Top;
+            state.Width = Width;
+            state.Height = Height;
+            state.Opacity = _windowOpacity;
+            state.IsMaximized = _isMaximized;
+            state.LastUrl = WebView.CoreWebView2?.Source ?? AppConstants.DefaultHomeUrl;
+            state.IsMuted = WebView.CoreWebView2?.IsMuted ?? false;
+            WindowStateService.Instance.Save(state);
         }
 
         #endregion
@@ -176,9 +193,17 @@ namespace FloatWebPlayer.Views
                 // 确保目录存在
                 Directory.CreateDirectory(userDataFolder);
 
+                // 创建 WebView2 环境选项，允许自动播放
+                var options = new CoreWebView2EnvironmentOptions
+                {
+                    // 允许自动播放媒体（禁用自动播放限制）
+                    AdditionalBrowserArguments = "--autoplay-policy=no-user-gesture-required"
+                };
+
                 // 创建 WebView2 环境，指定 UserDataFolder 以实现 Cookie 持久化
                 var env = await CoreWebView2Environment.CreateAsync(
-                    userDataFolder: userDataFolder
+                    userDataFolder: userDataFolder,
+                    options: options
                 );
 
                 // 初始化 WebView2
@@ -199,8 +224,23 @@ namespace FloatWebPlayer.Views
                 // 拦截新窗口请求，在当前窗口打开而非弹出新窗口
                 WebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
 
-                // 导航到默认页面
-                WebView.CoreWebView2.Navigate(AppConstants.DefaultHomeUrl);
+                // 从保存的状态加载 URL 和静音设置
+                var state = WindowStateService.Instance.Load();
+                
+                // 恢复静音状态
+                WebView.CoreWebView2.IsMuted = state.IsMuted;
+                
+                // 应用透明度
+                if (_windowOpacity < AppConstants.MaxOpacity)
+                {
+                    Win32Helper.SetWindowOpacity(this, _windowOpacity);
+                }
+                
+                // 导航到上次访问的页面（如果有）
+                var urlToLoad = !string.IsNullOrWhiteSpace(state.LastUrl) 
+                    ? state.LastUrl 
+                    : AppConstants.DefaultHomeUrl;
+                WebView.CoreWebView2.Navigate(urlToLoad);
             }
             catch (Exception ex)
             {
@@ -252,6 +292,21 @@ namespace FloatWebPlayer.Views
         {
             // 触发导航状态变化事件
             NavigationStateChanged?.Invoke(this, EventArgs.Empty);
+
+            // 记录到历史（仅成功的导航）
+            if (e.IsSuccess && WebView.CoreWebView2 != null)
+            {
+                var url = WebView.CoreWebView2.Source;
+                var title = WebView.CoreWebView2.DocumentTitle;
+                
+                // 过滤掉空白页和内部页面
+                if (!string.IsNullOrWhiteSpace(url) && 
+                    !url.StartsWith("about:") &&
+                    !url.StartsWith("data:"))
+                {
+                    DataService.Instance.AddHistory(url, title);
+                }
+            }
         }
 
         /// <summary>
@@ -317,6 +372,16 @@ namespace FloatWebPlayer.Views
         /// 是否可以前进
         /// </summary>
         public bool CanGoForward => WebView.CoreWebView2?.CanGoForward ?? false;
+
+        /// <summary>
+        /// 当前页面标题
+        /// </summary>
+        public string CurrentTitle => WebView.CoreWebView2?.DocumentTitle ?? string.Empty;
+
+        /// <summary>
+        /// 当前页面 URL
+        /// </summary>
+        public string CurrentUrl => WebView.CoreWebView2?.Source ?? string.Empty;
 
         #endregion
 
