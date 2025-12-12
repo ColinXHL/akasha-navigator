@@ -24,9 +24,9 @@ namespace FloatWebPlayer
         public const int ResizeBorderThickness = 8;
 
         /// <summary>
-        /// 边缘吸附阈值（像素），预留给 Phase 13
+        /// 边缘吸附阈值（像素）
         /// </summary>
-        public const int SnapThreshold = 10;
+        public const int SnapThreshold = 15;
 
         #endregion
 

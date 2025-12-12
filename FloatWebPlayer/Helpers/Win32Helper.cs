@@ -114,6 +114,12 @@ namespace FloatWebPlayer.Helpers
         private const uint WM_NCLBUTTONDOWN = 0x00A1;
         private const int HTCAPTION = 2;
 
+        // 窗口位置消息
+        public const int WM_MOVING = 0x0216;
+        public const int WM_SIZING = 0x0214;
+        public const int WM_ENTERSIZEMOVE = 0x0231;
+        public const int WM_EXITSIZEMOVE = 0x0232;
+
         // 调整大小方向常量
         private const int SC_SIZE_HTLEFT = 0xF001;
         private const int SC_SIZE_HTRIGHT = 0xF002;
@@ -448,6 +454,124 @@ namespace FloatWebPlayer.Helpers
         public static IntPtr CallNextHook(IntPtr hookId, int nCode, IntPtr wParam, IntPtr lParam)
         {
             return CallNextHookEx(hookId, nCode, wParam, lParam);
+        }
+
+        #endregion
+
+        #region Edge Snapping Methods
+
+        /// <summary>
+        /// 将窗口矩形吸附到屏幕边缘（简单版，无滞后）
+        /// </summary>
+        /// <param name="rect">窗口矩形（物理像素）</param>
+        /// <param name="workArea">工作区矩形（物理像素）</param>
+        /// <param name="threshold">吸附阈值（物理像素）</param>
+        public static void SnapRectToEdges(ref RECT rect, RECT workArea, int threshold)
+        {
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
+
+            // 左边缘吸附
+            if (Math.Abs(rect.Left - workArea.Left) <= threshold)
+            {
+                rect.Left = workArea.Left;
+                rect.Right = rect.Left + width;
+            }
+            // 右边缘吸附
+            else if (Math.Abs(rect.Right - workArea.Right) <= threshold)
+            {
+                rect.Right = workArea.Right;
+                rect.Left = rect.Right - width;
+            }
+
+            // 上边缘吸附
+            if (Math.Abs(rect.Top - workArea.Top) <= threshold)
+            {
+                rect.Top = workArea.Top;
+                rect.Bottom = rect.Top + height;
+            }
+            // 下边缘吸附
+            else if (Math.Abs(rect.Bottom - workArea.Bottom) <= threshold)
+            {
+                rect.Bottom = workArea.Bottom;
+                rect.Top = rect.Bottom - height;
+            }
+        }
+
+        /// <summary>
+        /// 调整大小时将窗口边缘吸附到屏幕边缘
+        /// </summary>
+        /// <param name="rect">窗口矩形（物理像素）</param>
+        /// <param name="workArea">工作区矩形（物理像素）</param>
+        /// <param name="threshold">吸附阈值（物理像素）</param>
+        /// <param name="sizingEdge">调整大小的边缘 (WMSZ_* 常量)</param>
+        /// <returns>是否进行了吸附</returns>
+        public static bool SnapSizingEdge(ref RECT rect, RECT workArea, int threshold, int sizingEdge)
+        {
+            bool snapped = false;
+
+            // 根据调整方向吸附对应边缘
+            // WMSZ_LEFT = 1, WMSZ_RIGHT = 2, WMSZ_TOP = 3, WMSZ_BOTTOM = 6
+            // WMSZ_TOPLEFT = 4, WMSZ_TOPRIGHT = 5, WMSZ_BOTTOMLEFT = 7, WMSZ_BOTTOMRIGHT = 8
+
+            // 左边缘
+            if (sizingEdge == 1 || sizingEdge == 4 || sizingEdge == 7)
+            {
+                if (Math.Abs(rect.Left - workArea.Left) < threshold)
+                {
+                    rect.Left = workArea.Left;
+                    snapped = true;
+                }
+            }
+
+            // 右边缘
+            if (sizingEdge == 2 || sizingEdge == 5 || sizingEdge == 8)
+            {
+                if (Math.Abs(rect.Right - workArea.Right) < threshold)
+                {
+                    rect.Right = workArea.Right;
+                    snapped = true;
+                }
+            }
+
+            // 上边缘
+            if (sizingEdge == 3 || sizingEdge == 4 || sizingEdge == 5)
+            {
+                if (Math.Abs(rect.Top - workArea.Top) < threshold)
+                {
+                    rect.Top = workArea.Top;
+                    snapped = true;
+                }
+            }
+
+            // 下边缘
+            if (sizingEdge == 6 || sizingEdge == 7 || sizingEdge == 8)
+            {
+                if (Math.Abs(rect.Bottom - workArea.Bottom) < threshold)
+                {
+                    rect.Bottom = workArea.Bottom;
+                    snapped = true;
+                }
+            }
+
+            return snapped;
+        }
+
+        /// <summary>
+        /// 将 WPF Rect 转换为物理像素 RECT
+        /// </summary>
+        /// <param name="rect">WPF 逻辑像素矩形</param>
+        /// <param name="dpiScale">DPI 缩放比例</param>
+        /// <returns>物理像素 RECT</returns>
+        public static RECT ToPhysicalRect(System.Windows.Rect rect, double dpiScale)
+        {
+            return new RECT
+            {
+                Left = (int)(rect.Left * dpiScale),
+                Top = (int)(rect.Top * dpiScale),
+                Right = (int)(rect.Right * dpiScale),
+                Bottom = (int)(rect.Bottom * dpiScale)
+            };
         }
 
         #endregion

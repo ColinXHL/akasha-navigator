@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using FloatWebPlayer.Helpers;
 using Microsoft.Web.WebView2.Core;
@@ -67,6 +69,16 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private bool _isCursorInWindowWhileClickThrough;
 
+        /// <summary>
+        /// 拖动开始时鼠标相对窗口左上角的偏移（物理像素）
+        /// </summary>
+        private Win32Helper.POINT _dragOffset;
+
+        /// <summary>
+        /// 是否正在拖动窗口
+        /// </summary>
+        private bool _isDragging;
+
         #endregion
 
         #region Constructor
@@ -107,17 +119,26 @@ namespace FloatWebPlayer.Views
         /// <summary>
         /// 初始化窗口位置和大小
         /// 默认位置：屏幕左下角
-        /// 默认大小：屏幕大小的 1/16
+        /// 默认大小：屏幕宽度的 1/4，16:9 比例
         /// </summary>
         private void InitializeWindowPosition()
         {
             // 获取主屏幕工作区域
             var workArea = SystemParameters.WorkArea;
 
-            // 计算默认大小：屏幕大小的 1/16
-            // 1/16 = 1/4 宽度 x 1/4 高度
-            Width = Math.Max(workArea.Width / 4, AppConstants.MinWindowWidth);
-            Height = Math.Max(workArea.Height / 4, AppConstants.MinWindowHeight);
+            // 计算默认大小：宽度为屏幕的 1/4，高度按 16:9 比例计算
+            double defaultWidth = Math.Max(workArea.Width / 4, AppConstants.MinWindowWidth);
+            double defaultHeight = defaultWidth * 9 / 16;
+            
+            // 确保高度不小于最小高度
+            if (defaultHeight < AppConstants.MinWindowHeight)
+            {
+                defaultHeight = AppConstants.MinWindowHeight;
+                defaultWidth = defaultHeight * 16 / 9;
+            }
+
+            Width = defaultWidth;
+            Height = defaultHeight;
 
             // 定位到屏幕左下角
             Left = workArea.Left;
@@ -542,7 +563,150 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private void Window_SourceInitialized(object sender, EventArgs e)
         {
-            // 预留：后续可添加其他初始化逻辑
+            // 注册窗口消息钩子用于边缘吸附
+            var hwndSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+            hwndSource?.AddHook(WndProc);
+        }
+
+        /// <summary>
+        /// 窗口消息处理钩子 - 用于实现边缘吸附
+        /// </summary>
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            switch (msg)
+            {
+                case Win32Helper.WM_ENTERSIZEMOVE:
+                    // 开始拖动：记录鼠标相对窗口的偏移
+                    if (Win32Helper.GetCursorPosition(out var cursorPos) &&
+                        Win32Helper.GetWindowRectangle(hwnd, out var windowRect))
+                    {
+                        _dragOffset.X = cursorPos.X - windowRect.Left;
+                        _dragOffset.Y = cursorPos.Y - windowRect.Top;
+                        _isDragging = true;
+                    }
+                    break;
+
+                case Win32Helper.WM_EXITSIZEMOVE:
+                    // 结束拖动
+                    _isDragging = false;
+                    break;
+
+                case Win32Helper.WM_MOVING:
+                    if (_isDragging && lParam != IntPtr.Zero)
+                    {
+                        HandleWindowMoving(hwnd, lParam);
+                    }
+                    break;
+
+                case Win32Helper.WM_SIZING:
+                    if (lParam != IntPtr.Zero)
+                    {
+                        HandleWindowSizing(wParam, lParam);
+                    }
+                    break;
+            }
+
+            return IntPtr.Zero;
+        }
+
+        /// <summary>
+        /// 处理窗口移动时的边缘吸附
+        /// </summary>
+        private void HandleWindowMoving(IntPtr hwnd, IntPtr lParam)
+        {
+            // 获取当前鼠标位置
+            if (!Win32Helper.GetCursorPosition(out var cursorPos))
+                return;
+
+            // 获取 DPI 缩放比例
+            var source = PresentationSource.FromVisual(this);
+            double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+
+            // 计算物理像素阈值
+            int threshold = (int)(AppConstants.SnapThreshold * dpiScale);
+
+            // 获取工作区（物理像素）- 排除任务栏
+            var workAreaWpf = SystemParameters.WorkArea;
+            var workArea = Win32Helper.ToPhysicalRect(workAreaWpf, dpiScale);
+
+            // 获取屏幕完整区域（物理像素）- 包括任务栏
+            var screenRect = new Win32Helper.RECT
+            {
+                Left = 0,
+                Top = 0,
+                Right = (int)(SystemParameters.PrimaryScreenWidth * dpiScale),
+                Bottom = (int)(SystemParameters.PrimaryScreenHeight * dpiScale)
+            };
+
+            // 获取窗口当前大小
+            var rect = Marshal.PtrToStructure<Win32Helper.RECT>(lParam);
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
+
+            // 根据鼠标位置和偏移计算用户意图的窗口位置
+            int intendedLeft = cursorPos.X - _dragOffset.X;
+            int intendedTop = cursorPos.Y - _dragOffset.Y;
+
+            // 对意图位置进行吸附计算
+            int finalLeft = intendedLeft;
+            int finalTop = intendedTop;
+
+            // 左边缘吸附（工作区和屏幕边缘相同）
+            if (Math.Abs(intendedLeft - workArea.Left) <= threshold)
+            {
+                finalLeft = workArea.Left;
+            }
+            // 右边缘吸附（工作区和屏幕边缘相同）
+            else if (Math.Abs(intendedLeft + width - workArea.Right) <= threshold)
+            {
+                finalLeft = workArea.Right - width;
+            }
+
+            // 上边缘吸附（工作区）
+            if (Math.Abs(intendedTop - workArea.Top) <= threshold)
+            {
+                finalTop = workArea.Top;
+            }
+            // 下边缘吸附 - 优先工作区（任务栏上方）
+            else if (Math.Abs(intendedTop + height - workArea.Bottom) <= threshold)
+            {
+                finalTop = workArea.Bottom - height;
+            }
+            // 下边缘吸附 - 屏幕真实底部
+            else if (Math.Abs(intendedTop + height - screenRect.Bottom) <= threshold)
+            {
+                finalTop = screenRect.Bottom - height;
+            }
+
+            // 更新窗口位置
+            rect.Left = finalLeft;
+            rect.Top = finalTop;
+            rect.Right = finalLeft + width;
+            rect.Bottom = finalTop + height;
+
+            Marshal.StructureToPtr(rect, lParam, false);
+        }
+
+        /// <summary>
+        /// 处理窗口调整大小时的边缘吸附
+        /// </summary>
+        private void HandleWindowSizing(IntPtr wParam, IntPtr lParam)
+        {
+            // 获取 DPI 缩放比例
+            var source = PresentationSource.FromVisual(this);
+            double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+
+            // 计算物理像素阈值
+            int threshold = (int)(AppConstants.SnapThreshold * dpiScale);
+
+            // 获取工作区（物理像素）
+            var workAreaWpf = SystemParameters.WorkArea;
+            var workArea = Win32Helper.ToPhysicalRect(workAreaWpf, dpiScale);
+
+            int sizingEdge = wParam.ToInt32();
+            var rect = Marshal.PtrToStructure<Win32Helper.RECT>(lParam);
+            Win32Helper.SnapSizingEdge(ref rect, workArea, threshold, sizingEdge);
+            Marshal.StructureToPtr(rect, lParam, false);
         }
 
         /// <summary>
