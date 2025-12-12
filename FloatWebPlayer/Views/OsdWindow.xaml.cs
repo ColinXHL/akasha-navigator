@@ -11,24 +11,6 @@ namespace FloatWebPlayer.Views
     /// </summary>
     public partial class OsdWindow : Window
     {
-        #region Constants
-
-        /// <summary>
-        /// 淡入动画时长（毫秒）
-        /// </summary>
-        private const int FadeInDuration = 200;
-
-        /// <summary>
-        /// 显示停留时长（毫秒）
-        /// </summary>
-        private const int DisplayDuration = 1000;
-
-        /// <summary>
-        /// 淡出动画时长（毫秒）
-        /// </summary>
-        private const int FadeOutDuration = 300;
-
-        #endregion
 
         #region Fields
 
@@ -128,7 +110,7 @@ namespace FloatWebPlayer.Views
             {
                 From = 0,
                 To = 1,
-                Duration = TimeSpan.FromMilliseconds(FadeInDuration),
+                Duration = TimeSpan.FromMilliseconds(AppConstants.OsdFadeInDuration),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             };
 
@@ -144,7 +126,7 @@ namespace FloatWebPlayer.Views
             {
                 From = 1,
                 To = 0,
-                Duration = TimeSpan.FromMilliseconds(FadeOutDuration),
+                Duration = TimeSpan.FromMilliseconds(AppConstants.OsdFadeOutDuration),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
             };
 
@@ -164,7 +146,7 @@ namespace FloatWebPlayer.Views
         {
             _hideTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(DisplayDuration)
+                Interval = TimeSpan.FromMilliseconds(AppConstants.OsdDisplayDuration)
             };
             _hideTimer.Tick += HideTimer_Tick;
             _hideTimer.Start();

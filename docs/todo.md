@@ -51,3 +51,5 @@
 | 2025-12-12 | 全局快捷键服务 | HotkeyService.cs，支持 5/6/`/7/8/0 键，视频控制方法 |
 | 2025-12-12 | 透明度调节和鼠标穿透 | 7/8 键调节透明度(20%-100%)，0 键切换穿透模式 |
 | 2025-12-12 | OSD 操作提示窗口 | 屏幕居中半透明窗口，1s 自动淡出，输入模式不触发快捷键，输入框聚焦时控制栏不隐藏 |
+| 2025-12-12 | 代码整理重构 | 统一 Win32 API 到 Win32Helper.cs，创建 AppConstants.cs 集中管理常量，创建 Models 目录和数据模型（AppConfig/WindowState/HistoryItem/BookmarkItem），HotkeyService 添加输入模式检测，移除 UseWindowsForms 依赖 |
+| 2025-12-12 | 快捷键自定义架构 | HotkeyBinding/HotkeyProfile/HotkeyConfig 模型，ActionDispatcher 动作分发器，支持组合键 (Ctrl/Alt/Shift) 和进程过滤，预留多 Profile 和脚本扩展 |

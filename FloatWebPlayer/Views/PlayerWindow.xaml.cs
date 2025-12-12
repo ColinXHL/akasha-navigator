@@ -29,39 +29,6 @@ namespace FloatWebPlayer.Views
 
         #endregion
 
-        #region Constants
-
-        /// <summary>
-        /// 拖拽边框厚度（像素）
-        /// </summary>
-        private const int ResizeBorderThickness = 8;
-
-        /// <summary>
-        /// 窗口最小宽度
-        /// </summary>
-        private const double MinWindowWidth = 200;
-
-        /// <summary>
-        /// 窗口最小高度
-        /// </summary>
-        private const double MinWindowHeight = 150;
-
-        /// <summary>
-        /// 最小透明度
-        /// </summary>
-        private const double MinOpacity = 0.2;
-
-        /// <summary>
-        /// 最大透明度
-        /// </summary>
-        private const double MaxOpacity = 1.0;
-
-        /// <summary>
-        /// 透明度步进
-        /// </summary>
-        private const double OpacityStep = 0.1;
-
-        #endregion
 
         #region Fields
 
@@ -149,8 +116,8 @@ namespace FloatWebPlayer.Views
 
             // 计算默认大小：屏幕大小的 1/16
             // 1/16 = 1/4 宽度 x 1/4 高度
-            Width = Math.Max(workArea.Width / 4, MinWindowWidth);
-            Height = Math.Max(workArea.Height / 4, MinWindowHeight);
+            Width = Math.Max(workArea.Width / 4, AppConstants.MinWindowWidth);
+            Height = Math.Max(workArea.Height / 4, AppConstants.MinWindowHeight);
 
             // 定位到屏幕左下角
             Left = workArea.Left;
@@ -176,6 +143,8 @@ namespace FloatWebPlayer.Views
 
         /// <summary>
         /// 初始化 WebView2 控件
+        /// 注意：此方法为 async void，是构造函数中调用异步方法的标准模式
+        /// 所有异常都在方法内部处理，不会导致未处理异常
         /// </summary>
         private async void InitializeWebView()
         {
@@ -209,11 +178,12 @@ namespace FloatWebPlayer.Views
                 // 拦截新窗口请求，在当前窗口打开而非弹出新窗口
                 WebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
 
-                // 导航到默认页面（B站）
-                WebView.CoreWebView2.Navigate("https://www.bilibili.com");
+                // 导航到默认页面
+                WebView.CoreWebView2.Navigate(AppConstants.DefaultHomeUrl);
             }
             catch (Exception ex)
             {
+                // async void 方法必须在内部处理所有异常
                 MessageBox.Show(
                     $"WebView2 初始化失败：{ex.Message}\n\n请确保已安装 WebView2 Runtime。",
                     "错误",
@@ -442,7 +412,7 @@ namespace FloatWebPlayer.Views
         {
             if (_isClickThrough) return _windowOpacity;
 
-            _windowOpacity = Math.Max(MinOpacity, _windowOpacity - OpacityStep);
+            _windowOpacity = Math.Max(AppConstants.MinOpacity, _windowOpacity - AppConstants.OpacityStep);
             Win32Helper.SetWindowOpacity(this, _windowOpacity);
             return _windowOpacity;
         }
@@ -455,7 +425,7 @@ namespace FloatWebPlayer.Views
         {
             if (_isClickThrough) return _windowOpacity;
 
-            _windowOpacity = Math.Min(MaxOpacity, _windowOpacity + OpacityStep);
+            _windowOpacity = Math.Min(AppConstants.MaxOpacity, _windowOpacity + AppConstants.OpacityStep);
             Win32Helper.SetWindowOpacity(this, _windowOpacity);
             return _windowOpacity;
         }
@@ -543,7 +513,7 @@ namespace FloatWebPlayer.Views
                 if (cursorInWindow)
                 {
                     // 鼠标进入窗口，降至最低透明度
-                    Win32Helper.SetWindowOpacity(this, MinOpacity);
+                    Win32Helper.SetWindowOpacity(this, AppConstants.MinOpacity);
                 }
                 else
                 {
@@ -583,7 +553,7 @@ namespace FloatWebPlayer.Views
             base.OnMouseLeftButtonDown(e);
 
             var position = e.GetPosition(this);
-            var direction = Win32Helper.GetResizeDirection(this, position, ResizeBorderThickness);
+            var direction = Win32Helper.GetResizeDirection(this, position, AppConstants.ResizeBorderThickness);
 
             if (direction != Win32Helper.ResizeDirection.None)
             {
@@ -605,7 +575,7 @@ namespace FloatWebPlayer.Views
             base.OnMouseMove(e);
 
             var position = e.GetPosition(this);
-            var direction = Win32Helper.GetResizeDirection(this, position, ResizeBorderThickness);
+            var direction = Win32Helper.GetResizeDirection(this, position, AppConstants.ResizeBorderThickness);
 
             Cursor = direction switch
             {

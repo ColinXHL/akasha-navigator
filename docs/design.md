@@ -184,7 +184,9 @@ injectContent();
 
 ### 2. 全局快捷键
 
-使用 Win32 API `RegisterHotKey` 实现系统级全局快捷键。
+使用低级键盘钩子（`SetWindowsHookEx` + `WH_KEYBOARD_LL`）实现系统级全局快捷键。
+
+#### 默认快捷键
 
 | 按键 | 功能 | 备注 |
 |------|------|------|
@@ -194,6 +196,72 @@ injectContent();
 | `7` | 降低透明度 | 每次 -10%，最低 20% |
 | `8` | 增加透明度 | 每次 +10%，最高 100% |
 | `0` | 切换鼠标穿透模式 | 开启时自动降至最低透明度 |
+
+#### 快捷键自定义架构
+
+采用配置驱动 + ActionDispatcher 模式，支持组合键和进程过滤。
+
+**数据模型**：
+
+```
+HotkeyConfig (配置根)
+├── Profiles: List<HotkeyProfile>     // 多配置 Profile
+├── ActiveProfileName: string          // 当前激活的 Profile
+└── AutoSwitchProfile: bool            // 是否根据进程自动切换
+
+HotkeyProfile (配置 Profile)
+├── Name: string                       // Profile 名称
+├── ActivationProcesses: List<string>? // 自动激活的进程列表
+└── Bindings: List<HotkeyBinding>      // 快捷键绑定列表
+
+HotkeyBinding (快捷键绑定)
+├── Key: uint                          // 虚拟键码 (VK_xxx)
+├── Modifiers: ModifierKeys            // 修饰键 (Ctrl|Alt|Shift)
+├── Action: string                     // 动作标识符
+├── ProcessFilters: List<string>?      // 进程过滤（仅特定进程生效）
+└── IsEnabled: bool                    // 是否启用
+```
+
+**架构图**：
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  HotkeyService                       │
+│  ┌────────────────┐    ┌──────────────────────────┐ │
+│  │ HotkeyConfig   │ -> │ ActionDispatcher         │ │
+│  │ (配置驱动)     │    │ (Action -> 处理器映射)   │ │
+│  └────────────────┘    └──────────────────────────┘ │
+│          │                       │                   │
+│          ▼                       ▼                   │
+│  ┌────────────────┐    ┌──────────────────────────┐ │
+│  │ Profile 匹配   │    │ 内置 Actions             │ │
+│  │ + 进程过滤     │    │ SeekBackward, TogglePlay │ │
+│  └────────────────┘    └──────────────────────────┘ │
+│                              │ 扩展点               │
+│                              ▼                      │
+│                      ┌──────────────────────────┐   │
+│                      │ 自定义脚本 (Script:xxx)  │   │
+│                      │ (预留，后续实现)          │   │
+│                      └──────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+```
+
+**修饰键支持**：
+
+| 标志 | 值 | 说明 |
+|------|-----|------|
+| None | 0 | 无修饰键 |
+| Alt | 1 | Alt 键 |
+| Ctrl | 2 | Ctrl 键 |
+| Shift | 4 | Shift 键 |
+| Ctrl+Alt | 3 | 组合 (1+2) |
+| Ctrl+Shift | 6 | 组合 (2+4) |
+
+**进程过滤**：
+
+- `ProcessFilters` 为 `null` 或空列表：全局生效
+- `ProcessFilters` 包含进程名：仅当前台进程匹配时生效
+- 匹配时不区分大小写，不含路径和扩展名（如 `game` 匹配 `Game.exe`）
 
 ---
 

@@ -1,8 +1,8 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using FloatWebPlayer.Helpers;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
@@ -26,52 +26,6 @@ namespace FloatWebPlayer.Views
     /// </summary>
     public partial class ControlBarWindow : Window
     {
-        #region Win32 API
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetCursorPos(out POINT lpPoint);
-
-        [DllImport("user32.dll")]
-        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-
-        [DllImport("user32.dll")]
-        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-
-        private const int GWL_EXSTYLE = -20;
-        private const int WS_EX_TOOLWINDOW = 0x00000080;
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT
-        {
-            public int X;
-            public int Y;
-        }
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
-        {
-            public int Left;
-            public int Top;
-            public int Right;
-            public int Bottom;
-        }
-
-        [DllImport("user32.dll")]
-        private static extern int GetSystemMetrics(int nIndex);
-
-        [DllImport("user32.dll")]
-        private static extern short GetAsyncKeyState(int vKey);
-
-        private const int SM_CXSCREEN = 0;
-        private const int SM_CYSCREEN = 1;
-        private const int VK_LBUTTON = 0x01;
-
-        #endregion
 
         #region Events
 
@@ -140,30 +94,9 @@ namespace FloatWebPlayer.Views
         private DispatcherTimer? _hideDelayTimer;
 
         /// <summary>
-        /// 展开时的高度
-        /// </summary>
-        private const double ExpandedHeight = 50;
-
-        /// <summary>
-        /// 触发细线状态的窗口高度（比触发线视觉高度大，方便悬停触发）
-        /// </summary>
-        private const double TriggerLineHeight = 16;
-
-        /// <summary>
-        /// 屏幕顶部触发区域比例
-        /// </summary>
-        private const double TriggerAreaRatio = 1.0 / 4.0;
-
-        /// <summary>
-        /// 延迟隐藏时间（毫秒）
-        /// </summary>
-        private const int HideDelayMs = 400;
-
-        /// <summary>
         /// 状态切换后的稳定期（防抖）
         /// </summary>
         private DateTime _lastStateChangeTime = DateTime.MinValue;
-        private const int StateStabilityMs = 150;
 
         /// <summary>
         /// 窗口内容边距（与 XAML 中 MainBorder 的 Margin 一致）
@@ -251,7 +184,7 @@ namespace FloatWebPlayer.Views
             // 初始化延迟隐藏定时器
             _hideDelayTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(HideDelayMs)
+                Interval = TimeSpan.FromMilliseconds(AppConstants.ControlBarHideDelayMs)
             };
             _hideDelayTimer.Tick += HideDelayTimer_Tick;
         }
@@ -266,9 +199,7 @@ namespace FloatWebPlayer.Views
         private void Window_SourceInitialized(object sender, EventArgs e)
         {
             // 设置 WS_EX_TOOLWINDOW 样式，从 Alt+Tab 中隐藏窗口
-            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
+            Win32Helper.SetToolWindowStyle(this);
         }
 
         /// <summary>
@@ -424,23 +355,23 @@ namespace FloatWebPlayer.Views
             // 防止在窗口关闭后操作
             if (!IsLoaded) return;
 
-            if (!GetCursorPos(out POINT cursorPos))
+            if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPos))
                 return;
 
             // 防抖：状态切换后短暂稳定期内不做处理
-            if ((DateTime.Now - _lastStateChangeTime).TotalMilliseconds < StateStabilityMs)
+            if ((DateTime.Now - _lastStateChangeTime).TotalMilliseconds < AppConstants.ControlBarStateStabilityMs)
                 return;
 
             // 使用物理像素计算触发区域（避免 DPI 问题）
-            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-            int triggerAreaHeight = (int)(screenHeight * TriggerAreaRatio);
+            int screenHeight = Win32Helper.GetScreenMetrics(Win32Helper.SM_CYSCREEN);
+            int triggerAreaHeight = (int)(screenHeight * AppConstants.ControlBarTriggerAreaRatio);
 
             // 获取窗口的屏幕坐标（物理像素）
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             bool isMouseOverWindow = false;
             bool isInWindowHorizontalRange = false;
             
-            if (hwnd != IntPtr.Zero && GetWindowRect(hwnd, out RECT windowRect))
+            if (hwnd != IntPtr.Zero && Win32Helper.GetWindowRectangle(hwnd, out Win32Helper.RECT windowRect))
             {
                 // 使用物理像素坐标进行比较
                 isInWindowHorizontalRange = cursorPos.X >= windowRect.Left + ContentMargin && 
@@ -490,7 +421,7 @@ namespace FloatWebPlayer.Views
                     {
                         // 输入框聚焦但鼠标不在窗口上
                         // 检测鼠标左键是否被按下（点击了其他位置）
-                        bool mouseButtonDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+                        bool mouseButtonDown = Win32Helper.IsKeyPressed(Win32Helper.VK_LBUTTON);
                         if (mouseButtonDown)
                         {
                             // 点击了其他位置，清除焦点并移除焦点视觉样式
@@ -526,7 +457,7 @@ namespace FloatWebPlayer.Views
             _hideDelayTimer?.Stop();
 
             // 再次检查鼠标位置，确保真的要隐藏
-            if (!GetCursorPos(out POINT cursorPos))
+            if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPos))
             {
                 SetDisplayState(ControlBarDisplayState.Hidden);
                 return;
@@ -536,7 +467,7 @@ namespace FloatWebPlayer.Views
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             bool isMouseOverWindow = false;
             
-            if (hwnd != IntPtr.Zero && GetWindowRect(hwnd, out RECT windowRect))
+            if (hwnd != IntPtr.Zero && Win32Helper.GetWindowRectangle(hwnd, out Win32Helper.RECT windowRect))
             {
                 bool isInWindowHorizontalRange = cursorPos.X >= windowRect.Left + ContentMargin && 
                                                  cursorPos.X <= windowRect.Right - ContentMargin;
@@ -592,7 +523,7 @@ namespace FloatWebPlayer.Views
                     MainBorder.Opacity = 0;
                     MainBorder.Visibility = Visibility.Collapsed;
                     TriggerLineBorder.Visibility = Visibility.Collapsed;
-                    Height = TriggerLineHeight;
+                    Height = AppConstants.ControlBarTriggerLineHeight;
                     Hide();
                     break;
 
@@ -602,7 +533,7 @@ namespace FloatWebPlayer.Views
                     MainBorder.Visibility = Visibility.Collapsed;
                     TriggerLineBorder.Visibility = Visibility.Collapsed;
                     // 设置高度
-                    Height = TriggerLineHeight;
+                    Height = AppConstants.ControlBarTriggerLineHeight;
                     // 显示触发线
                     TriggerLineBorder.Visibility = Visibility.Visible;
                     if (!IsVisible)
@@ -615,7 +546,7 @@ namespace FloatWebPlayer.Views
                     // 先隐藏触发线
                     TriggerLineBorder.Visibility = Visibility.Collapsed;
                     // 设置高度
-                    Height = ExpandedHeight;
+                    Height = AppConstants.ControlBarExpandedHeight;
                     // 显示主容器（先设置 Opacity 为 0，再设置 Visibility，最后恢复 Opacity）
                     MainBorder.Opacity = 0;
                     MainBorder.Visibility = Visibility.Visible;

@@ -16,11 +16,6 @@ namespace FloatWebPlayer
         private HotkeyService? _hotkeyService;
         private OsdWindow? _osdWindow;
 
-        /// <summary>
-        /// 默认快进/倒退秒数
-        /// </summary>
-        private const int DefaultSeekSeconds = 5;
-
         #endregion
 
         #region Event Handlers
@@ -112,14 +107,14 @@ namespace FloatWebPlayer
             // 绑定快捷键事件
             _hotkeyService.SeekBackward += (s, e) =>
             {
-                _playerWindow?.SeekAsync(-DefaultSeekSeconds);
-                ShowOsd($"-{DefaultSeekSeconds}s", "⏪");
+                _playerWindow?.SeekAsync(-AppConstants.DefaultSeekSeconds);
+                ShowOsd($"-{AppConstants.DefaultSeekSeconds}s", "⏪");
             };
 
             _hotkeyService.SeekForward += (s, e) =>
             {
-                _playerWindow?.SeekAsync(DefaultSeekSeconds);
-                ShowOsd($"+{DefaultSeekSeconds}s", "⏩");
+                _playerWindow?.SeekAsync(AppConstants.DefaultSeekSeconds);
+                ShowOsd($"+{AppConstants.DefaultSeekSeconds}s", "⏩");
             };
 
             _hotkeyService.TogglePlay += (s, e) =>

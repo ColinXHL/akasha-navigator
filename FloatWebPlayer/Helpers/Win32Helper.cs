@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -10,7 +11,7 @@ namespace FloatWebPlayer.Helpers
     /// </summary>
     public static class Win32Helper
     {
-        #region Win32 API
+        #region Win32 API - Window
 
         [DllImport("user32.dll")]
         private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
@@ -31,19 +32,60 @@ namespace FloatWebPlayer.Helpers
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetCursorPos(out POINT lpPoint);
 
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetFocus();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        #endregion
+
+        #region Win32 API - Keyboard Hook
+
+        /// <summary>
+        /// 低级键盘钩子回调委托
+        /// </summary>
+        public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string? lpModuleName);
+
+        #endregion
+
+        #region Win32 Structures
+
         [StructLayout(LayoutKind.Sequential)]
-        private struct POINT
+        public struct POINT
         {
             public int X;
             public int Y;
         }
 
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
         [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
+        public struct RECT
         {
             public int Left;
             public int Top;
@@ -51,9 +93,22 @@ namespace FloatWebPlayer.Helpers
             public int Bottom;
         }
 
+        /// <summary>
+        /// 键盘钩子结构体
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        public struct KBDLLHOOKSTRUCT
+        {
+            public uint vkCode;
+            public uint scanCode;
+            public uint flags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
         #endregion
 
-        #region Constants
+        #region Constants - Window
 
         private const uint WM_SYSCOMMAND = 0x0112;
         private const uint WM_NCLBUTTONDOWN = 0x00A1;
@@ -70,12 +125,40 @@ namespace FloatWebPlayer.Helpers
         private const int SC_SIZE_HTBOTTOMRIGHT = 0xF008;
 
         // 扩展窗口样式常量
-        private const int GWL_EXSTYLE = -20;
-        private const int WS_EX_TRANSPARENT = 0x00000020;
-        private const int WS_EX_LAYERED = 0x00080000;
+        public const int GWL_EXSTYLE = -20;
+        public const int WS_EX_TRANSPARENT = 0x00000020;
+        public const int WS_EX_LAYERED = 0x00080000;
+        public const int WS_EX_TOOLWINDOW = 0x00000080;
 
         // SetLayeredWindowAttributes 标志
         private const uint LWA_ALPHA = 0x02;
+
+        // 系统度量常量
+        public const int SM_CXSCREEN = 0;
+        public const int SM_CYSCREEN = 1;
+
+        // 虚拟键码
+        public const int VK_LBUTTON = 0x01;
+
+        #endregion
+
+        #region Constants - Keyboard Hook
+
+        public const int WH_KEYBOARD_LL = 13;
+        public const int WM_KEYDOWN = 0x0100;
+
+        // 快捷键虚拟键码
+        public const uint VK_0 = 0x30;
+        public const uint VK_5 = 0x35;
+        public const uint VK_6 = 0x36;
+        public const uint VK_7 = 0x37;
+        public const uint VK_8 = 0x38;
+        public const uint VK_OEM_3 = 0xC0; // ` 波浪键
+
+        // 修饰键虚拟键码
+        public const int VK_SHIFT = 0x10;
+        public const int VK_CONTROL = 0x11;
+        public const int VK_MENU = 0x12; // Alt 键
 
         #endregion
 
@@ -245,6 +328,173 @@ namespace FloatWebPlayer.Helpers
             // 使用 Win32 API 获取的窗口坐标（物理像素）进行比较
             return pt.X >= rect.Left && pt.X <= rect.Right && 
                    pt.Y >= rect.Top && pt.Y <= rect.Bottom;
+        }
+
+        #endregion
+
+        #region Cursor & Screen Methods
+
+        /// <summary>
+        /// 获取当前鼠标位置（物理像素）
+        /// </summary>
+        /// <param name="point">输出鼠标位置</param>
+        /// <returns>是否成功</returns>
+        public static bool GetCursorPosition(out POINT point)
+        {
+            return GetCursorPos(out point);
+        }
+
+        /// <summary>
+        /// 获取窗口矩形（物理像素）
+        /// </summary>
+        /// <param name="hwnd">窗口句柄</param>
+        /// <param name="rect">输出矩形</param>
+        /// <returns>是否成功</returns>
+        public static bool GetWindowRectangle(IntPtr hwnd, out RECT rect)
+        {
+            return GetWindowRect(hwnd, out rect);
+        }
+
+        /// <summary>
+        /// 获取屏幕尺寸
+        /// </summary>
+        /// <param name="index">SM_CXSCREEN 或 SM_CYSCREEN</param>
+        /// <returns>像素值</returns>
+        public static int GetScreenMetrics(int index)
+        {
+            return GetSystemMetrics(index);
+        }
+
+        /// <summary>
+        /// 检查指定按键是否被按下
+        /// </summary>
+        /// <param name="vKey">虚拟键码</param>
+        /// <returns>是否按下</returns>
+        public static bool IsKeyPressed(int vKey)
+        {
+            return (GetAsyncKeyState(vKey) & 0x8000) != 0;
+        }
+
+        #endregion
+
+        #region Window Style Methods
+
+        /// <summary>
+        /// 获取窗口扩展样式
+        /// </summary>
+        /// <param name="hwnd">窗口句柄</param>
+        /// <returns>扩展样式值</returns>
+        public static int GetWindowExStyle(IntPtr hwnd)
+        {
+            return GetWindowLong(hwnd, GWL_EXSTYLE);
+        }
+
+        /// <summary>
+        /// 设置窗口扩展样式
+        /// </summary>
+        /// <param name="hwnd">窗口句柄</param>
+        /// <param name="exStyle">扩展样式值</param>
+        public static void SetWindowExStyle(IntPtr hwnd, int exStyle)
+        {
+            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+        }
+
+        /// <summary>
+        /// 设置窗口为工具窗口样式（从 Alt+Tab 隐藏）
+        /// </summary>
+        /// <param name="window">目标窗口</param>
+        public static void SetToolWindowStyle(Window window)
+        {
+            var hwnd = new WindowInteropHelper(window).Handle;
+            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
+        }
+
+        #endregion
+
+        #region Keyboard Hook Methods
+
+        /// <summary>
+        /// 设置低级键盘钩子
+        /// </summary>
+        /// <param name="proc">回调函数</param>
+        /// <returns>钩子句柄</returns>
+        public static IntPtr SetKeyboardHook(LowLevelKeyboardProc proc)
+        {
+            using var curProcess = Process.GetCurrentProcess();
+            using var curModule = curProcess.MainModule;
+            return SetWindowsHookEx(WH_KEYBOARD_LL, proc,
+                GetModuleHandle(curModule?.ModuleName), 0);
+        }
+
+        /// <summary>
+        /// 移除键盘钩子
+        /// </summary>
+        /// <param name="hookId">钩子句柄</param>
+        /// <returns>是否成功</returns>
+        public static bool RemoveKeyboardHook(IntPtr hookId)
+        {
+            return UnhookWindowsHookEx(hookId);
+        }
+
+        /// <summary>
+        /// 调用下一个钩子
+        /// </summary>
+        /// <param name="hookId">钩子句柄</param>
+        /// <param name="nCode">代码</param>
+        /// <param name="wParam">参数1</param>
+        /// <param name="lParam">参数2</param>
+        /// <returns>结果</returns>
+        public static IntPtr CallNextHook(IntPtr hookId, int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            return CallNextHookEx(hookId, nCode, wParam, lParam);
+        }
+
+        #endregion
+
+        #region Process Methods
+
+        /// <summary>
+        /// 获取前台窗口的进程名（不含路径和扩展名）
+        /// </summary>
+        /// <returns>进程名，失败返回 null</returns>
+        public static string? GetForegroundWindowProcessName()
+        {
+            try
+            {
+                IntPtr hwnd = GetForegroundWindow();
+                if (hwnd == IntPtr.Zero)
+                    return null;
+
+                GetWindowThreadProcessId(hwnd, out uint processId);
+                if (processId == 0)
+                    return null;
+
+                using var process = Process.GetProcessById((int)processId);
+                return process.ProcessName;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 获取当前按下的修饰键状态
+        /// </summary>
+        /// <returns>修饰键标志组合</returns>
+        public static Models.ModifierKeys GetCurrentModifiers()
+        {
+            var modifiers = Models.ModifierKeys.None;
+
+            if (IsKeyPressed(VK_CONTROL))
+                modifiers |= Models.ModifierKeys.Ctrl;
+            if (IsKeyPressed(VK_MENU))
+                modifiers |= Models.ModifierKeys.Alt;
+            if (IsKeyPressed(VK_SHIFT))
+                modifiers |= Models.ModifierKeys.Shift;
+
+            return modifiers;
         }
 
         #endregion
