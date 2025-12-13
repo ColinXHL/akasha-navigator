@@ -1,5 +1,9 @@
 # 🎬 FloatWebPlayer
 
+<p align="center">
+  <img src="assets/float-web-player-logo.png" alt="Float Web Player Logo" width="128">
+</p>
+
 [English](README.md) | 简体中文
 
 **Windows 悬浮网页播放器，专为游戏时观看攻略视频设计。**

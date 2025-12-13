@@ -1,5 +1,9 @@
 # 🎬 FloatWebPlayer
 
+<p align="center">
+  <img src="assets/float-web-player-logo.png" alt="Float Web Player Logo" width="128">
+</p>
+
 English | [简体中文](README-zh_CN.md)
 
 **A floating web player for Windows, designed for watching tutorial videos while gaming.**
