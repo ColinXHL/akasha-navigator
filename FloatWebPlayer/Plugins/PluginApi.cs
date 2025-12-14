@@ -54,6 +54,13 @@ namespace FloatWebPlayer.Plugins
         public OverlayApi? Overlay => HasPermission("overlay") ? _overlayApi : null;
         private readonly OverlayApi? _overlayApi;
 
+        /// <summary>
+        /// 字幕 API
+        /// 需要 "subtitle" 权限
+        /// </summary>
+        public SubtitleApi? Subtitle => HasPermission("subtitle") ? _subtitleApi : null;
+        private readonly SubtitleApi? _subtitleApi;
+
         #endregion
 
         #region Constructor
@@ -87,8 +94,10 @@ namespace FloatWebPlayer.Plugins
             // 初始化需要权限的 API
             _speechApi = new SpeechApi(context);
             _overlayApi = new OverlayApi(context, Config);
+            _subtitleApi = new SubtitleApi(context);
 
             Services.LogService.Instance.Debug("PluginApi", $"_overlayApi is null = {_overlayApi == null}, Overlay property is null = {Overlay == null}");
+            Services.LogService.Instance.Debug("PluginApi", $"_subtitleApi is null = {_subtitleApi == null}, Subtitle property is null = {Subtitle == null}");
         }
 
         #endregion

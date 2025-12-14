@@ -101,6 +101,11 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private bool _isOpacityReducedByCursorDetection;
 
+        /// <summary>
+        /// 视频时间同步定时器
+        /// </summary>
+        private DispatcherTimer? _videoTimeSyncTimer;
+
         #endregion
 
         #region Constructor
@@ -130,12 +135,18 @@ namespace FloatWebPlayer.Views
                 // 停止鼠标检测
                 StopCursorDetection();
                 
+                // 停止视频时间同步
+                StopVideoTimeSync();
+                
                 // 取消 Profile 事件订阅
                 ProfileManager.Instance.ProfileChanged -= OnProfileChanged;
                 
                 // 取消事件订阅
                 if (WebView.CoreWebView2 != null)
                 {
+                    // 分离字幕服务
+                    SubtitleService.Instance.DetachFromWebView(WebView.CoreWebView2);
+                    
                     WebView.CoreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
                     WebView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
                     WebView.CoreWebView2.SourceChanged -= CoreWebView2_SourceChanged;
@@ -254,6 +265,12 @@ namespace FloatWebPlayer.Views
                 // 拦截新窗口请求，在当前窗口打开而非弹出新窗口
                 WebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
 
+                // 附加字幕服务以拦截字幕数据
+                SubtitleService.Instance.AttachToWebView(WebView.CoreWebView2);
+                
+                // 启动视频时间同步
+                StartVideoTimeSync();
+
                 // 从保存的状态加载 URL 和静音设置
                 var state = WindowStateService.Instance.Load();
                 
@@ -290,6 +307,30 @@ namespace FloatWebPlayer.Views
         private void CoreWebView2_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
             var message = e.TryGetWebMessageAsString();
+            if (string.IsNullOrEmpty(message))
+                return;
+
+            // 检查是否是 JSON 格式的字幕消息
+            if (message.StartsWith("{") && message.Contains("\"type\""))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(message);
+                    if (doc.RootElement.TryGetProperty("type", out var typeEl))
+                    {
+                        var type = typeEl.GetString();
+                        if (type == "subtitle_url" || type == "subtitle_data" || type == "subtitle_error" || type == "subtitle_info")
+                        {
+                            SubtitleService.Instance.HandleSubtitleMessage(message);
+                            return;
+                        }
+                    }
+                }
+                catch
+                {
+                    // 不是有效的 JSON，继续处理为普通消息
+                }
+            }
             
             switch (message)
             {
@@ -336,12 +377,16 @@ namespace FloatWebPlayer.Views
                 {
                     DataService.Instance.AddHistory(url, title);
                 }
+
+                // 注意：字幕获取现在由被动拦截处理（SubtitleService.OnWebResourceResponseReceived）
+                // 不需要在这里清除字幕或主动请求
             }
         }
 
         /// <summary>
         /// URL 变化事件处理
         /// </summary>
+        private string _lastSubtitleUrl = string.Empty;
         private void CoreWebView2_SourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
         {
             // 触发 URL 变化事件
@@ -350,6 +395,35 @@ namespace FloatWebPlayer.Views
 
             // 触发导航状态变化事件
             NavigationStateChanged?.Invoke(this, EventArgs.Empty);
+
+            // 注意：字幕获取现在由被动拦截处理（SubtitleService.OnWebResourceResponseReceived）
+            // 不需要在这里主动请求字幕
+        }
+
+        /// <summary>
+        /// 提取 B站视频标识（BV号+分P参数）
+        /// </summary>
+        private string ExtractBilibiliVideoKey(string url)
+        {
+            try
+            {
+                var uri = new Uri(url);
+                var path = uri.AbsolutePath; // e.g., /video/BV1234567890/
+                var query = uri.Query; // e.g., ?p=2
+                
+                // 提取 BV 号
+                var bvMatch = System.Text.RegularExpressions.Regex.Match(path, @"BV\w+");
+                if (bvMatch.Success)
+                {
+                    var bv = bvMatch.Value;
+                    // 提取分P参数
+                    var pMatch = System.Text.RegularExpressions.Regex.Match(query, @"[?&]p=(\d+)");
+                    var p = pMatch.Success ? pMatch.Groups[1].Value : "1";
+                    return $"{bv}_p{p}";
+                }
+            }
+            catch { }
+            return string.Empty;
         }
 
         /// <summary>
@@ -876,6 +950,79 @@ namespace FloatWebPlayer.Views
                 Win32Helper.ResizeDirection.BottomLeft => Cursors.SizeNESW,
                 _ => Cursors.Arrow
             };
+        }
+
+        #endregion
+
+        #region Video Time Sync
+
+        /// <summary>
+        /// 启动视频时间同步
+        /// </summary>
+        private void StartVideoTimeSync()
+        {
+            if (_videoTimeSyncTimer != null)
+                return;
+
+            _videoTimeSyncTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(200) // 每 200ms 同步一次
+            };
+            _videoTimeSyncTimer.Tick += VideoTimeSyncTimer_Tick;
+            _videoTimeSyncTimer.Start();
+            
+            LogService.Instance.Debug("PlayerWindow", "视频时间同步已启动");
+        }
+
+        /// <summary>
+        /// 停止视频时间同步
+        /// </summary>
+        private void StopVideoTimeSync()
+        {
+            if (_videoTimeSyncTimer != null)
+            {
+                _videoTimeSyncTimer.Stop();
+                _videoTimeSyncTimer.Tick -= VideoTimeSyncTimer_Tick;
+                _videoTimeSyncTimer = null;
+                
+                LogService.Instance.Debug("PlayerWindow", "视频时间同步已停止");
+            }
+        }
+
+        /// <summary>
+        /// 视频时间同步定时器回调
+        /// </summary>
+        private async void VideoTimeSyncTimer_Tick(object? sender, EventArgs e)
+        {
+            if (WebView.CoreWebView2 == null)
+                return;
+
+            try
+            {
+                // 使用 JavaScript 获取视频当前时间
+                const string script = @"
+                    (function() {
+                        var video = document.querySelector('video');
+                        if (video && !video.paused) {
+                            return video.currentTime;
+                        }
+                        return -1;
+                    })();
+                ";
+
+                var result = await WebView.CoreWebView2.ExecuteScriptAsync(script);
+                
+                // 解析结果
+                if (double.TryParse(result, out double currentTime) && currentTime >= 0)
+                {
+                    // 更新字幕服务的当前时间
+                    SubtitleService.Instance.UpdateCurrentTime(currentTime);
+                }
+            }
+            catch
+            {
+                // 忽略脚本执行错误
+            }
         }
 
         #endregion

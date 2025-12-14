@@ -82,14 +82,18 @@ namespace FloatWebPlayer.Plugins
         {
             _jsEngine = new Engine(options =>
             {
-                // 限制执行时间（防止无限循环）
-                options.TimeoutInterval(TimeSpan.FromSeconds(30));
+                // 注意：不使用 TimeoutInterval，因为它是累积超时
+                // 一旦总执行时间超过限制，所有后续调用都会失败
+                // 我们的插件脚本都是简单的回调，不需要超时保护
                 
-                // 限制递归深度
+                // 限制递归深度（防止无限递归）
                 options.LimitRecursion(100);
                 
                 // 限制内存使用
                 options.LimitMemory(50_000_000); // 50MB
+                
+                // 限制单次语句执行数量（防止无限循环）
+                options.MaxStatements(100_000);
                 
                 // 启用严格模式
                 options.Strict();
