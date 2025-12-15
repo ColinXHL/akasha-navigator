@@ -208,6 +208,152 @@ namespace FloatWebPlayer.Tests
         #endregion
 
 
+        #region Property 1: 权限控制一致性 (新增 API)
+
+        /// <summary>
+        /// **Feature: plugin-api-enhancement, Property 1: 权限控制一致性**
+        /// *对于任意*权限名称和对应的 API，当插件 manifest 声明该权限时，PluginApi 应暴露对应的 API 对象；
+        /// 当未声明时，对应的 API 属性应返回 null。
+        /// **Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5, 7.6**
+        /// </summary>
+        [Property(MaxTest = 100)]
+        public Property PermissionControlConsistency_NewApis(PositiveInt permIndex)
+        {
+            // 新增的需要权限的 API 及其对应权限
+            var permissionApiPairs = new[]
+            {
+                ("player", new Func<PluginApi, object?>(api => api.Player)),
+                ("window", new Func<PluginApi, object?>(api => api.Window)),
+                ("storage", new Func<PluginApi, object?>(api => api.Storage)),
+                ("network", new Func<PluginApi, object?>(api => api.Http)),
+                ("events", new Func<PluginApi, object?>(api => api.Event))
+            };
+
+            // 选择一个权限进行测试
+            var (permission, apiGetter) = permissionApiPairs[permIndex.Get % permissionApiPairs.Length];
+
+            // 测试 1: 有权限时应该返回非 null
+            var apiWithPermission = CreatePluginApi(new List<string> { permission });
+            var hasPermissionResult = apiWithPermission.HasPermission(permission);
+            var apiWithPermissionNotNull = apiGetter(apiWithPermission) != null;
+
+            // 测试 2: 无权限时应该返回 null
+            var apiWithoutPermission = CreatePluginApi(new List<string>());
+            var noPermissionResult = !apiWithoutPermission.HasPermission(permission);
+            var apiWithoutPermissionIsNull = apiGetter(apiWithoutPermission) == null;
+
+            // 测试 3: RequirePermission 在有权限时不抛异常
+            var requirePermissionNoThrow = true;
+            try
+            {
+                apiWithPermission.RequirePermission(permission);
+            }
+            catch
+            {
+                requirePermissionNoThrow = false;
+            }
+
+            // 测试 4: RequirePermission 在无权限时抛出 PermissionDeniedException
+            var requirePermissionThrows = false;
+            var correctExceptionType = false;
+            try
+            {
+                apiWithoutPermission.RequirePermission(permission);
+            }
+            catch (PermissionDeniedException ex)
+            {
+                requirePermissionThrows = true;
+                correctExceptionType = ex.Permission == permission;
+            }
+            catch
+            {
+                requirePermissionThrows = true;
+            }
+
+            return (hasPermissionResult && apiWithPermissionNotNull && 
+                    noPermissionResult && apiWithoutPermissionIsNull &&
+                    requirePermissionNoThrow && requirePermissionThrows && correctExceptionType)
+                .Label($"Permission: {permission}, " +
+                       $"HasPerm: {hasPermissionResult}, ApiNotNull: {apiWithPermissionNotNull}, " +
+                       $"NoPerm: {noPermissionResult}, ApiNull: {apiWithoutPermissionIsNull}, " +
+                       $"NoThrow: {requirePermissionNoThrow}, Throws: {requirePermissionThrows}, CorrectEx: {correctExceptionType}");
+        }
+
+        /// <summary>
+        /// **Feature: plugin-api-enhancement, Property 1: 权限控制一致性（多权限组合）**
+        /// *对于任意*权限子集，只有声明的权限对应的 API 应该可用，未声明的应该返回 null。
+        /// **Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5, 7.6**
+        /// </summary>
+        [Property(MaxTest = 100)]
+        public Property PermissionControlConsistency_MultiplePermissions(PositiveInt seed)
+        {
+            // 所有新增的权限
+            var allNewPermissions = new[] { "player", "window", "storage", "network", "events" };
+            
+            // 根据 seed 生成一个权限子集
+            var grantedPermissions = new List<string>();
+            var seedValue = seed.Get;
+            for (int i = 0; i < allNewPermissions.Length; i++)
+            {
+                if ((seedValue & (1 << i)) != 0)
+                {
+                    grantedPermissions.Add(allNewPermissions[i]);
+                }
+            }
+
+            var api = CreatePluginApi(grantedPermissions);
+
+            // 验证每个权限的 API 可用性
+            var playerCorrect = (api.Player != null) == grantedPermissions.Contains("player");
+            var windowCorrect = (api.Window != null) == grantedPermissions.Contains("window");
+            var storageCorrect = (api.Storage != null) == grantedPermissions.Contains("storage");
+            var httpCorrect = (api.Http != null) == grantedPermissions.Contains("network");
+            var eventCorrect = (api.Event != null) == grantedPermissions.Contains("events");
+
+            // 验证 HasPermission 方法
+            var hasPermissionCorrect = allNewPermissions.All(p => 
+                api.HasPermission(p) == grantedPermissions.Contains(p));
+
+            return (playerCorrect && windowCorrect && storageCorrect && httpCorrect && eventCorrect && hasPermissionCorrect)
+                .Label($"Granted: [{string.Join(",", grantedPermissions)}], " +
+                       $"Player: {playerCorrect}, Window: {windowCorrect}, Storage: {storageCorrect}, " +
+                       $"Http: {httpCorrect}, Event: {eventCorrect}, HasPerm: {hasPermissionCorrect}");
+        }
+
+        /// <summary>
+        /// **Feature: plugin-api-enhancement, Property 1: 权限控制一致性（无权限 API 始终可用）**
+        /// *对于任意*权限配置，Core、Config、Profile API 应该始终可用（无需权限）。
+        /// **Validates: Requirements 7.6**
+        /// </summary>
+        [Property(MaxTest = 100)]
+        public Property NoPermissionApis_AlwaysAvailable(PositiveInt seed)
+        {
+            // 随机生成权限列表
+            var allPermissions = new[] { "player", "window", "storage", "network", "events", "audio", "overlay", "subtitle" };
+            var grantedPermissions = new List<string>();
+            var seedValue = seed.Get;
+            for (int i = 0; i < allPermissions.Length; i++)
+            {
+                if ((seedValue & (1 << i)) != 0)
+                {
+                    grantedPermissions.Add(allPermissions[i]);
+                }
+            }
+
+            var api = CreatePluginApi(grantedPermissions);
+
+            // 无需权限的 API 应该始终可用
+            var coreAvailable = api.Core != null;
+            var configAvailable = api.Config != null;
+            var profileAvailable = api.Profile != null;
+
+            return (coreAvailable && configAvailable && profileAvailable)
+                .Label($"Granted: [{string.Join(",", grantedPermissions)}], " +
+                       $"Core: {coreAvailable}, Config: {configAvailable}, Profile: {profileAvailable}");
+        }
+
+        #endregion
+
         #region Unit Tests
 
         /// <summary>

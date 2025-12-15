@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using FloatWebPlayer.Helpers;
 using FloatWebPlayer.Models;
+using FloatWebPlayer.Plugins;
 
 namespace FloatWebPlayer.Services
 {
@@ -110,6 +111,9 @@ namespace FloatWebPlayer.Services
             
             // 加载新 Profile 的插件
             PluginHost.Instance.LoadPluginsForProfile(profileId);
+            
+            // 广播 profileChanged 事件到插件
+            PluginHost.Instance.BroadcastEvent(Plugins.EventApi.ProfileChanged, new { profileId = profile.Id });
             
             ProfileChanged?.Invoke(this, profile);
             return true;

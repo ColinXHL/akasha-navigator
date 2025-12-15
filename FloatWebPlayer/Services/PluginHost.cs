@@ -58,6 +58,7 @@ namespace FloatWebPlayer.Services
 
         private readonly List<PluginContext> _loadedPlugins = new();
         private readonly Dictionary<string, PluginConfig> _pluginConfigs = new();
+        private readonly Dictionary<string, PluginApi> _pluginApis = new();
         private string? _currentProfileId;
         private bool _disposed;
 
@@ -143,6 +144,7 @@ namespace FloatWebPlayer.Services
 
             _loadedPlugins.Clear();
             _pluginConfigs.Clear();
+            _pluginApis.Clear();
             _currentProfileId = null;
 
             Log("已卸载所有插件");
@@ -205,6 +207,67 @@ namespace FloatWebPlayer.Services
             {
                 SavePluginConfig(config, plugin.PluginDirectory);
             }
+        }
+
+        /// <summary>
+        /// 广播事件到所有启用的插件
+        /// </summary>
+        /// <param name="eventName">事件名称</param>
+        /// <param name="data">事件数据</param>
+        public void BroadcastEvent(string eventName, object data)
+        {
+            foreach (var kvp in _pluginApis)
+            {
+                var pluginId = kvp.Key;
+                var pluginApi = kvp.Value;
+                
+                // 检查插件是否启用
+                var plugin = GetPlugin(pluginId);
+                if (plugin == null || !plugin.IsEnabled)
+                    continue;
+
+                // 检查插件是否有 events 权限
+                if (!pluginApi.HasPermission(PluginPermissions.Events))
+                    continue;
+
+                // 触发事件
+                try
+                {
+                    pluginApi.Event?.Emit(eventName, data);
+                }
+                catch (Exception ex)
+                {
+                    Log($"广播事件 {eventName} 到插件 {pluginId} 失败: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 广播播放状态变化事件
+        /// </summary>
+        /// <param name="playing">是否正在播放</param>
+        public void BroadcastPlayStateChanged(bool playing)
+        {
+            BroadcastEvent(Plugins.EventApi.PlayStateChanged, new { playing });
+        }
+
+        /// <summary>
+        /// 广播时间更新事件
+        /// </summary>
+        /// <param name="currentTime">当前时间（秒）</param>
+        /// <param name="duration">总时长（秒）</param>
+        public void BroadcastTimeUpdate(double currentTime, double duration)
+        {
+            BroadcastEvent(Plugins.EventApi.TimeUpdate, new { currentTime, duration });
+        }
+
+        /// <summary>
+        /// 广播 URL 变化事件
+        /// </summary>
+        /// <param name="url">新 URL</param>
+        public void BroadcastUrlChanged(string url)
+        {
+            BroadcastEvent(Plugins.EventApi.UrlChanged, new { url });
         }
 
         /// <summary>
@@ -342,6 +405,7 @@ namespace FloatWebPlayer.Services
             }
 
             _loadedPlugins.Add(context);
+            _pluginApis[manifest.Id!] = pluginApi;
             PluginLoaded?.Invoke(this, context);
 
             Log($"插件 {manifest.Name} (v{manifest.Version}) 加载成功");
@@ -359,6 +423,9 @@ namespace FloatWebPlayer.Services
 
             // 释放资源
             plugin.Dispose();
+
+            // 从 API 字典移除
+            _pluginApis.Remove(pluginId);
 
             PluginUnloaded?.Invoke(this, pluginId);
             Log($"插件 {pluginId} 已卸载");

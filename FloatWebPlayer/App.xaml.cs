@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using FloatWebPlayer.Models;
+using FloatWebPlayer.Plugins;
 using FloatWebPlayer.Services;
 using FloatWebPlayer.Views;
 
@@ -43,6 +44,13 @@ namespace FloatWebPlayer
 
             // 创建主窗口（播放器）
             _playerWindow = new PlayerWindow();
+
+            // 设置 PluginApi 的全局窗口获取器（在创建 PlayerWindow 后立即设置）
+            PluginApi.SetGlobalWindowGetter(() => _playerWindow);
+
+            // 加载当前 Profile 的插件
+            var currentProfileId = ProfileManager.Instance.CurrentProfile.Id;
+            PluginHost.Instance.LoadPluginsForProfile(currentProfileId);
 
             // 创建控制栏窗口
             _controlBarWindow = new ControlBarWindow();
@@ -258,6 +266,9 @@ namespace FloatWebPlayer
             
             // 确保控制栏停止定时器
             _controlBarWindow?.StopAutoShowHide();
+            
+            // 卸载所有插件
+            PluginHost.Instance.UnloadAllPlugins();
             
             base.OnExit(e);
         }

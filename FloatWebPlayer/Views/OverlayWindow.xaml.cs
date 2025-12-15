@@ -1,8 +1,11 @@
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using FloatWebPlayer.Helpers;
@@ -36,7 +39,7 @@ namespace FloatWebPlayer.Views
         /// <summary>
         /// 方向标记元素映射
         /// </summary>
-        private readonly Dictionary<Direction, Path> _markers;
+        private readonly Dictionary<Direction, System.Windows.Shapes.Path> _markers;
 
         /// <summary>
         /// 是否处于编辑模式
@@ -63,6 +66,21 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private Rect _resizeStartRect;
 
+        /// <summary>
+        /// 绘图元素 ID 计数器
+        /// </summary>
+        private int _elementIdCounter;
+
+        /// <summary>
+        /// 绘图元素映射（ID -> UIElement）
+        /// </summary>
+        private readonly Dictionary<string, UIElement> _drawingElements = new();
+
+        /// <summary>
+        /// 元素自动隐藏定时器映射
+        /// </summary>
+        private readonly Dictionary<string, DispatcherTimer> _elementTimers = new();
+
         #endregion
 
         #region Events
@@ -82,7 +100,7 @@ namespace FloatWebPlayer.Views
             PluginId = pluginId;
 
             // 初始化方向标记映射
-            _markers = new Dictionary<Direction, Path>
+            _markers = new Dictionary<Direction, System.Windows.Shapes.Path>
             {
                 { Direction.North, MarkerNorth },
                 { Direction.NorthEast, MarkerNorthEast },
@@ -308,6 +326,277 @@ namespace FloatWebPlayer.Views
 
             // 触发退出事件
             EditModeExited?.Invoke(this, EventArgs.Empty);
+        }
+
+        #endregion
+
+        #region Drawing Methods
+
+        /// <summary>
+        /// 绘制文本
+        /// </summary>
+        /// <param name="text">文本内容</param>
+        /// <param name="x">X 坐标</param>
+        /// <param name="y">Y 坐标</param>
+        /// <param name="options">样式选项</param>
+        /// <returns>元素 ID</returns>
+        public string DrawText(string text, double x, double y, DrawTextOptions? options = null)
+        {
+            options ??= new DrawTextOptions();
+            var elementId = GenerateElementId();
+
+            var textBlock = new TextBlock
+            {
+                Text = text,
+                FontSize = Math.Max(1, options.FontSize),
+                FontFamily = new FontFamily(options.FontFamily ?? "Microsoft YaHei"),
+                Foreground = ParseBrush(options.Color, Brushes.White),
+                Opacity = Math.Clamp(options.Opacity, 0, 1)
+            };
+
+            // 设置背景
+            if (!string.IsNullOrEmpty(options.BackgroundColor))
+            {
+                var border = new Border
+                {
+                    Background = ParseBrush(options.BackgroundColor, Brushes.Transparent),
+                    Padding = new Thickness(4, 2, 4, 2),
+                    Child = textBlock
+                };
+                
+                Canvas.SetLeft(border, Math.Max(0, x));
+                Canvas.SetTop(border, Math.Max(0, y));
+                DrawingCanvas.Children.Add(border);
+                _drawingElements[elementId] = border;
+            }
+            else
+            {
+                Canvas.SetLeft(textBlock, Math.Max(0, x));
+                Canvas.SetTop(textBlock, Math.Max(0, y));
+                DrawingCanvas.Children.Add(textBlock);
+                _drawingElements[elementId] = textBlock;
+            }
+
+            // 设置自动隐藏
+            if (options.Duration > 0)
+            {
+                StartElementTimer(elementId, options.Duration);
+            }
+
+            return elementId;
+        }
+
+        /// <summary>
+        /// 绘制矩形
+        /// </summary>
+        /// <param name="x">X 坐标</param>
+        /// <param name="y">Y 坐标</param>
+        /// <param name="width">宽度</param>
+        /// <param name="height">高度</param>
+        /// <param name="options">样式选项</param>
+        /// <returns>元素 ID</returns>
+        public string DrawRect(double x, double y, double width, double height, DrawRectOptions? options = null)
+        {
+            options ??= new DrawRectOptions();
+            var elementId = GenerateElementId();
+
+            var rect = new Rectangle
+            {
+                Width = Math.Max(0, width),
+                Height = Math.Max(0, height),
+                Fill = ParseBrush(options.Fill, Brushes.Transparent),
+                Stroke = ParseBrush(options.Stroke, null),
+                StrokeThickness = Math.Max(0, options.StrokeWidth),
+                Opacity = Math.Clamp(options.Opacity, 0, 1),
+                RadiusX = Math.Max(0, options.CornerRadius),
+                RadiusY = Math.Max(0, options.CornerRadius)
+            };
+
+            Canvas.SetLeft(rect, Math.Max(0, x));
+            Canvas.SetTop(rect, Math.Max(0, y));
+            DrawingCanvas.Children.Add(rect);
+            _drawingElements[elementId] = rect;
+
+            // 设置自动隐藏
+            if (options.Duration > 0)
+            {
+                StartElementTimer(elementId, options.Duration);
+            }
+
+            return elementId;
+        }
+
+        /// <summary>
+        /// 绘制图片
+        /// </summary>
+        /// <param name="path">图片路径</param>
+        /// <param name="x">X 坐标</param>
+        /// <param name="y">Y 坐标</param>
+        /// <param name="options">样式选项</param>
+        /// <returns>元素 ID，失败返回空字符串</returns>
+        public string DrawImage(string path, double x, double y, DrawImageOptions? options = null)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                Services.LogService.Instance.Error("OverlayWindow", $"DrawImage: Image file not found: {path}");
+                return string.Empty;
+            }
+
+            options ??= new DrawImageOptions();
+            var elementId = GenerateElementId();
+
+            try
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                bitmap.Freeze();
+
+                var image = new Image
+                {
+                    Source = bitmap,
+                    Opacity = Math.Clamp(options.Opacity, 0, 1),
+                    Stretch = Stretch.Fill
+                };
+
+                if (options.Width.HasValue)
+                    image.Width = Math.Max(0, options.Width.Value);
+                if (options.Height.HasValue)
+                    image.Height = Math.Max(0, options.Height.Value);
+
+                Canvas.SetLeft(image, Math.Max(0, x));
+                Canvas.SetTop(image, Math.Max(0, y));
+                DrawingCanvas.Children.Add(image);
+                _drawingElements[elementId] = image;
+
+                // 设置自动隐藏
+                if (options.Duration > 0)
+                {
+                    StartElementTimer(elementId, options.Duration);
+                }
+
+                return elementId;
+            }
+            catch (Exception ex)
+            {
+                Services.LogService.Instance.Error("OverlayWindow", $"DrawImage failed: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// 移除指定绘图元素
+        /// </summary>
+        /// <param name="elementId">元素 ID</param>
+        /// <returns>是否成功移除</returns>
+        public bool RemoveElement(string elementId)
+        {
+            if (string.IsNullOrEmpty(elementId))
+                return false;
+
+            // 停止定时器
+            StopElementTimer(elementId);
+
+            if (_drawingElements.TryGetValue(elementId, out var element))
+            {
+                DrawingCanvas.Children.Remove(element);
+                _drawingElements.Remove(elementId);
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 清除所有绘图元素
+        /// </summary>
+        public void ClearDrawingElements()
+        {
+            // 停止所有定时器
+            foreach (var timer in _elementTimers.Values)
+            {
+                timer.Stop();
+            }
+            _elementTimers.Clear();
+
+            // 移除所有元素
+            foreach (var element in _drawingElements.Values)
+            {
+                DrawingCanvas.Children.Remove(element);
+            }
+            _drawingElements.Clear();
+        }
+
+        /// <summary>
+        /// 获取所有绘图元素 ID
+        /// </summary>
+        /// <returns>元素 ID 列表</returns>
+        public IReadOnlyCollection<string> GetDrawingElementIds()
+        {
+            return _drawingElements.Keys.ToList().AsReadOnly();
+        }
+
+        #endregion
+
+        #region Drawing Helper Methods
+
+        /// <summary>
+        /// 生成唯一元素 ID
+        /// </summary>
+        private string GenerateElementId()
+        {
+            return $"{PluginId}_elem_{++_elementIdCounter}_{DateTime.UtcNow.Ticks}";
+        }
+
+        /// <summary>
+        /// 解析颜色字符串为 Brush
+        /// </summary>
+        private static Brush? ParseBrush(string? colorString, Brush? defaultBrush)
+        {
+            if (string.IsNullOrEmpty(colorString))
+                return defaultBrush;
+
+            try
+            {
+                var color = (Color)ColorConverter.ConvertFromString(colorString);
+                return new SolidColorBrush(color);
+            }
+            catch
+            {
+                return defaultBrush;
+            }
+        }
+
+        /// <summary>
+        /// 启动元素自动隐藏定时器
+        /// </summary>
+        private void StartElementTimer(string elementId, int durationMs)
+        {
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(durationMs)
+            };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                RemoveElement(elementId);
+            };
+            timer.Start();
+            _elementTimers[elementId] = timer;
+        }
+
+        /// <summary>
+        /// 停止元素定时器
+        /// </summary>
+        private void StopElementTimer(string elementId)
+        {
+            if (_elementTimers.TryGetValue(elementId, out var timer))
+            {
+                timer.Stop();
+                _elementTimers.Remove(elementId);
+            }
         }
 
         #endregion
@@ -630,5 +919,103 @@ namespace FloatWebPlayer.Views
         SouthWest,
         West,
         NorthWest
+    }
+
+    /// <summary>
+    /// 绘制文本选项
+    /// </summary>
+    public class DrawTextOptions
+    {
+        /// <summary>
+        /// 字体大小（默认 16）
+        /// </summary>
+        public double FontSize { get; set; } = 16;
+
+        /// <summary>
+        /// 字体名称（默认 Microsoft YaHei）
+        /// </summary>
+        public string? FontFamily { get; set; } = "Microsoft YaHei";
+
+        /// <summary>
+        /// 文本颜色（默认白色）
+        /// </summary>
+        public string? Color { get; set; } = "#FFFFFF";
+
+        /// <summary>
+        /// 背景颜色（可选）
+        /// </summary>
+        public string? BackgroundColor { get; set; }
+
+        /// <summary>
+        /// 透明度（0-1，默认 1）
+        /// </summary>
+        public double Opacity { get; set; } = 1.0;
+
+        /// <summary>
+        /// 显示时长（毫秒，0 = 永久）
+        /// </summary>
+        public int Duration { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// 绘制矩形选项
+    /// </summary>
+    public class DrawRectOptions
+    {
+        /// <summary>
+        /// 填充颜色
+        /// </summary>
+        public string? Fill { get; set; }
+
+        /// <summary>
+        /// 边框颜色
+        /// </summary>
+        public string? Stroke { get; set; }
+
+        /// <summary>
+        /// 边框宽度（默认 1）
+        /// </summary>
+        public double StrokeWidth { get; set; } = 1;
+
+        /// <summary>
+        /// 透明度（0-1，默认 1）
+        /// </summary>
+        public double Opacity { get; set; } = 1.0;
+
+        /// <summary>
+        /// 圆角半径（默认 0）
+        /// </summary>
+        public double CornerRadius { get; set; } = 0;
+
+        /// <summary>
+        /// 显示时长（毫秒，0 = 永久）
+        /// </summary>
+        public int Duration { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// 绘制图片选项
+    /// </summary>
+    public class DrawImageOptions
+    {
+        /// <summary>
+        /// 宽度（可选，不指定则使用原始宽度）
+        /// </summary>
+        public double? Width { get; set; }
+
+        /// <summary>
+        /// 高度（可选，不指定则使用原始高度）
+        /// </summary>
+        public double? Height { get; set; }
+
+        /// <summary>
+        /// 透明度（0-1，默认 1）
+        /// </summary>
+        public double Opacity { get; set; } = 1.0;
+
+        /// <summary>
+        /// 显示时长（毫秒，0 = 永久）
+        /// </summary>
+        public int Duration { get; set; } = 0;
     }
 }

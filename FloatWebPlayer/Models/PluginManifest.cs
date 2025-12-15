@@ -7,6 +7,50 @@ using System.Text.Json.Serialization;
 namespace FloatWebPlayer.Models
 {
     /// <summary>
+    /// 插件权限常量定义
+    /// </summary>
+    public static class PluginPermissions
+    {
+        // 现有权限
+        /// <summary>音频权限 - 访问语音识别 API</summary>
+        public const string Audio = "audio";
+        /// <summary>覆盖层权限 - 访问 Overlay API</summary>
+        public const string Overlay = "overlay";
+        /// <summary>字幕权限 - 访问字幕 API</summary>
+        public const string Subtitle = "subtitle";
+
+        // 新增权限
+        /// <summary>播放器权限 - 访问 Player API 控制视频播放</summary>
+        public const string Player = "player";
+        /// <summary>窗口权限 - 访问 Window API 控制窗口状态</summary>
+        public const string Window = "window";
+        /// <summary>存储权限 - 访问 Storage API 进行数据持久化</summary>
+        public const string Storage = "storage";
+        /// <summary>网络权限 - 访问 Http API 发起网络请求</summary>
+        public const string Network = "network";
+        /// <summary>事件权限 - 访问 Event API 监听应用事件</summary>
+        public const string Events = "events";
+
+        /// <summary>
+        /// 所有支持的权限列表
+        /// </summary>
+        public static readonly string[] AllPermissions = new[]
+        {
+            Audio, Overlay, Subtitle, Player, Window, Storage, Network, Events
+        };
+
+        /// <summary>
+        /// 检查权限名称是否有效
+        /// </summary>
+        /// <param name="permission">权限名称</param>
+        /// <returns>是否为有效权限</returns>
+        public static bool IsValidPermission(string permission)
+        {
+            return AllPermissions.Contains(permission, StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
     /// 插件清单模型
     /// 对应 plugin.json 文件，描述插件元数据
     /// </summary>
@@ -54,7 +98,8 @@ namespace FloatWebPlayer.Models
         public string? MinAppVersion { get; set; }
 
         /// <summary>
-        /// 权限列表（audio、overlay、network、storage）
+        /// 权限列表
+        /// 支持的权限：audio、overlay、subtitle、player、window、storage、network、events
         /// </summary>
         public List<string>? Permissions { get; set; }
 

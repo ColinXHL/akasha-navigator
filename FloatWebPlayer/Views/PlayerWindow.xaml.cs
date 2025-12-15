@@ -370,6 +370,12 @@ namespace FloatWebPlayer.Views
             // 触发导航状态变化事件
             NavigationStateChanged?.Invoke(this, EventArgs.Empty);
 
+            // 广播 urlChanged 事件到插件
+            if (!string.IsNullOrEmpty(currentUrl))
+            {
+                PluginHost.Instance.BroadcastUrlChanged(currentUrl);
+            }
+
             // 注意：字幕获取现在由被动拦截处理（SubtitleService.OnWebResourceResponseReceived）
             // 不需要在这里主动请求字幕
         }
@@ -754,24 +760,45 @@ namespace FloatWebPlayer.Views
 
             try
             {
-                // 使用 JavaScript 获取视频当前时间
+                // 使用 JavaScript 获取视频当前时间和总时长
                 const string script = @"
                     (function() {
                         var video = document.querySelector('video');
                         if (video && !video.paused) {
-                            return video.currentTime;
+                            return JSON.stringify({
+                                currentTime: video.currentTime,
+                                duration: video.duration || 0
+                            });
                         }
-                        return -1;
+                        return 'null';
                     })();
                 ";
 
                 var result = await WebView.CoreWebView2.ExecuteScriptAsync(script);
                 
-                // 解析结果
-                if (double.TryParse(result, out double currentTime) && currentTime >= 0)
+                // 解析结果（去除 JSON 字符串的引号）
+                if (!string.IsNullOrEmpty(result) && result != "\"null\"" && result != "null")
                 {
-                    // 更新字幕服务的当前时间
-                    SubtitleService.Instance.UpdateCurrentTime(currentTime);
+                    // WebView2 返回的 JSON 字符串会被额外包装一层引号
+                    var jsonStr = result.Trim('"').Replace("\\\"", "\"");
+                    if (jsonStr.StartsWith("{"))
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(jsonStr);
+                        var root = doc.RootElement;
+                        
+                        if (root.TryGetProperty("currentTime", out var ctEl) &&
+                            root.TryGetProperty("duration", out var durEl))
+                        {
+                            var currentTime = ctEl.GetDouble();
+                            var duration = durEl.GetDouble();
+                            
+                            // 更新字幕服务的当前时间
+                            SubtitleService.Instance.UpdateCurrentTime(currentTime);
+                            
+                            // 广播 timeUpdate 事件到插件
+                            PluginHost.Instance.BroadcastTimeUpdate(currentTime, duration);
+                        }
+                    }
                 }
             }
             catch

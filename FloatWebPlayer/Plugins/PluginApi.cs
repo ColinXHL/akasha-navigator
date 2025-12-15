@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using FloatWebPlayer.Models;
+using FloatWebPlayer.Views;
 
 namespace FloatWebPlayer.Plugins
 {
@@ -18,9 +19,26 @@ namespace FloatWebPlayer.Plugins
         private readonly PluginConfig _config;
         private readonly HashSet<string> _permissions;
 
+        // 用于延迟设置的窗口引用
+        private static Func<PlayerWindow?>? _globalWindowGetter;
+
         #endregion
 
-        #region Properties
+        #region Static Methods
+
+        /// <summary>
+        /// 设置全局 PlayerWindow 获取器
+        /// 应在应用启动时调用
+        /// </summary>
+        /// <param name="windowGetter">获取 PlayerWindow 的委托</param>
+        public static void SetGlobalWindowGetter(Func<PlayerWindow?> windowGetter)
+        {
+            _globalWindowGetter = windowGetter;
+        }
+
+        #endregion
+
+        #region Properties - No Permission Required
 
         /// <summary>
         /// 核心 API（日志、版本等）
@@ -40,26 +58,69 @@ namespace FloatWebPlayer.Plugins
         /// </summary>
         public ProfileInfo Profile { get; }
 
+        #endregion
+
+        #region Properties - Existing APIs (Permission Required)
+
         /// <summary>
         /// 语音识别 API
         /// 需要 "audio" 权限
         /// </summary>
-        public SpeechApi? Speech => HasPermission("audio") ? _speechApi : null;
+        public SpeechApi? Speech => HasPermission(PluginPermissions.Audio) ? _speechApi : null;
         private readonly SpeechApi? _speechApi;
 
         /// <summary>
         /// 覆盖层 API
         /// 需要 "overlay" 权限
         /// </summary>
-        public OverlayApi? Overlay => HasPermission("overlay") ? _overlayApi : null;
+        public OverlayApi? Overlay => HasPermission(PluginPermissions.Overlay) ? _overlayApi : null;
         private readonly OverlayApi? _overlayApi;
 
         /// <summary>
         /// 字幕 API
         /// 需要 "subtitle" 权限
         /// </summary>
-        public SubtitleApi? Subtitle => HasPermission("subtitle") ? _subtitleApi : null;
+        public SubtitleApi? Subtitle => HasPermission(PluginPermissions.Subtitle) ? _subtitleApi : null;
         private readonly SubtitleApi? _subtitleApi;
+
+        #endregion
+
+        #region Properties - New APIs (Permission Required)
+
+        /// <summary>
+        /// 播放器控制 API
+        /// 需要 "player" 权限
+        /// </summary>
+        public PlayerApi? Player => HasPermission(PluginPermissions.Player) ? _playerApi : null;
+        private readonly PlayerApi? _playerApi;
+
+        /// <summary>
+        /// 窗口控制 API
+        /// 需要 "window" 权限
+        /// </summary>
+        public WindowApi? Window => HasPermission(PluginPermissions.Window) ? _windowApi : null;
+        private readonly WindowApi? _windowApi;
+
+        /// <summary>
+        /// 数据存储 API
+        /// 需要 "storage" 权限
+        /// </summary>
+        public StorageApi? Storage => HasPermission(PluginPermissions.Storage) ? _storageApi : null;
+        private readonly StorageApi? _storageApi;
+
+        /// <summary>
+        /// HTTP 网络请求 API
+        /// 需要 "network" 权限
+        /// </summary>
+        public HttpApi? Http => HasPermission(PluginPermissions.Network) ? _httpApi : null;
+        private readonly HttpApi? _httpApi;
+
+        /// <summary>
+        /// 事件系统 API
+        /// 需要 "events" 权限
+        /// </summary>
+        public EventApi? Event => HasPermission(PluginPermissions.Events) ? _eventApi : null;
+        private readonly EventApi? _eventApi;
 
         #endregion
 
@@ -84,20 +145,36 @@ namespace FloatWebPlayer.Plugins
             );
 
             Services.LogService.Instance.Debug("PluginApi", $"Plugin {context.PluginId} permissions: [{string.Join(", ", _permissions)}]");
-            Services.LogService.Instance.Debug("PluginApi", $"HasPermission('overlay') = {HasPermission("overlay")}, HasPermission('audio') = {HasPermission("audio")}");
+            Services.LogService.Instance.Debug("PluginApi", $"HasPermission('overlay') = {HasPermission(PluginPermissions.Overlay)}, HasPermission('audio') = {HasPermission(PluginPermissions.Audio)}");
 
-            // 初始化子 API
+            // 初始化无需权限的 API
             Core = new CoreApi(context);
             Config = new ConfigApi(config);
             Profile = profileInfo ?? throw new ArgumentNullException(nameof(profileInfo));
 
-            // 初始化需要权限的 API
+            // 初始化现有需要权限的 API
             _speechApi = new SpeechApi(context);
             _overlayApi = new OverlayApi(context, Config);
             _subtitleApi = new SubtitleApi(context);
 
+            // 初始化新增的需要权限的 API
+            _playerApi = _globalWindowGetter != null 
+                ? new PlayerApi(context, _globalWindowGetter) 
+                : new PlayerApi(context);
+            _windowApi = _globalWindowGetter != null 
+                ? new WindowApi(context, _globalWindowGetter) 
+                : new WindowApi(context);
+            _storageApi = new StorageApi(context);
+            _httpApi = new HttpApi(context);
+            _eventApi = new EventApi(context);
+
+            // 将 EventApi 引用传递给需要触发事件的 API
+            _windowApi.SetEventApi(_eventApi);
+            _playerApi.SetEventApi(_eventApi);
+
             Services.LogService.Instance.Debug("PluginApi", $"_overlayApi is null = {_overlayApi == null}, Overlay property is null = {Overlay == null}");
             Services.LogService.Instance.Debug("PluginApi", $"_subtitleApi is null = {_subtitleApi == null}, Subtitle property is null = {Subtitle == null}");
+            Services.LogService.Instance.Debug("PluginApi", $"New APIs initialized: Player={Player != null}, Window={Window != null}, Storage={Storage != null}, Http={Http != null}, Event={Event != null}");
         }
 
         #endregion

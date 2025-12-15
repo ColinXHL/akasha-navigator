@@ -52,6 +52,9 @@
             </Border.Effect>
         </Border>
         
+        <!-- 通用绘图元素容器 -->
+        <Canvas x:Name="DrawingCanvas"/>
+        
         <!-- 主容器：使用 Canvas 精确定位方向标记 -->
         <Canvas x:Name="OverlayCanvas">
         
