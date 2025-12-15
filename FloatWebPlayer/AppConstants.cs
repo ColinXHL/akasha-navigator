@@ -6,6 +6,15 @@ namespace FloatWebPlayer
     /// </summary>
     public static class AppConstants
     {
+        #region Application Info
+
+        /// <summary>
+        /// 应用程序版本
+        /// </summary>
+        public const string Version = "0.1.0";
+
+        #endregion
+
         #region Window - PlayerWindow
 
         /// <summary>

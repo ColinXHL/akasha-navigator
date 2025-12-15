@@ -1,0 +1,150 @@
+<Window x:Class="FloatWebPlayer.Views.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Overlay"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        ResizeMode="NoResize"
+        Width="200"
+        Height="200"
+        WindowStartupLocation="Manual"
+        SourceInitialized="Window_SourceInitialized"
+        KeyDown="Window_KeyDown">
+    
+    <Window.Resources>
+        <!-- 方向标记箭头样式 -->
+        <Style x:Key="DirectionMarkerStyle" TargetType="Path">
+            <Setter Property="Fill" Value="#FFFF6B6B"/>
+            <Setter Property="Stroke" Value="#FFFFFFFF"/>
+            <Setter Property="StrokeThickness" Value="2"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="2" Opacity="0.6"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- 编辑模式控制点样式 -->
+        <Style x:Key="ResizeHandleStyle" TargetType="Rectangle">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Fill" Value="#FF4CAF50"/>
+            <Setter Property="Stroke" Value="White"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid>
+        <!-- 编辑模式边框 -->
+        <Border x:Name="EditBorder" 
+                BorderBrush="#FF4CAF50" 
+                BorderThickness="2" 
+                Background="#22000000"
+                Visibility="Collapsed">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="0" Opacity="0.5"/>
+            </Border.Effect>
+        </Border>
+        
+        <!-- 主容器：使用 Canvas 精确定位方向标记 -->
+        <Canvas x:Name="OverlayCanvas">
+        
+        <!-- 北 (上) -->
+        <Path x:Name="MarkerNorth" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 0,15 L 12,0 L 24,15 Z"
+              Canvas.Left="88" Canvas.Top="5"/>
+        
+        <!-- 东北 (右上) -->
+        <Path x:Name="MarkerNorthEast" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 0,17 L 17,0 L 17,17 Z"
+              Canvas.Right="5" Canvas.Top="5"/>
+        
+        <!-- 东 (右) -->
+        <Path x:Name="MarkerEast" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 0,0 L 15,12 L 0,24 Z"
+              Canvas.Right="5" Canvas.Top="88"/>
+        
+        <!-- 东南 (右下) -->
+        <Path x:Name="MarkerSouthEast" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 0,0 L 17,0 L 17,17 Z"
+              Canvas.Right="5" Canvas.Bottom="5"/>
+        
+        <!-- 南 (下) -->
+        <Path x:Name="MarkerSouth" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 0,0 L 12,15 L 24,0 Z"
+              Canvas.Left="88" Canvas.Bottom="5"/>
+        
+        <!-- 西南 (左下) -->
+        <Path x:Name="MarkerSouthWest" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 0,0 L 17,17 L 0,17 Z"
+              Canvas.Left="5" Canvas.Bottom="5"/>
+        
+        <!-- 西 (左) -->
+        <Path x:Name="MarkerWest" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 15,0 L 0,12 L 15,24 Z"
+              Canvas.Left="5" Canvas.Top="88"/>
+        
+        <!-- 西北 (左上) -->
+        <Path x:Name="MarkerNorthWest" Style="{StaticResource DirectionMarkerStyle}"
+              Data="M 0,0 L 17,0 L 0,17 Z"
+              Canvas.Left="5" Canvas.Top="5"/>
+        
+        </Canvas>
+        
+        <!-- 编辑模式控制点 -->
+        <Canvas x:Name="ResizeHandlesCanvas" Visibility="Collapsed">
+            <!-- 四角控制点 -->
+            <Rectangle x:Name="HandleTopLeft" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeNWSE" Canvas.Left="-5" Canvas.Top="-5"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+            <Rectangle x:Name="HandleTopRight" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeNESW" Canvas.Top="-5"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+            <Rectangle x:Name="HandleBottomLeft" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeNESW" Canvas.Left="-5"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+            <Rectangle x:Name="HandleBottomRight" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeNWSE"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+            
+            <!-- 四边中点控制点 -->
+            <Rectangle x:Name="HandleTop" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeNS" Canvas.Top="-5"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+            <Rectangle x:Name="HandleBottom" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeNS"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+            <Rectangle x:Name="HandleLeft" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeWE" Canvas.Left="-5"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+            <Rectangle x:Name="HandleRight" Style="{StaticResource ResizeHandleStyle}" 
+                       Cursor="SizeWE"
+                       MouseLeftButtonDown="Handle_MouseLeftButtonDown"/>
+        </Canvas>
+        
+        <!-- 编辑模式完成按钮 -->
+        <Button x:Name="DoneButton" 
+                Content="完成" 
+                HorizontalAlignment="Center" 
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,20"
+                Padding="15,5"
+                FontSize="14"
+                Background="#FF4CAF50"
+                Foreground="White"
+                BorderThickness="0"
+                Cursor="Hand"
+                Visibility="Collapsed"
+                Click="DoneButton_Click">
+            <Button.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2" Opacity="0.5"/>
+            </Button.Effect>
+        </Button>
+    </Grid>
+</Window>
