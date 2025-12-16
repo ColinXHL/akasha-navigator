@@ -51,7 +51,7 @@ namespace FloatWebPlayer.Views
             // 隐藏所有页面
             InstalledPluginsPage.Visibility = Visibility.Collapsed;
             AvailablePluginsPage.Visibility = Visibility.Collapsed;
-            MyProfilesPlaceholder.Visibility = Visibility.Collapsed;
+            MyProfilesPage.Visibility = Visibility.Collapsed;
             ProfileMarketPlaceholder.Visibility = Visibility.Collapsed;
 
             // 根据选中的导航按钮显示对应页面
@@ -67,7 +67,8 @@ namespace FloatWebPlayer.Views
             }
             else if (radioButton == NavMyProfiles)
             {
-                MyProfilesPlaceholder.Visibility = Visibility.Visible;
+                MyProfilesPage.Visibility = Visibility.Visible;
+                MyProfilesPage.RefreshProfileList();
             }
             else if (radioButton == NavProfileMarket)
             {
