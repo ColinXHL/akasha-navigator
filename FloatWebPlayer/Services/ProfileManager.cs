@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FloatWebPlayer.Helpers;
 using FloatWebPlayer.Models;
 using FloatWebPlayer.Plugins;
@@ -326,6 +327,411 @@ namespace FloatWebPlayer.Services
                 // 从列表中移除
                 Profiles.RemoveAll(p => p.Id.Equals(profileId, StringComparison.OrdinalIgnoreCase));
                 LogService.Instance.Info("ProfileManager", $"成功取消订阅 Profile '{profileId}'");
+            }
+
+            return result;
+        }
+
+        #endregion
+
+        #region Profile Import/Export (导入导出)
+
+        /// <summary>
+        /// 导出 Profile（仅清单+配置，不含插件本体）
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <returns>导出数据，如果 Profile 不存在则返回 null</returns>
+        public ProfileExportData? ExportProfile(string profileId)
+        {
+            if (string.IsNullOrWhiteSpace(profileId))
+                return null;
+
+            // 获取 Profile 配置
+            var profile = GetProfileById(profileId);
+            if (profile == null)
+            {
+                LogService.Instance.Warn("ProfileManager", $"导出失败：Profile '{profileId}' 不存在");
+                return null;
+            }
+
+            // 获取插件引用清单
+            var pluginReferences = PluginAssociationManager.Instance.GetPluginsInProfile(profileId);
+            var referenceEntries = pluginReferences
+                .Select(r => PluginReferenceEntry.FromReference(r))
+                .ToList();
+
+            // 获取所有插件配置
+            var pluginConfigs = GetAllPluginConfigs(profileId);
+
+            // 创建导出数据
+            var exportData = new ProfileExportData
+            {
+                Version = 1,
+                ProfileId = profile.Id,
+                ProfileName = profile.Name,
+                ProfileConfig = profile,
+                PluginReferences = referenceEntries,
+                PluginConfigs = pluginConfigs,
+                ExportedAt = DateTime.Now
+            };
+
+            LogService.Instance.Info("ProfileManager", 
+                $"导出 Profile '{profileId}'：{referenceEntries.Count} 个插件引用，{pluginConfigs.Count} 个插件配置");
+
+            return exportData;
+        }
+
+        /// <summary>
+        /// 导出 Profile 到文件
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="filePath">目标文件路径</param>
+        /// <returns>是否成功导出</returns>
+        public bool ExportProfileToFile(string profileId, string filePath)
+        {
+            var exportData = ExportProfile(profileId);
+            if (exportData == null)
+                return false;
+
+            try
+            {
+                exportData.SaveToFile(filePath);
+                LogService.Instance.Info("ProfileManager", $"Profile '{profileId}' 已导出到 {filePath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Error("ProfileManager", $"导出 Profile 到文件失败: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 导入 Profile（检查缺失插件）
+        /// </summary>
+        /// <param name="data">导出数据</param>
+        /// <param name="overwrite">如果 Profile 已存在是否覆盖</param>
+        /// <returns>导入结果</returns>
+        public ProfileImportResult ImportProfile(ProfileExportData data, bool overwrite = false)
+        {
+            if (data == null)
+                return ProfileImportResult.Failure("导入数据为空");
+
+            if (string.IsNullOrWhiteSpace(data.ProfileId))
+                return ProfileImportResult.Failure("Profile ID 为空");
+
+            // 检查版本兼容性
+            if (data.Version > 1)
+            {
+                return ProfileImportResult.Failure($"不支持的导出格式版本: {data.Version}");
+            }
+
+            // 检查 Profile 是否已存在
+            var existingProfile = GetProfileById(data.ProfileId);
+            if (existingProfile != null && !overwrite)
+            {
+                return ProfileImportResult.Exists(data.ProfileId);
+            }
+
+            // 检测缺失的插件
+            var missingPlugins = new List<string>();
+            foreach (var reference in data.PluginReferences)
+            {
+                if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+                {
+                    missingPlugins.Add(reference.PluginId);
+                }
+            }
+
+            try
+            {
+                // 创建或更新 Profile 配置
+                var profileDir = GetProfileDirectory(data.ProfileId);
+                Directory.CreateDirectory(profileDir);
+
+                // 保存 Profile 配置
+                var profileConfig = data.ProfileConfig ?? new GameProfile
+                {
+                    Id = data.ProfileId,
+                    Name = data.ProfileName
+                };
+                profileConfig.Id = data.ProfileId; // 确保 ID 一致
+                SaveProfile(profileConfig);
+
+                // 创建插件关联
+                foreach (var reference in data.PluginReferences)
+                {
+                    PluginAssociationManager.Instance.AddPluginToProfile(
+                        reference.PluginId, 
+                        data.ProfileId, 
+                        reference.Enabled);
+                }
+
+                // 保存插件配置
+                foreach (var kvp in data.PluginConfigs)
+                {
+                    SavePluginConfig(data.ProfileId, kvp.Key, kvp.Value);
+                }
+
+                // 添加到订阅
+                if (!SubscriptionManager.Instance.IsProfileSubscribed(data.ProfileId))
+                {
+                    // 手动添加到订阅配置
+                    var subscriptionsPath = AppPaths.SubscriptionsFilePath;
+                    var config = new SubscriptionConfig();
+                    
+                    if (File.Exists(subscriptionsPath))
+                    {
+                        try
+                        {
+                            config = SubscriptionConfig.LoadFromFile(subscriptionsPath);
+                        }
+                        catch
+                        {
+                            config = new SubscriptionConfig();
+                        }
+                    }
+
+                    config.AddProfile(data.ProfileId);
+                    config.SaveToFile(subscriptionsPath);
+                    SubscriptionManager.Instance.Load();
+                }
+
+                // 重新加载 Profiles 列表
+                ReloadProfiles();
+
+                LogService.Instance.Info("ProfileManager", 
+                    $"导入 Profile '{data.ProfileId}'：{data.PluginReferences.Count} 个插件引用，{missingPlugins.Count} 个缺失");
+
+                return ProfileImportResult.Success(data.ProfileId, missingPlugins);
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Error("ProfileManager", $"导入 Profile 失败: {ex.Message}");
+                return ProfileImportResult.Failure($"导入失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 从文件导入 Profile
+        /// </summary>
+        /// <param name="filePath">导入文件路径</param>
+        /// <param name="overwrite">如果 Profile 已存在是否覆盖</param>
+        /// <returns>导入结果</returns>
+        public ProfileImportResult ImportProfileFromFile(string filePath, bool overwrite = false)
+        {
+            if (!File.Exists(filePath))
+                return ProfileImportResult.Failure($"文件不存在: {filePath}");
+
+            var data = ProfileExportData.LoadFromFile(filePath);
+            if (data == null)
+                return ProfileImportResult.Failure("无法解析导入文件");
+
+            return ImportProfile(data, overwrite);
+        }
+
+        /// <summary>
+        /// 预览导入（不实际导入，只检查缺失插件）
+        /// </summary>
+        /// <param name="data">导出数据</param>
+        /// <returns>导入预览结果</returns>
+        public ProfileImportResult PreviewImport(ProfileExportData data)
+        {
+            if (data == null)
+                return ProfileImportResult.Failure("导入数据为空");
+
+            if (string.IsNullOrWhiteSpace(data.ProfileId))
+                return ProfileImportResult.Failure("Profile ID 为空");
+
+            // 检查 Profile 是否已存在
+            var existingProfile = GetProfileById(data.ProfileId);
+            if (existingProfile != null)
+            {
+                var result = ProfileImportResult.Exists(data.ProfileId);
+                // 仍然检测缺失插件
+                foreach (var reference in data.PluginReferences)
+                {
+                    if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+                    {
+                        result.MissingPlugins.Add(reference.PluginId);
+                    }
+                }
+                return result;
+            }
+
+            // 检测缺失的插件
+            var missingPlugins = new List<string>();
+            foreach (var reference in data.PluginReferences)
+            {
+                if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+                {
+                    missingPlugins.Add(reference.PluginId);
+                }
+            }
+
+            return ProfileImportResult.Success(data.ProfileId, missingPlugins);
+        }
+
+        #endregion
+
+        #region Plugin Reference Management (插件引用管理)
+
+        /// <summary>
+        /// 获取 Profile 的插件引用清单
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <returns>插件引用列表</returns>
+        public List<PluginReference> GetPluginReferences(string profileId)
+        {
+            return PluginAssociationManager.Instance.GetPluginsInProfile(profileId);
+        }
+
+        /// <summary>
+        /// 设置插件在 Profile 中的启用状态
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="pluginId">插件 ID</param>
+        /// <param name="enabled">是否启用</param>
+        /// <returns>是否成功设置</returns>
+        public bool SetPluginEnabled(string profileId, string pluginId, bool enabled)
+        {
+            return PluginAssociationManager.Instance.SetPluginEnabled(profileId, pluginId, enabled);
+        }
+
+        /// <summary>
+        /// 获取插件的 Profile 特定配置
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="pluginId">插件 ID</param>
+        /// <returns>配置字典，如果不存在则返回 null</returns>
+        public Dictionary<string, object>? GetPluginConfig(string profileId, string pluginId)
+        {
+            if (string.IsNullOrWhiteSpace(profileId) || string.IsNullOrWhiteSpace(pluginId))
+                return null;
+
+            var configPath = GetPluginConfigPath(profileId, pluginId);
+            if (!File.Exists(configPath))
+                return null;
+
+            try
+            {
+                return JsonHelper.LoadFromFile<Dictionary<string, object>>(configPath);
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Debug("ProfileManager", $"加载插件配置失败 [{configPath}]: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 保存插件的 Profile 特定配置
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="pluginId">插件 ID</param>
+        /// <param name="config">配置字典</param>
+        /// <returns>是否成功保存</returns>
+        public bool SavePluginConfig(string profileId, string pluginId, Dictionary<string, object> config)
+        {
+            if (string.IsNullOrWhiteSpace(profileId) || string.IsNullOrWhiteSpace(pluginId))
+                return false;
+
+            var configPath = GetPluginConfigPath(profileId, pluginId);
+
+            try
+            {
+                var configDir = Path.GetDirectoryName(configPath);
+                if (!string.IsNullOrEmpty(configDir))
+                    Directory.CreateDirectory(configDir);
+
+                JsonHelper.SaveToFile(configPath, config);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Debug("ProfileManager", $"保存插件配置失败 [{configPath}]: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 删除插件的 Profile 特定配置
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="pluginId">插件 ID</param>
+        /// <returns>是否成功删除</returns>
+        public bool DeletePluginConfig(string profileId, string pluginId)
+        {
+            if (string.IsNullOrWhiteSpace(profileId) || string.IsNullOrWhiteSpace(pluginId))
+                return false;
+
+            var configPath = GetPluginConfigPath(profileId, pluginId);
+
+            try
+            {
+                if (File.Exists(configPath))
+                {
+                    File.Delete(configPath);
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Debug("ProfileManager", $"删除插件配置失败 [{configPath}]: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 获取插件配置文件路径
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="pluginId">插件 ID</param>
+        /// <returns>配置文件路径</returns>
+        private string GetPluginConfigPath(string profileId, string pluginId)
+        {
+            var profileDir = GetProfileDirectory(profileId);
+            return Path.Combine(profileDir, "plugin-configs", $"{pluginId}.json");
+        }
+
+        /// <summary>
+        /// 获取 Profile 的插件配置目录
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <returns>插件配置目录路径</returns>
+        public string GetPluginConfigsDirectory(string profileId)
+        {
+            return Path.Combine(GetProfileDirectory(profileId), "plugin-configs");
+        }
+
+        /// <summary>
+        /// 获取 Profile 中所有插件的配置
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <returns>插件ID到配置的字典</returns>
+        public Dictionary<string, Dictionary<string, object>> GetAllPluginConfigs(string profileId)
+        {
+            var result = new Dictionary<string, Dictionary<string, object>>();
+            var configsDir = GetPluginConfigsDirectory(profileId);
+
+            if (!Directory.Exists(configsDir))
+                return result;
+
+            try
+            {
+                foreach (var file in Directory.GetFiles(configsDir, "*.json"))
+                {
+                    var pluginId = Path.GetFileNameWithoutExtension(file);
+                    var config = JsonHelper.LoadFromFile<Dictionary<string, object>>(file);
+                    if (config != null)
+                    {
+                        result[pluginId] = config;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Debug("ProfileManager", $"加载所有插件配置失败: {ex.Message}");
             }
 
             return result;
