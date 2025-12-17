@@ -63,13 +63,6 @@ namespace FloatWebPlayer.Plugins
         #region Properties - Existing APIs (Permission Required)
 
         /// <summary>
-        /// 语音识别 API
-        /// 需要 "audio" 权限
-        /// </summary>
-        public SpeechApi? Speech => HasPermission(PluginPermissions.Audio) ? _speechApi : null;
-        private readonly SpeechApi? _speechApi;
-
-        /// <summary>
         /// 覆盖层 API
         /// 需要 "overlay" 权限
         /// </summary>
@@ -153,7 +146,6 @@ namespace FloatWebPlayer.Plugins
             Profile = profileInfo ?? throw new ArgumentNullException(nameof(profileInfo));
 
             // 初始化现有需要权限的 API
-            _speechApi = new SpeechApi(context);
             _overlayApi = new OverlayApi(context, Config);
             _subtitleApi = new SubtitleApi(context);
 
@@ -253,8 +245,6 @@ namespace FloatWebPlayer.Plugins
                 TryCleanupApi("OverlayApi", () => _overlayApi.Cleanup());
             if (_subtitleApi != null)
                 TryCleanupApi("SubtitleApi", () => _subtitleApi.Cleanup());
-            if (_speechApi != null)
-                TryCleanupApi("SpeechApi", () => _speechApi.Cleanup());
             if (_playerApi != null)
                 TryCleanupApi("PlayerApi", () => _playerApi.Cleanup());
             if (_windowApi != null)
