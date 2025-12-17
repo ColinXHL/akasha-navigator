@@ -640,6 +640,118 @@ namespace FloatWebPlayer.Services
 
         #endregion
 
+        #region Original Plugins (原始插件列表)
+
+        /// <summary>
+        /// 设置 Profile 的原始插件列表（来自市场定义）
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="pluginIds">原始插件 ID 列表</param>
+        public void SetOriginalPlugins(string profileId, List<string> pluginIds)
+        {
+            if (string.IsNullOrEmpty(profileId) || pluginIds == null)
+                return;
+
+            lock (_indexLock)
+            {
+                _index.OriginalPlugins[profileId] = new List<string>(pluginIds);
+                SaveIndex();
+            }
+        }
+
+        /// <summary>
+        /// 获取 Profile 的原始插件列表
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <returns>原始插件 ID 列表，如果没有则返回空列表</returns>
+        public List<string> GetOriginalPlugins(string profileId)
+        {
+            if (string.IsNullOrEmpty(profileId))
+                return new List<string>();
+
+            lock (_indexLock)
+            {
+                if (_index.OriginalPlugins.TryGetValue(profileId, out var plugins))
+                {
+                    return new List<string>(plugins);
+                }
+                return new List<string>();
+            }
+        }
+
+        /// <summary>
+        /// 检查 Profile 是否有原始插件列表（判断是否来自市场）
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <returns>是否有原始插件列表</returns>
+        public bool HasOriginalPlugins(string profileId)
+        {
+            if (string.IsNullOrEmpty(profileId))
+                return false;
+
+            lock (_indexLock)
+            {
+                return _index.OriginalPlugins.ContainsKey(profileId) && 
+                       _index.OriginalPlugins[profileId].Count > 0;
+            }
+        }
+
+        /// <summary>
+        /// 获取 Profile 中缺失的原始插件（在原始列表中但不在当前关联中）
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <returns>缺失的插件 ID 列表</returns>
+        public List<string> GetMissingOriginalPlugins(string profileId)
+        {
+            if (string.IsNullOrEmpty(profileId))
+                return new List<string>();
+
+            lock (_indexLock)
+            {
+                // 获取原始插件列表
+                if (!_index.OriginalPlugins.TryGetValue(profileId, out var originalPlugins) || originalPlugins.Count == 0)
+                {
+                    return new List<string>();
+                }
+
+                // 获取当前关联的插件
+                var currentPlugins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (_index.ProfilePlugins.TryGetValue(profileId, out var entries))
+                {
+                    foreach (var entry in entries)
+                    {
+                        currentPlugins.Add(entry.PluginId);
+                    }
+                }
+
+                // 找出在原始列表中但不在当前关联中的插件
+                return originalPlugins
+                    .Where(id => !currentPlugins.Contains(id))
+                    .ToList();
+            }
+        }
+
+        /// <summary>
+        /// 删除 Profile 的原始插件列表
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        public void RemoveOriginalPlugins(string profileId)
+        {
+            if (string.IsNullOrEmpty(profileId))
+                return;
+
+            lock (_indexLock)
+            {
+                if (_index.OriginalPlugins.ContainsKey(profileId))
+                {
+                    _index.OriginalPlugins.Remove(profileId);
+                    SaveIndex();
+                }
+            }
+        }
+
+        #endregion
+
         #region Profile Management
 
         /// <summary>
@@ -654,14 +766,28 @@ namespace FloatWebPlayer.Services
 
             lock (_indexLock)
             {
-                if (!_index.ProfilePlugins.ContainsKey(profileId))
-                    return false;
+                var removed = false;
 
-                _index.ProfilePlugins.Remove(profileId);
-                SaveIndex();
+                if (_index.ProfilePlugins.ContainsKey(profileId))
+                {
+                    _index.ProfilePlugins.Remove(profileId);
+                    removed = true;
+                }
+
+                // 同时删除原始插件列表
+                if (_index.OriginalPlugins.ContainsKey(profileId))
+                {
+                    _index.OriginalPlugins.Remove(profileId);
+                    removed = true;
+                }
+
+                if (removed)
+                {
+                    SaveIndex();
+                }
+
+                return removed;
             }
-
-            return true;
         }
 
         /// <summary>

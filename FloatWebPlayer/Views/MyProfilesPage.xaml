@@ -466,9 +466,14 @@
                                         <Button Content="安装" Style="{StaticResource PrimaryButtonStyle}"
                                                 Click="BtnInstallPlugin_Click" Tag="{Binding PluginId}"
                                                 Visibility="{Binding InstallButtonVisibility}" Margin="0,0,8,0"/>
+                                        <!-- 添加按钮（仅从原始列表移除的插件显示） -->
+                                        <Button Content="添加" Style="{StaticResource PrimaryButtonStyle}"
+                                                Click="BtnAddBackPlugin_Click" Tag="{Binding PluginId}"
+                                                Visibility="{Binding AddBackButtonVisibility}" Margin="0,0,8,0"/>
                                         <!-- 移除按钮 -->
-                                        <Button Content="移除" Style="{StaticResource DangerButtonStyle}"
-                                                Click="BtnRemovePlugin_Click" Tag="{Binding PluginId}"/>
+                                        <Button Content="{Binding RemoveButtonText}" Style="{StaticResource DangerButtonStyle}"
+                                                Click="BtnRemovePlugin_Click" Tag="{Binding PluginId}"
+                                                Visibility="{Binding RemoveButtonVisibility}"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

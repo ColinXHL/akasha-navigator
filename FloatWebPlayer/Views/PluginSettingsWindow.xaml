@@ -152,8 +152,8 @@
 
             <!-- 内容区 -->
             <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewer}" 
-                          VerticalScrollBarVisibility="Auto" Padding="20,16">
-                <StackPanel x:Name="SettingsContainer"/>
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="SettingsContainer" Margin="20,16,20,16"/>
             </ScrollViewer>
 
             <!-- 按钮区 -->

@@ -115,8 +115,7 @@ namespace FloatWebPlayer.Views
                 var result = PluginLibrary.Instance.InstallPlugin(viewModel.Id, viewModel.SourceDirectory);
                 if (result.IsSuccess)
                 {
-                    MessageBox.Show($"插件 \"{viewModel.Name}\" 安装成功！", "安装成功",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    NotificationService.Instance.Success($"插件 \"{viewModel.Name}\" 安装成功！");
                     
                     // 更新视图模型状态
                     viewModel.IsInstalled = true;
@@ -129,8 +128,7 @@ namespace FloatWebPlayer.Views
                 }
                 else
                 {
-                    MessageBox.Show($"安装失败: {result.ErrorMessage}", "安装失败",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    NotificationService.Instance.Error($"安装失败: {result.ErrorMessage}");
                 }
             }
         }
@@ -142,21 +140,12 @@ namespace FloatWebPlayer.Views
         {
             if (sender is Button btn && btn.Tag is AvailablePluginViewModel viewModel)
             {
-                var confirmResult = MessageBox.Show(
-                    $"确定要卸载插件 \"{viewModel.Name}\" 吗？",
-                    "确认卸载",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (confirmResult != MessageBoxResult.Yes)
-                    return;
-
-                var result = PluginLibrary.Instance.UninstallPlugin(viewModel.Id);
-                if (result.IsSuccess)
+                // 显示卸载确认对话框（包含引用信息）
+                var dialog = new UninstallConfirmDialog(viewModel.Id, viewModel.Name);
+                dialog.Owner = Window.GetWindow(this);
+                
+                if (dialog.ShowDialog() == true && dialog.UninstallSucceeded)
                 {
-                    MessageBox.Show($"插件 \"{viewModel.Name}\" 已卸载！", "卸载成功",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                    
                     // 更新视图模型状态
                     viewModel.IsInstalled = false;
                     
@@ -165,11 +154,6 @@ namespace FloatWebPlayer.Views
                     {
                         centerWindow.RefreshCurrentPage();
                     }
-                }
-                else
-                {
-                    MessageBox.Show($"卸载失败: {result.ErrorMessage}", "卸载失败",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }

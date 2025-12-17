@@ -164,6 +164,9 @@ namespace FloatWebPlayer.Helpers
                 MinWidth = 200
             };
 
+            // 应用圆角样式
+            ApplyRoundedTextBoxStyle(textBox);
+
             // 设置占位符
             if (!string.IsNullOrEmpty(item.Placeholder))
             {
@@ -193,6 +196,52 @@ namespace FloatWebPlayer.Helpers
             return container;
         }
 
+        /// <summary>
+        /// 应用圆角 TextBox 样式
+        /// </summary>
+        private void ApplyRoundedTextBoxStyle(TextBox textBox)
+        {
+            var template = new ControlTemplate(typeof(TextBox));
+
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "border";
+            borderFactory.SetValue(Border.BackgroundProperty, new System.Windows.Data.Binding("Background")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            borderFactory.SetValue(Border.BorderBrushProperty, new System.Windows.Data.Binding("BorderBrush")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            borderFactory.SetValue(Border.BorderThicknessProperty, new System.Windows.Data.Binding("BorderThickness")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+
+            var scrollViewerFactory = new FrameworkElementFactory(typeof(ScrollViewer));
+            scrollViewerFactory.Name = "PART_ContentHost";
+            scrollViewerFactory.SetValue(ScrollViewer.MarginProperty, new System.Windows.Data.Binding("Padding")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+
+            borderFactory.AppendChild(scrollViewerFactory);
+            template.VisualTree = borderFactory;
+
+            // 触发器
+            var focusTrigger = new Trigger { Property = UIElement.IsFocusedProperty, Value = true };
+            focusTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4)), "border"));
+            focusTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)), "border"));
+            template.Triggers.Add(focusTrigger);
+
+            var mouseOverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            mouseOverTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)), "border"));
+            template.Triggers.Add(mouseOverTrigger);
+
+            textBox.Template = template;
+        }
+
         #endregion
 
         #region NumberBox Rendering
@@ -212,11 +261,15 @@ namespace FloatWebPlayer.Helpers
                 Foreground = Brushes.White,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
                 BorderThickness = new Thickness(1),
-                Padding = new Thickness(8, 6, 8, 6),
+                Padding = new Thickness(8, 0, 8, 0),
                 FontSize = 12,
                 MinWidth = 100,
+                Height = 32,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
+
+            // 应用圆角样式
+            ApplyRoundedTextBoxStyle(textBox);
 
             // 加载当前值或默认值
             var defaultValue = item.GetDefaultValue<double?>() ?? 0;
@@ -294,19 +347,49 @@ namespace FloatWebPlayer.Helpers
 
         private Button CreateSpinButton(string content)
         {
-            return new Button
+            var button = new Button
             {
                 Content = content,
-                Width = 28,
-                Height = 28,
+                Width = 32,
+                Height = 32,
                 Background = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0),
-                Margin = new Thickness(2, 0, 0, 0),
+                Margin = new Thickness(4, 0, 0, 0),
                 FontSize = 14,
-                FontWeight = FontWeights.Bold,
-                Cursor = System.Windows.Input.Cursors.Hand
+                FontWeight = FontWeights.Bold
             };
+
+            // 应用圆角样式
+            var template = new ControlTemplate(typeof(Button));
+
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "border";
+            borderFactory.SetValue(Border.BackgroundProperty, new System.Windows.Data.Binding("Background")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+
+            var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            contentFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            contentFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+            borderFactory.AppendChild(contentFactory);
+            template.VisualTree = borderFactory;
+
+            // 触发器
+            var mouseOverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)), "border"));
+            mouseOverTrigger.Setters.Add(new Setter(FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
+            template.Triggers.Add(mouseOverTrigger);
+
+            var pressedTrigger = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
+            pressedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x66)), "border"));
+            template.Triggers.Add(pressedTrigger);
+
+            button.Template = template;
+            return button;
         }
 
         #endregion
@@ -424,25 +507,24 @@ namespace FloatWebPlayer.Helpers
 
             var comboBox = new ComboBox
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(8, 6, 8, 6),
-                FontSize = 12,
                 MinWidth = 150
             };
+
+            // 应用深色主题样式
+            ApplyDarkComboBoxStyle(comboBox);
 
             // 添加选项
             if (item.Options != null)
             {
                 foreach (var option in item.Options)
                 {
-                    comboBox.Items.Add(new ComboBoxItem
+                    var comboBoxItem = new ComboBoxItem
                     {
                         Content = option.Label,
                         Tag = option.Value
-                    });
+                    };
+                    ApplyDarkComboBoxItemStyle(comboBoxItem);
+                    comboBox.Items.Add(comboBoxItem);
                 }
             }
 
@@ -476,6 +558,207 @@ namespace FloatWebPlayer.Helpers
 
             container.Children.Add(comboBox);
             return container;
+        }
+
+        /// <summary>
+        /// 应用深色主题 ComboBox 样式
+        /// </summary>
+        private void ApplyDarkComboBoxStyle(ComboBox comboBox)
+        {
+            comboBox.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+            comboBox.Foreground = Brushes.White;
+            comboBox.BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+            comboBox.BorderThickness = new Thickness(1);
+            comboBox.Padding = new Thickness(8, 6, 8, 6);
+            comboBox.FontSize = 12;
+
+            // 创建深色主题模板
+            var template = new ControlTemplate(typeof(ComboBox));
+
+            var gridFactory = new FrameworkElementFactory(typeof(Grid));
+
+            // ToggleButton
+            var toggleFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.ToggleButton));
+            toggleFactory.Name = "ToggleButton";
+            toggleFactory.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+                new System.Windows.Data.Binding("IsDropDownOpen")
+                {
+                    Mode = System.Windows.Data.BindingMode.TwoWay,
+                    RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+                });
+            toggleFactory.SetValue(System.Windows.Controls.Primitives.ToggleButton.ClickModeProperty, ClickMode.Press);
+            toggleFactory.SetValue(System.Windows.Controls.Primitives.ToggleButton.TemplateProperty, CreateToggleButtonTemplate());
+
+            // ContentPresenter
+            var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            contentFactory.Name = "ContentSite";
+            contentFactory.SetValue(ContentPresenter.ContentProperty, new System.Windows.Data.Binding("SelectionBoxItem")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            contentFactory.SetValue(ContentPresenter.ContentTemplateProperty, new System.Windows.Data.Binding("SelectionBoxItemTemplate")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            contentFactory.SetValue(ContentPresenter.MarginProperty, new Thickness(10, 6, 28, 6));
+            contentFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+            contentFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            contentFactory.SetValue(ContentPresenter.IsHitTestVisibleProperty, false);
+
+            // Popup
+            var popupFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.Popup));
+            popupFactory.Name = "Popup";
+            popupFactory.SetValue(System.Windows.Controls.Primitives.Popup.PlacementProperty, System.Windows.Controls.Primitives.PlacementMode.Bottom);
+            popupFactory.SetBinding(System.Windows.Controls.Primitives.Popup.IsOpenProperty,
+                new System.Windows.Data.Binding("IsDropDownOpen")
+                {
+                    RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+                });
+            popupFactory.SetValue(System.Windows.Controls.Primitives.Popup.AllowsTransparencyProperty, true);
+            popupFactory.SetValue(System.Windows.Controls.Primitives.Popup.FocusableProperty, false);
+            popupFactory.SetValue(System.Windows.Controls.Primitives.Popup.PopupAnimationProperty, System.Windows.Controls.Primitives.PopupAnimation.Slide);
+
+            // Popup 内容
+            var dropDownGridFactory = new FrameworkElementFactory(typeof(Grid));
+            dropDownGridFactory.Name = "DropDown";
+            dropDownGridFactory.SetBinding(Grid.MinWidthProperty,
+                new System.Windows.Data.Binding("ActualWidth")
+                {
+                    RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+                });
+            dropDownGridFactory.SetBinding(Grid.MaxHeightProperty,
+                new System.Windows.Data.Binding("MaxDropDownHeight")
+                {
+                    RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+                });
+
+            var dropDownBorderFactory = new FrameworkElementFactory(typeof(Border));
+            dropDownBorderFactory.Name = "DropDownBorder";
+            dropDownBorderFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)));
+            dropDownBorderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)));
+            dropDownBorderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            dropDownBorderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+            dropDownBorderFactory.SetValue(Border.MarginProperty, new Thickness(0, 2, 0, 0));
+            dropDownBorderFactory.SetValue(Border.EffectProperty, new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 8,
+                ShadowDepth = 2,
+                Opacity = 0.3
+            });
+
+            var scrollViewerFactory = new FrameworkElementFactory(typeof(ScrollViewer));
+            scrollViewerFactory.SetValue(ScrollViewer.MarginProperty, new Thickness(4));
+            scrollViewerFactory.SetValue(ScrollViewer.SnapsToDevicePixelsProperty, true);
+
+            var itemsHostFactory = new FrameworkElementFactory(typeof(StackPanel));
+            itemsHostFactory.SetValue(StackPanel.IsItemsHostProperty, true);
+            itemsHostFactory.SetValue(System.Windows.Input.KeyboardNavigation.DirectionalNavigationProperty, System.Windows.Input.KeyboardNavigationMode.Contained);
+
+            scrollViewerFactory.AppendChild(itemsHostFactory);
+            dropDownBorderFactory.AppendChild(scrollViewerFactory);
+            dropDownGridFactory.AppendChild(dropDownBorderFactory);
+            popupFactory.AppendChild(dropDownGridFactory);
+
+            gridFactory.AppendChild(toggleFactory);
+            gridFactory.AppendChild(contentFactory);
+            gridFactory.AppendChild(popupFactory);
+
+            template.VisualTree = gridFactory;
+            comboBox.Template = template;
+        }
+
+        /// <summary>
+        /// 创建 ComboBox 的 ToggleButton 模板
+        /// </summary>
+        private ControlTemplate CreateToggleButtonTemplate()
+        {
+            var template = new ControlTemplate(typeof(System.Windows.Controls.Primitives.ToggleButton));
+
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "border";
+            borderFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)));
+            borderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)));
+            borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+
+            var gridFactory = new FrameworkElementFactory(typeof(Grid));
+
+            var col1 = new FrameworkElementFactory(typeof(ColumnDefinition));
+            col1.SetValue(ColumnDefinition.WidthProperty, new GridLength(1, GridUnitType.Star));
+            var col2 = new FrameworkElementFactory(typeof(ColumnDefinition));
+            col2.SetValue(ColumnDefinition.WidthProperty, new GridLength(20));
+
+            var colDefsFactory = new FrameworkElementFactory(typeof(Grid));
+            colDefsFactory.AppendChild(col1);
+            colDefsFactory.AppendChild(col2);
+
+            var arrowFactory = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
+            arrowFactory.Name = "Arrow";
+            arrowFactory.SetValue(System.Windows.Shapes.Path.DataProperty, System.Windows.Media.Geometry.Parse("M 0 0 L 4 4 L 8 0 Z"));
+            arrowFactory.SetValue(System.Windows.Shapes.Path.FillProperty, new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)));
+            arrowFactory.SetValue(System.Windows.Shapes.Path.HorizontalAlignmentProperty, HorizontalAlignment.Right);
+            arrowFactory.SetValue(System.Windows.Shapes.Path.VerticalAlignmentProperty, VerticalAlignment.Center);
+            arrowFactory.SetValue(System.Windows.Shapes.Path.MarginProperty, new Thickness(0, 0, 8, 0));
+
+            gridFactory.AppendChild(arrowFactory);
+            borderFactory.AppendChild(gridFactory);
+
+            template.VisualTree = borderFactory;
+
+            // 触发器
+            var mouseOverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            mouseOverTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4)), "border"));
+            mouseOverTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.FillProperty, Brushes.White, "Arrow"));
+            mouseOverTrigger.Setters.Add(new Setter(FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
+            template.Triggers.Add(mouseOverTrigger);
+
+            var checkedTrigger = new Trigger { Property = System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, Value = true };
+            checkedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4)), "border"));
+            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)), "border"));
+            template.Triggers.Add(checkedTrigger);
+
+            return template;
+        }
+
+        /// <summary>
+        /// 应用深色主题 ComboBoxItem 样式
+        /// </summary>
+        private void ApplyDarkComboBoxItemStyle(ComboBoxItem item)
+        {
+            item.Background = Brushes.Transparent;
+            item.Foreground = Brushes.White;
+            item.Padding = new Thickness(8, 6, 8, 6);
+
+            var template = new ControlTemplate(typeof(ComboBoxItem));
+
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "border";
+            borderFactory.SetValue(Border.BackgroundProperty, new System.Windows.Data.Binding("Background")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            borderFactory.SetValue(Border.PaddingProperty, new System.Windows.Data.Binding("Padding")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(3));
+
+            var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            borderFactory.AppendChild(contentFactory);
+
+            template.VisualTree = borderFactory;
+
+            // 触发器
+            var mouseOverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)), "border"));
+            mouseOverTrigger.Setters.Add(new Setter(FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
+            template.Triggers.Add(mouseOverTrigger);
+
+            var selectedTrigger = new Trigger { Property = ComboBoxItem.IsSelectedProperty, Value = true };
+            selectedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4)), "border"));
+            template.Triggers.Add(selectedTrigger);
+
+            item.Template = template;
         }
 
         #endregion
@@ -550,11 +833,14 @@ namespace FloatWebPlayer.Helpers
                 Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0),
-                Padding = new Thickness(12, 6, 12, 6),
+                Padding = new Thickness(16, 8, 16, 8),
                 FontSize = 12,
                 Margin = new Thickness(0, 8, 0, 0),
-                Cursor = System.Windows.Input.Cursors.Hand
+                MinWidth = 80
             };
+
+            // 应用圆角按钮样式
+            ApplyRoundedButtonStyle(button);
 
             button.Click += (s, e) =>
             {
@@ -562,6 +848,45 @@ namespace FloatWebPlayer.Helpers
             };
 
             return button;
+        }
+
+        /// <summary>
+        /// 应用圆角按钮样式
+        /// </summary>
+        private void ApplyRoundedButtonStyle(Button button)
+        {
+            var template = new ControlTemplate(typeof(Button));
+
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "border";
+            borderFactory.SetValue(Border.BackgroundProperty, new System.Windows.Data.Binding("Background")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+            borderFactory.SetValue(Border.PaddingProperty, new System.Windows.Data.Binding("Padding")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent)
+            });
+
+            var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            contentFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            contentFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+            borderFactory.AppendChild(contentFactory);
+            template.VisualTree = borderFactory;
+
+            // 触发器
+            var mouseOverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)), "border"));
+            mouseOverTrigger.Setters.Add(new Setter(FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand));
+            template.Triggers.Add(mouseOverTrigger);
+
+            var pressedTrigger = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
+            pressedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)), "border"));
+            template.Triggers.Add(pressedTrigger);
+
+            button.Template = template;
         }
 
         #endregion
@@ -636,7 +961,16 @@ namespace FloatWebPlayer.Helpers
             switch (control)
             {
                 case TextBox textBox:
-                    textBox.Text = _config.Get(key, string.Empty);
+                    // 尝试作为数字读取，如果失败则作为字符串读取
+                    var numValue = _config.Get<double?>(key, null);
+                    if (numValue.HasValue)
+                    {
+                        textBox.Text = numValue.Value.ToString();
+                    }
+                    else
+                    {
+                        textBox.Text = _config.Get(key, string.Empty);
+                    }
                     break;
                 case ToggleButton toggle:
                     toggle.IsChecked = _config.Get(key, false);

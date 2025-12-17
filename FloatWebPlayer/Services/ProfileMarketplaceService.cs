@@ -977,6 +977,9 @@ namespace FloatWebPlayer.Services
 
             if (importResult.IsSuccess)
             {
+                // 保存原始插件列表（用于后续显示缺失状态）
+                PluginAssociationManager.Instance.SetOriginalPlugins(profile.Id, profile.PluginIds);
+                
                 return ProfileInstallResult.Success(profile.Id, missingPlugins);
             }
             else if (importResult.ProfileExists)

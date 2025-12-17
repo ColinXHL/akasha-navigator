@@ -177,8 +177,11 @@ namespace FloatWebPlayer.Services
             // 加载所有 Profile
             LoadAllProfiles();
 
-            // 设置默认 Profile
-            CurrentProfile = GetProfileById(AppConstants.DefaultProfileId) ?? CreateDefaultProfile();
+            // 从配置中恢复上次选择的 Profile，如果不存在则使用默认 Profile
+            var savedProfileId = ConfigService.Instance.Config.CurrentProfileId;
+            CurrentProfile = GetProfileById(savedProfileId) 
+                ?? GetProfileById(AppConstants.DefaultProfileId) 
+                ?? CreateDefaultProfile();
         }
 
         #endregion
@@ -198,6 +201,11 @@ namespace FloatWebPlayer.Services
             PluginHost.Instance.UnloadAllPlugins();
 
             CurrentProfile = profile;
+            
+            // 保存当前选择的 Profile ID 到配置
+            var config = ConfigService.Instance.Config;
+            config.CurrentProfileId = profileId;
+            ConfigService.Instance.Save();
             
             // 加载新 Profile 的插件
             PluginHost.Instance.LoadPluginsForProfile(profileId);

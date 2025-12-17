@@ -170,7 +170,55 @@ namespace FloatWebPlayer.Views
             }
             else
             {
-                LogService.Instance.Warn("PluginSettingsWindow", $"插件 {_pluginId} 没有覆盖层");
+                // 覆盖层不存在，尝试创建一个临时的用于位置调整
+                // 从配置中读取当前位置
+                var x = _config.Get("overlay.x", 100.0);
+                var y = _config.Get("overlay.y", 100.0);
+                var size = _config.Get("overlay.size", 200.0);
+
+                // 创建临时覆盖层用于位置调整
+                var options = new OverlayOptions
+                {
+                    X = x,
+                    Y = y,
+                    Width = size,
+                    Height = size
+                };
+                var tempOverlay = OverlayManager.Instance.CreateOverlay(_pluginId, options);
+                
+                // 显示并进入编辑模式
+                tempOverlay.Show();
+                tempOverlay.EnterEditMode();
+
+                // 监听编辑模式退出，保存位置后销毁临时覆盖层
+                tempOverlay.EditModeExited += OnTempOverlayEditModeExited;
+            }
+        }
+
+        /// <summary>
+        /// 临时覆盖层编辑模式退出处理
+        /// </summary>
+        private void OnTempOverlayEditModeExited(object? sender, EventArgs e)
+        {
+            if (sender is OverlayWindow overlay)
+            {
+                // 取消事件订阅
+                overlay.EditModeExited -= OnTempOverlayEditModeExited;
+
+                // 保存位置到配置
+                _config.Set("overlay.x", overlay.Left);
+                _config.Set("overlay.y", overlay.Top);
+                _config.Set("overlay.size", overlay.Width);
+                SaveConfig();
+
+                // 刷新 UI 显示
+                _renderer?.RefreshValues();
+
+                // 通知插件配置已变更
+                NotifyPluginConfigChanged(null, null);
+
+                // 销毁临时覆盖层
+                OverlayManager.Instance.DestroyOverlay(_pluginId);
             }
         }
 
@@ -385,15 +433,18 @@ namespace FloatWebPlayer.Views
         /// <param name="pluginName">插件名称</param>
         /// <param name="pluginDirectory">插件源码目录</param>
         /// <param name="configDirectory">插件配置目录</param>
-        /// <param name="owner">父窗口</param>
+        /// <param name="owner">父窗口（仅用于定位，不设置 Owner 以避免关闭时影响父窗口）</param>
         public static void ShowSettings(string pluginId, string pluginName, string pluginDirectory, string configDirectory, Window? owner = null)
         {
             var window = new PluginSettingsWindow(pluginId, pluginName, pluginDirectory, configDirectory);
             
             if (owner != null)
             {
-                window.Owner = owner;
-                window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                // 不设置 Owner，只用于计算居中位置
+                // 这样关闭设置窗口时不会影响父窗口
+                window.WindowStartupLocation = WindowStartupLocation.Manual;
+                window.Left = owner.Left + (owner.Width - window.Width) / 2;
+                window.Top = owner.Top + (owner.Height - window.Height) / 2;
             }
 
             window.Show();

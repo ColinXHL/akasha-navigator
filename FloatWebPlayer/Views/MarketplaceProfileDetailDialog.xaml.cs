@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using FloatWebPlayer.Models;
 using FloatWebPlayer.Services;
@@ -25,6 +26,27 @@ namespace FloatWebPlayer.Views
             InitializeComponent();
             _profile = profile;
             LoadProfileDetails();
+        }
+
+        /// <summary>
+        /// 标题栏拖动
+        /// </summary>
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 1)
+            {
+                DragMove();
+            }
+        }
+
+        /// <summary>
+        /// 关闭按钮点击
+        /// </summary>
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            ShouldInstall = false;
+            DialogResult = false;
+            Close();
         }
 
         /// <summary>

@@ -77,6 +77,13 @@ namespace FloatWebPlayer.Models
         public Dictionary<string, List<PluginReferenceEntry>> ProfilePlugins { get; set; } = new();
 
         /// <summary>
+        /// Profile -> 原始插件列表的映射（来自市场定义）
+        /// Key: Profile ID, Value: 该 Profile 原始定义的插件 ID 列表
+        /// 用于在用户移除插件后仍能显示"缺失"状态
+        /// </summary>
+        public Dictionary<string, List<string>> OriginalPlugins { get; set; } = new();
+
+        /// <summary>
         /// 从文件加载索引
         /// </summary>
         /// <param name="filePath">索引文件路径</param>
