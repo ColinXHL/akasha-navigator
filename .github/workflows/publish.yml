@@ -47,111 +47,111 @@ jobs:
             echo "🏷️ 从 tag 触发构建，版本号：$VERSION"
           fi
 
-build_dist:
-  runs-on: windows-latest
-  needs: [validate]
-  steps:
-    - uses: actions/checkout@v4
+  build_dist:
+    runs-on: windows-latest
+    needs: [validate]
+    steps:
+      - uses: actions/checkout@v4
 
-    - uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.x
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
 
-    - name: 🛠️ Publish FloatWebPlayer
-      run: |
-        dotnet publish FloatWebPlayer/FloatWebPlayer.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained true `
-          /p:PublishSingleFile=false `
-          /p:Version=${{ needs.validate.outputs.version }}
+      - name: 🛠️ Publish FloatWebPlayer
+        run: |
+          dotnet publish FloatWebPlayer/FloatWebPlayer.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            /p:PublishSingleFile=false `
+            /p:Version=${{ needs.validate.outputs.version }}
 
-    - name: 🧹 Collect publish files
-      run: |
-        $src = "FloatWebPlayer/bin/Release/net8.0-windows/win-x64/publish"
-        $dst = "dist/FloatWebPlayer"
+      - name: 🧹 Collect publish files
+        run: |
+          $src = "FloatWebPlayer/bin/Release/net8.0-windows/win-x64/publish"
+          $dst = "dist/FloatWebPlayer"
 
-        New-Item $dst -ItemType Directory -Force | Out-Null
+          New-Item $dst -ItemType Directory -Force | Out-Null
 
-        Copy-Item "$src\*" $dst -Recurse -Force
+          Copy-Item "$src\*" $dst -Recurse -Force
 
-        # 清理调试垃圾
-        Get-ChildItem $dst -Recurse -Include *.pdb,*.lib | Remove-Item -Force
+          # 清理调试垃圾
+          Get-ChildItem $dst -Recurse -Include *.pdb,*.lib | Remove-Item -Force
 
-    - name: 📦 Pack 7z
-      run: |
-        cd dist
-        7z a "FloatWebPlayer_v${{ needs.validate.outputs.version }}.7z" FloatWebPlayer -t7z -mx=5 -r -y
+      - name: 📦 Pack 7z
+        run: |
+          cd dist
+          7z a "FloatWebPlayer_v${{ needs.validate.outputs.version }}.7z" FloatWebPlayer -t7z -mx=5 -r -y
 
-    - uses: actions/upload-artifact@v4
-      with:
-        name: FloatWebPlayer_7z
-        path: dist/FloatWebPlayer_v*.7z
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FloatWebPlayer_7z
+          path: dist/FloatWebPlayer_v*.7z
 
-build_installer:
-  runs-on: windows-latest
-  needs: [validate, build_dist]
+  build_installer:
+    runs-on: windows-latest
+    needs: [validate, build_dist]
 
-  steps:
-    - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-    - uses: actions/download-artifact@v4
-      with:
-        name: FloatWebPlayer_7z
-        path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: FloatWebPlayer_7z
+          path: dist
 
-    - name: 📦 Unpack
-      run: |
-        cd dist
-        7z x "FloatWebPlayer_v${{ needs.validate.outputs.version }}.7z"
+      - name: 📦 Unpack
+        run: |
+          cd dist
+          7z x "FloatWebPlayer_v${{ needs.validate.outputs.version }}.7z"
 
-    - name: 📥 Download kachina-builder
-      uses: robinraju/release-downloader@v1.8
-      with:
-        repository: "YuehaiTeam/kachina-installer"
-        latest: true
-        fileName: "kachina-builder.exe"
+      - name: 📥 Download kachina-builder
+        uses: robinraju/release-downloader@v1.8
+        with:
+          repository: "YuehaiTeam/kachina-installer"
+          latest: true
+          fileName: "kachina-builder.exe"
 
-    - name: 🧰 Build Installer
-      run: |
-        cd dist
-        ..\kachina-builder.exe pack `
-          -c ..\Build\kachina.config.json `
-          -d FloatWebPlayer `
-          -o FloatWebPlayer.Install.v${{ needs.validate.outputs.version }}.exe
+      - name: 🧰 Build Installer
+        run: |
+          cd dist
+          ..\kachina-builder.exe pack `
+            -c ..\Build\kachina.config.json `
+            -d FloatWebPlayer `
+            -o FloatWebPlayer.Install.v${{ needs.validate.outputs.version }}.exe
 
-    - uses: actions/upload-artifact@v4
-      with:
-        name: FloatWebPlayer_Installer
-        path: dist/FloatWebPlayer.Install.*.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FloatWebPlayer_Installer
+          path: dist/FloatWebPlayer.Install.*.exe
 
-create_release:
-  name: Create GitHub Release
-  runs-on: ubuntu-latest
-  needs: build_installer
-  permissions:
-    contents: write
-  if: github.event.inputs.create_release == 'true'
+  create_release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build_installer
+    permissions:
+      contents: write
+    if: github.event.inputs.create_release == 'true'
 
-  steps:
-    - uses: actions/download-artifact@v4
-      with:
-        name: FloatWebPlayer_Installer
-        path: release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FloatWebPlayer_Installer
+          path: release
 
-    - uses: actions/download-artifact@v4
-      with:
-        name: FloatWebPlayer_7z
-        path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: FloatWebPlayer_7z
+          path: release
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v${{ needs.validate.outputs.version }}
-        name: FloatWebPlayer v${{ needs.validate.outputs.version }}
-        draft: true
-        prerelease: ${{ github.event.inputs.channel == 'dev' }}
-        fail_on_unmatched_files: true
-        files: |
-          release/FloatWebPlayer.Install.*.exe
-          release/FloatWebPlayer_v*.7z
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: FloatWebPlayer v${{ needs.validate.outputs.version }}
+          draft: true
+          prerelease: ${{ github.event.inputs.channel == 'dev' }}
+          fail_on_unmatched_files: true
+          files: |
+            release/FloatWebPlayer.Install.*.exe
+            release/FloatWebPlayer_v*.7z
