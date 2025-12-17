@@ -10,16 +10,18 @@
   "publisher": "ColinXHL",
   "regName": "FloatWebPlayer",
   "exeName": "FloatWebPlayer.exe",
+  "uninstallName": "FloatWebPlayer.uninst.exe",
   "updaterName": "FloatWebPlayer.update.exe",
   "programFilesPath": "FloatWebPlayer",
   "title": "FloatWebPlayer",
-  "description": "悬浮网页播放器，专为游戏时观看攻略视频设计",
+  "description": "悬浮网页播放器",
   "windowTitle": "FloatWebPlayer 安装程序",
   "userDataPath": [
     "${INSTALL_PATH}/User"
   ],
   "uacStrategy": "prefer-admin",
   "runtimes": [
+    "Microsoft.DotNet.DesktopRuntime.8",
     "Microsoft.VCRedist.2015+.x64"
   ]
 }

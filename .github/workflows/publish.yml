@@ -61,9 +61,7 @@ jobs:
         run: |
           dotnet publish FloatWebPlayer/FloatWebPlayer.csproj `
             -c Release `
-            -r win-x64 `
-            --self-contained true `
-            /p:PublishSingleFile=false `
+            -p:PublishProfile=FolderProfile `
             /p:Version=${{ needs.validate.outputs.version }}
 
       - name: 🧹 Collect publish files
@@ -128,7 +126,7 @@ jobs:
         run: |
           cd dist
           Write-Host "开始打包 installer..."
-          ..\kachina-builder.exe pack -c ..\Build\kachina.config.json -m metadata.json -d hashed -o FloatWebPlayer.Install.v${{ needs.validate.outputs.version }}.exe
+          ..\kachina-builder.exe pack -c ..\Build\kachina.config.json -m metadata.json -d hashed -o FloatWebPlayer.Install.${{ needs.validate.outputs.version }}.exe
           Write-Host "打包完成"
 
       - uses: actions/upload-artifact@v4
