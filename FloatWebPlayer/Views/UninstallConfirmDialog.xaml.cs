@@ -128,12 +128,10 @@ namespace FloatWebPlayer.Views
             }
             else
             {
-                // 显示错误但不关闭对话框
-                MessageBox.Show(
+                // 使用 NotificationService 显示错误
+                NotificationService.Instance.Error(
                     ErrorMessage ?? "卸载失败，请稍后重试。",
-                    "卸载失败",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                    "卸载失败");
             }
         }
 

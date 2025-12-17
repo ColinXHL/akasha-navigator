@@ -76,7 +76,7 @@ namespace FloatWebPlayer.Views
             var url = UrlInput.Text?.Trim();
             if (string.IsNullOrEmpty(url))
             {
-                MessageBox.Show("请输入订阅源 URL", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                NotificationService.Instance.Info("请输入订阅源 URL", "提示");
                 return;
             }
 
@@ -105,12 +105,11 @@ namespace FloatWebPlayer.Views
                         message += $"\n包含 {result.ProfileCount} 个 Profile";
                     }
                     
-                    MessageBox.Show(message, "添加成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                    NotificationService.Instance.Success(message, "添加成功");
                 }
                 else
                 {
-                    MessageBox.Show($"添加失败: {result.ErrorMessage}", "添加失败", 
-                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    NotificationService.Instance.Error($"添加失败: {result.ErrorMessage}", "添加失败");
                 }
             }
             finally
@@ -125,17 +124,15 @@ namespace FloatWebPlayer.Views
         /// <summary>
         /// 删除订阅源按钮点击
         /// </summary>
-        private void BtnRemoveSource_Click(object sender, RoutedEventArgs e)
+        private async void BtnRemoveSource_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is string url)
             {
-                var result = MessageBox.Show(
+                var confirmed = await NotificationService.Instance.ConfirmAsync(
                     $"确定要删除此订阅源吗？\n\n{url}",
-                    "确认删除",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
+                    "确认删除");
 
-                if (result == MessageBoxResult.Yes)
+                if (confirmed)
                 {
                     ProfileMarketplaceService.Instance.RemoveSubscriptionSource(url);
                     RefreshSourceList();

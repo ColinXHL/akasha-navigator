@@ -96,9 +96,28 @@ namespace FloatWebPlayer.Views
         {
             if (sender is Button btn && btn.Tag is string pluginId)
             {
-                // TODO: 打开插件设置对话框
-                MessageBox.Show($"插件 {pluginId} 的设置功能正在开发中", "提示", 
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                // 获取插件信息
+                var pluginInfo = PluginLibrary.Instance.GetInstalledPluginInfo(pluginId);
+                if (pluginInfo == null)
+                {
+                    NotificationService.Instance.Show($"找不到插件 {pluginId}", NotificationType.Error);
+                    return;
+                }
+
+                // 获取插件目录
+                var pluginDirectory = PluginLibrary.Instance.GetPluginDirectory(pluginId);
+                
+                // 获取配置目录（使用插件库目录作为配置目录）
+                var configDirectory = pluginDirectory;
+
+                // 打开插件设置窗口
+                PluginSettingsWindow.ShowSettings(
+                    pluginId,
+                    pluginInfo.Name,
+                    pluginDirectory,
+                    configDirectory,
+                    Window.GetWindow(this)
+                );
             }
         }
 

@@ -217,14 +217,12 @@ namespace FloatWebPlayer.Views
             }
             else
             {
-                // 没有唯一插件，显示简单确认对话框
-                var result = MessageBox.Show(
+                // 没有唯一插件，使用 NotificationService 显示确认对话框
+                var confirmed = await NotificationService.Instance.ConfirmAsync(
                     $"确定要卸载 Profile \"{profileName}\" 吗？\n\n此操作将删除该 Profile 的配置文件。",
-                    "确认卸载",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
+                    "确认卸载");
 
-                if (result != MessageBoxResult.Yes)
+                if (!confirmed)
                 {
                     return;
                 }
@@ -268,15 +266,14 @@ namespace FloatWebPlayer.Views
                     }
                 }
 
-                MessageBox.Show(message, "卸载成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                NotificationService.Instance.Success(message, "卸载成功");
 
                 // 刷新列表以更新 UI 状态
                 FilterProfiles();
             }
             else
             {
-                MessageBox.Show($"卸载失败: {result.ErrorMessage}", "卸载失败",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                NotificationService.Instance.Error($"卸载失败: {result.ErrorMessage}", "卸载失败");
             }
 
             await Task.CompletedTask;
@@ -294,13 +291,11 @@ namespace FloatWebPlayer.Views
             bool overwrite = false;
             if (ProfileMarketplaceService.Instance.ProfileExists(profile.Id))
             {
-                var result = MessageBox.Show(
+                var confirmed = await NotificationService.Instance.ConfirmAsync(
                     $"Profile \"{profile.Name}\" 已存在。\n\n是否覆盖现有 Profile？",
-                    "Profile 已存在",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Question);
+                    "Profile 已存在");
 
-                if (result == MessageBoxResult.Cancel || result == MessageBoxResult.No)
+                if (!confirmed)
                     return;
                 
                 overwrite = true;
@@ -317,9 +312,8 @@ namespace FloatWebPlayer.Views
                 }
                 message += "\n\n安装后可以在「我的 Profile」页面一键安装缺失插件。\n\n是否继续？";
 
-                var result = MessageBox.Show(message, "确认安装", 
-                    MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (result != MessageBoxResult.Yes)
+                var confirmed = await NotificationService.Instance.ConfirmAsync(message, "确认安装");
+                if (!confirmed)
                     return;
             }
 
@@ -334,12 +328,11 @@ namespace FloatWebPlayer.Views
                     successMessage += $"\n\n有 {installResult.MissingPlugins.Count} 个插件缺失，可以在「我的 Profile」页面点击「一键安装缺失插件」进行安装。";
                 }
                 
-                MessageBox.Show(successMessage, "安装成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                NotificationService.Instance.Success(successMessage, "安装成功");
             }
             else
             {
-                MessageBox.Show($"安装失败: {installResult.ErrorMessage}", "安装失败", 
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                NotificationService.Instance.Error($"安装失败: {installResult.ErrorMessage}", "安装失败");
             }
         }
     }

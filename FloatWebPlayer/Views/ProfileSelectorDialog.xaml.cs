@@ -87,8 +87,7 @@ namespace FloatWebPlayer.Views
             
             if (selectedProfiles.Count == 0)
             {
-                MessageBox.Show("请至少选择一个 Profile", "提示", 
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                NotificationService.Instance.Warning("请至少选择一个 Profile", "提示");
                 return;
             }
 
@@ -109,14 +108,12 @@ namespace FloatWebPlayer.Views
 
             if (successCount > 0)
             {
-                MessageBox.Show($"已成功将插件添加到 {successCount} 个 Profile", "添加成功",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                NotificationService.Instance.Success($"已成功将插件添加到 {successCount} 个 Profile", "添加成功");
                 DialogResult = true;
             }
             else
             {
-                MessageBox.Show("添加失败，请查看日志了解详情", "添加失败",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                NotificationService.Instance.Error("添加失败，请查看日志了解详情", "添加失败");
                 DialogResult = false;
             }
             
