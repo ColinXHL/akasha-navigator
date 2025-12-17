@@ -47,12 +47,15 @@ namespace FloatWebPlayer.Views
         private void NavButton_Checked(object sender, RoutedEventArgs e)
         {
             if (sender is not RadioButton radioButton) return;
+            
+            // 防止在 InitializeComponent 期间触发（控件尚未初始化）
+            if (InstalledPluginsPage == null) return;
 
             // 隐藏所有页面
             InstalledPluginsPage.Visibility = Visibility.Collapsed;
             AvailablePluginsPage.Visibility = Visibility.Collapsed;
             MyProfilesPage.Visibility = Visibility.Collapsed;
-            ProfileMarketPlaceholder.Visibility = Visibility.Collapsed;
+            ProfileMarketPage.Visibility = Visibility.Collapsed;
 
             // 根据选中的导航按钮显示对应页面
             if (radioButton == NavInstalledPlugins)
@@ -72,7 +75,8 @@ namespace FloatWebPlayer.Views
             }
             else if (radioButton == NavProfileMarket)
             {
-                ProfileMarketPlaceholder.Visibility = Visibility.Visible;
+                ProfileMarketPage.Visibility = Visibility.Visible;
+                _ = ProfileMarketPage.LoadProfilesAsync();
             }
         }
 

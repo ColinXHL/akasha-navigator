@@ -1,4 +1,5 @@
 using System.IO;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using FloatWebPlayer.Helpers;
@@ -8,7 +9,7 @@ using FloatWebPlayer.Services;
 namespace FloatWebPlayer.Views
 {
     /// <summary>
-    /// 可用插件页面 - 显示内置但未安装的插件
+    /// 可用插件页面 - 显示所有内置插件（包括已安装和未安装）
     /// </summary>
     public partial class AvailablePluginsPage : UserControl
     {
@@ -28,27 +29,27 @@ namespace FloatWebPlayer.Views
         /// </summary>
         public void RefreshPluginList()
         {
-            var availablePlugins = GetAvailablePlugins();
+            var allPlugins = GetAllBuiltinPlugins();
             var searchText = SearchBox?.Text?.ToLower() ?? "";
 
             // 过滤搜索
             if (!string.IsNullOrWhiteSpace(searchText))
             {
-                availablePlugins = availablePlugins.Where(p =>
+                allPlugins = allPlugins.Where(p =>
                     p.Name.ToLower().Contains(searchText) ||
                     (p.Description?.ToLower().Contains(searchText) ?? false)
                 ).ToList();
             }
 
-            PluginList.ItemsSource = availablePlugins;
-            PluginCountText.Text = $"共 {availablePlugins.Count} 个可用插件";
-            NoPluginsText.Visibility = availablePlugins.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            PluginList.ItemsSource = allPlugins;
+            PluginCountText.Text = $"共 {allPlugins.Count} 个插件";
+            NoPluginsText.Visibility = allPlugins.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>
-        /// 获取可用（未安装）的插件列表
+        /// 获取所有内置插件列表（包括已安装和未安装）
         /// </summary>
-        private List<AvailablePluginViewModel> GetAvailablePlugins()
+        private List<AvailablePluginViewModel> GetAllBuiltinPlugins()
         {
             var result = new List<AvailablePluginViewModel>();
             var installedIds = PluginLibrary.Instance.GetInstalledPlugins()
@@ -72,9 +73,7 @@ namespace FloatWebPlayer.Views
                     if (manifest == null || string.IsNullOrEmpty(manifest.Id))
                         continue;
 
-                    // 跳过已安装的插件
-                    if (installedIds.Contains(manifest.Id))
-                        continue;
+                    var isInstalled = installedIds.Contains(manifest.Id);
 
                     result.Add(new AvailablePluginViewModel
                     {
@@ -85,7 +84,8 @@ namespace FloatWebPlayer.Views
                         Author = manifest.Author,
                         SourceDirectory = pluginDir,
                         HasDescription = !string.IsNullOrWhiteSpace(manifest.Description),
-                        HasAuthor = !string.IsNullOrWhiteSpace(manifest.Author)
+                        HasAuthor = !string.IsNullOrWhiteSpace(manifest.Author),
+                        IsInstalled = isInstalled
                     });
                 }
                 catch
@@ -110,21 +110,16 @@ namespace FloatWebPlayer.Views
         /// </summary>
         private void BtnInstall_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.Tag is string pluginId)
+            if (sender is Button btn && btn.Tag is AvailablePluginViewModel viewModel)
             {
-                // 获取插件源目录
-                var viewModel = (PluginList.ItemsSource as List<AvailablePluginViewModel>)?
-                    .FirstOrDefault(p => p.Id == pluginId);
-                
-                if (viewModel == null)
-                    return;
-
-                var result = PluginLibrary.Instance.InstallPlugin(pluginId, viewModel.SourceDirectory);
+                var result = PluginLibrary.Instance.InstallPlugin(viewModel.Id, viewModel.SourceDirectory);
                 if (result.IsSuccess)
                 {
                     MessageBox.Show($"插件 \"{viewModel.Name}\" 安装成功！", "安装成功",
                         MessageBoxButton.OK, MessageBoxImage.Information);
-                    RefreshPluginList();
+                    
+                    // 更新视图模型状态
+                    viewModel.IsInstalled = true;
                     
                     // 通知父窗口刷新
                     if (Window.GetWindow(this) is PluginCenterWindow centerWindow)
@@ -139,13 +134,56 @@ namespace FloatWebPlayer.Views
                 }
             }
         }
+
+        /// <summary>
+        /// 卸载按钮点击
+        /// </summary>
+        private void BtnUninstall_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is AvailablePluginViewModel viewModel)
+            {
+                var confirmResult = MessageBox.Show(
+                    $"确定要卸载插件 \"{viewModel.Name}\" 吗？",
+                    "确认卸载",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (confirmResult != MessageBoxResult.Yes)
+                    return;
+
+                var result = PluginLibrary.Instance.UninstallPlugin(viewModel.Id);
+                if (result.IsSuccess)
+                {
+                    MessageBox.Show($"插件 \"{viewModel.Name}\" 已卸载！", "卸载成功",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                    
+                    // 更新视图模型状态
+                    viewModel.IsInstalled = false;
+                    
+                    // 通知父窗口刷新
+                    if (Window.GetWindow(this) is PluginCenterWindow centerWindow)
+                    {
+                        centerWindow.RefreshCurrentPage();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show($"卸载失败: {result.ErrorMessage}", "卸载失败",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
     }
 
     /// <summary>
     /// 可用插件视图模型
     /// </summary>
-    public class AvailablePluginViewModel
+    public class AvailablePluginViewModel : INotifyPropertyChanged
     {
+        private bool _isInstalled;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
@@ -156,5 +194,26 @@ namespace FloatWebPlayer.Views
         public bool HasAuthor { get; set; }
         public Visibility HasDescriptionVisibility => HasDescription ? Visibility.Visible : Visibility.Collapsed;
         public Visibility HasAuthorVisibility => HasAuthor ? Visibility.Visible : Visibility.Collapsed;
+
+        /// <summary>
+        /// 插件是否已安装
+        /// </summary>
+        public bool IsInstalled
+        {
+            get => _isInstalled;
+            set
+            {
+                if (_isInstalled != value)
+                {
+                    _isInstalled = value;
+                    OnPropertyChanged(nameof(IsInstalled));
+                }
+            }
+        }
+
+        protected void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }

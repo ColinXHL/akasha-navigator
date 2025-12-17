@@ -36,4 +36,23 @@ namespace FloatWebPlayer.Helpers
             return value is Visibility v && v != Visibility.Visible;
         }
     }
+
+    /// <summary>
+    /// 零值到 Visible 转换器（用于搜索框占位符）
+    /// 当值为 0 时显示，否则隐藏
+    /// </summary>
+    public class ZeroToVisibleConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int intValue)
+                return intValue == 0 ? Visibility.Visible : Visibility.Collapsed;
+            return Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

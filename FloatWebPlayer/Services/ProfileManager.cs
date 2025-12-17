@@ -2,12 +2,89 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using FloatWebPlayer.Helpers;
 using FloatWebPlayer.Models;
 using FloatWebPlayer.Plugins;
 
 namespace FloatWebPlayer.Services
 {
+    #region Result Types
+
+    /// <summary>
+    /// Profile 创建结果
+    /// </summary>
+    public class CreateProfileResult
+    {
+        /// <summary>
+        /// 是否成功
+        /// </summary>
+        public bool IsSuccess { get; set; }
+
+        /// <summary>
+        /// 错误消息（失败时）
+        /// </summary>
+        public string? ErrorMessage { get; set; }
+
+        /// <summary>
+        /// 创建的 Profile ID（成功时）
+        /// </summary>
+        public string? ProfileId { get; set; }
+
+        /// <summary>
+        /// 创建成功结果
+        /// </summary>
+        public static CreateProfileResult Success(string profileId) => new()
+        {
+            IsSuccess = true,
+            ProfileId = profileId
+        };
+
+        /// <summary>
+        /// 创建失败结果
+        /// </summary>
+        public static CreateProfileResult Failure(string errorMessage) => new()
+        {
+            IsSuccess = false,
+            ErrorMessage = errorMessage
+        };
+    }
+
+    /// <summary>
+    /// Profile 删除结果
+    /// </summary>
+    public class DeleteProfileResult
+    {
+        /// <summary>
+        /// 是否成功
+        /// </summary>
+        public bool IsSuccess { get; set; }
+
+        /// <summary>
+        /// 错误消息（失败时）
+        /// </summary>
+        public string? ErrorMessage { get; set; }
+
+        /// <summary>
+        /// 创建成功结果
+        /// </summary>
+        public static DeleteProfileResult Success() => new()
+        {
+            IsSuccess = true
+        };
+
+        /// <summary>
+        /// 创建失败结果
+        /// </summary>
+        public static DeleteProfileResult Failure(string errorMessage) => new()
+        {
+            IsSuccess = false,
+            ErrorMessage = errorMessage
+        };
+    }
+
+    #endregion
+
     /// <summary>
     /// Profile 管理服务
     /// 负责加载、切换、保存 Profile 配置
@@ -262,6 +339,328 @@ namespace FloatWebPlayer.Services
             {
                 CurrentProfile = GetProfileById(AppConstants.DefaultProfileId) ?? CreateDefaultProfile();
                 ProfileChanged?.Invoke(this, CurrentProfile);
+            }
+        }
+
+        #endregion
+
+        #region Profile CRUD Operations
+
+        /// <summary>
+        /// 预定义的 Profile 图标列表
+        /// </summary>
+        public static readonly string[] ProfileIcons = new[]
+        {
+            "📦", "🎮", "🎬", "📺", "🎵", "📚", "🎯", "⚡", "🔧", "💡"
+        };
+
+        /// <summary>
+        /// 创建新的 Profile
+        /// </summary>
+        /// <param name="id">Profile ID（如果为空则自动生成）</param>
+        /// <param name="name">Profile 名称</param>
+        /// <param name="icon">Profile 图标</param>
+        /// <param name="pluginIds">要关联的插件 ID 列表</param>
+        /// <returns>创建结果</returns>
+        public CreateProfileResult CreateProfile(string? id, string name, string icon, List<string>? pluginIds)
+        {
+            // 验证名称
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return CreateProfileResult.Failure("Profile 名称不能为空");
+            }
+
+            // 生成或验证 ID
+            var profileId = string.IsNullOrWhiteSpace(id) ? GenerateProfileId(name) : id;
+
+            // 检查 ID 是否已存在
+            if (ProfileIdExists(profileId))
+            {
+                return CreateProfileResult.Failure("已存在同名 Profile");
+            }
+
+            // 验证图标
+            if (string.IsNullOrWhiteSpace(icon))
+            {
+                icon = "📦";
+            }
+
+            try
+            {
+                // 创建 Profile 对象
+                var profile = new GameProfile
+                {
+                    Id = profileId,
+                    Name = name.Trim(),
+                    Icon = icon,
+                    Version = 1,
+                    Defaults = new ProfileDefaults
+                    {
+                        Url = AppConstants.DefaultHomeUrl,
+                        Opacity = 1.0,
+                        SeekSeconds = AppConstants.DefaultSeekSeconds
+                    }
+                };
+
+                // 创建 Profile 目录和配置文件
+                var profileDir = GetProfileDirectory(profileId);
+                Directory.CreateDirectory(profileDir);
+                SaveProfile(profile);
+
+                // 添加到订阅
+                AddProfileToSubscription(profileId);
+
+                // 添加到内存列表
+                Profiles.Add(profile);
+
+                // 关联插件
+                if (pluginIds != null && pluginIds.Count > 0)
+                {
+                    PluginAssociationManager.Instance.AddPluginsToProfile(pluginIds, profileId);
+                }
+
+                LogService.Instance.Info("ProfileManager", $"成功创建 Profile '{profileId}'");
+                return CreateProfileResult.Success(profileId);
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Error("ProfileManager", $"创建 Profile 失败: {ex.Message}");
+                return CreateProfileResult.Failure($"创建失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 更新 Profile 名称和图标
+        /// </summary>
+        /// <param name="id">Profile ID</param>
+        /// <param name="newName">新名称</param>
+        /// <param name="newIcon">新图标</param>
+        /// <returns>是否成功</returns>
+        public bool UpdateProfile(string id, string newName, string newIcon)
+        {
+            // 验证名称
+            if (string.IsNullOrWhiteSpace(newName))
+            {
+                LogService.Instance.Warn("ProfileManager", "更新 Profile 失败: 名称不能为空");
+                return false;
+            }
+
+            // 查找 Profile
+            var profile = GetProfileById(id);
+            if (profile == null)
+            {
+                LogService.Instance.Warn("ProfileManager", $"更新 Profile 失败: Profile '{id}' 不存在");
+                return false;
+            }
+
+            try
+            {
+                // 更新属性
+                profile.Name = newName.Trim();
+                if (!string.IsNullOrWhiteSpace(newIcon))
+                {
+                    profile.Icon = newIcon;
+                }
+
+                // 保存到文件
+                SaveProfile(profile);
+
+                LogService.Instance.Info("ProfileManager", $"成功更新 Profile '{id}'");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Error("ProfileManager", $"更新 Profile 失败: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 删除 Profile
+        /// </summary>
+        /// <param name="id">Profile ID</param>
+        /// <returns>删除结果</returns>
+        public DeleteProfileResult DeleteProfile(string id)
+        {
+            // 验证 ID
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return DeleteProfileResult.Failure("Profile ID 不能为空");
+            }
+
+            // 不允许删除默认 Profile
+            if (IsDefaultProfile(id))
+            {
+                return DeleteProfileResult.Failure("默认 Profile 不能删除");
+            }
+
+            // 查找 Profile
+            var profile = GetProfileById(id);
+            if (profile == null)
+            {
+                // Profile 不存在，静默成功
+                return DeleteProfileResult.Success();
+            }
+
+            try
+            {
+                // 如果是当前 Profile，先切换到默认 Profile
+                if (CurrentProfile.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                {
+                    SwitchProfile(AppConstants.DefaultProfileId);
+                }
+
+                // 删除插件关联
+                PluginAssociationManager.Instance.RemoveProfile(id);
+
+                // 从订阅中移除
+                RemoveProfileFromSubscription(id);
+
+                // 从内存列表中移除
+                Profiles.RemoveAll(p => p.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+                // 删除 Profile 目录
+                var profileDir = GetProfileDirectory(id);
+                if (Directory.Exists(profileDir))
+                {
+                    Directory.Delete(profileDir, recursive: true);
+                }
+
+                LogService.Instance.Info("ProfileManager", $"成功删除 Profile '{id}'");
+                return DeleteProfileResult.Success();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return DeleteProfileResult.Failure($"删除 Profile 目录失败：权限不足。{ex.Message}");
+            }
+            catch (IOException ex)
+            {
+                return DeleteProfileResult.Failure($"删除 Profile 目录失败：文件被占用。{ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Error("ProfileManager", $"删除 Profile 失败: {ex.Message}");
+                return DeleteProfileResult.Failure($"删除失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 检查是否是默认 Profile
+        /// </summary>
+        /// <param name="id">Profile ID</param>
+        /// <returns>是否是默认 Profile</returns>
+        public bool IsDefaultProfile(string id)
+        {
+            return id.Equals(AppConstants.DefaultProfileId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 检查 Profile ID 是否已存在
+        /// </summary>
+        /// <param name="id">Profile ID</param>
+        /// <returns>是否存在</returns>
+        public bool ProfileIdExists(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return false;
+
+            return GetProfileById(id) != null;
+        }
+
+        /// <summary>
+        /// 根据名称生成 Profile ID
+        /// </summary>
+        /// <param name="name">Profile 名称</param>
+        /// <returns>生成的 ID</returns>
+        public string GenerateProfileId(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return $"profile-{Guid.NewGuid():N}".Substring(0, 16);
+            }
+
+            // 将名称转换为 kebab-case ID
+            var id = name.Trim().ToLowerInvariant();
+            
+            // 替换空格和特殊字符为连字符
+            id = Regex.Replace(id, @"[^a-z0-9\u4e00-\u9fa5]", "-");
+            
+            // 移除连续的连字符
+            id = Regex.Replace(id, @"-+", "-");
+            
+            // 移除首尾连字符
+            id = id.Trim('-');
+
+            // 如果 ID 为空或太短，添加随机后缀
+            if (string.IsNullOrEmpty(id) || id.Length < 2)
+            {
+                id = $"profile-{Guid.NewGuid():N}".Substring(0, 16);
+            }
+
+            // 如果 ID 已存在，添加数字后缀
+            var baseId = id;
+            var counter = 1;
+            while (ProfileIdExists(id))
+            {
+                id = $"{baseId}-{counter}";
+                counter++;
+            }
+
+            return id;
+        }
+
+        /// <summary>
+        /// 将 Profile 添加到订阅配置
+        /// </summary>
+        private void AddProfileToSubscription(string profileId)
+        {
+            var subscriptionsPath = AppPaths.SubscriptionsFilePath;
+            var config = new SubscriptionConfig();
+            
+            if (File.Exists(subscriptionsPath))
+            {
+                try
+                {
+                    config = SubscriptionConfig.LoadFromFile(subscriptionsPath);
+                }
+                catch
+                {
+                    config = new SubscriptionConfig();
+                }
+            }
+
+            if (!config.IsProfileSubscribed(profileId))
+            {
+                config.AddProfile(profileId);
+                config.SaveToFile(subscriptionsPath);
+            }
+
+            // 重新加载 SubscriptionManager
+            SubscriptionManager.Instance.Load();
+        }
+
+        /// <summary>
+        /// 从订阅配置中移除 Profile
+        /// </summary>
+        private void RemoveProfileFromSubscription(string profileId)
+        {
+            var subscriptionsPath = AppPaths.SubscriptionsFilePath;
+            
+            if (!File.Exists(subscriptionsPath))
+                return;
+
+            try
+            {
+                var config = SubscriptionConfig.LoadFromFile(subscriptionsPath);
+                config.RemoveProfile(profileId);
+                config.SaveToFile(subscriptionsPath);
+                
+                // 重新加载 SubscriptionManager
+                SubscriptionManager.Instance.Load();
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Warn("ProfileManager", $"从订阅配置移除 Profile 失败: {ex.Message}");
             }
         }
 

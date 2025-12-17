@@ -1,19 +1,25 @@
 {
   "version": 1,
+  "name": "FloatWebPlayer 官方 Profile 市场",
+  "description": "FloatWebPlayer 官方维护的 Profile 集合，包含针对不同游戏优化的配置",
   "profiles": [
     {
       "id": "default",
       "name": "默认",
-      "icon": "📺",
       "description": "通用配置，适用于一般视频观看场景",
-      "recommendedPlugins": []
+      "author": "FloatWebPlayer",
+      "targetGame": "",
+      "version": "1.0.0",
+      "pluginIds": []
     },
     {
       "id": "genshin",
       "name": "原神",
-      "icon": "🎮",
-      "description": "原神游戏配置，包含方向标记插件",
-      "recommendedPlugins": ["genshin-direction-marker"]
+      "description": "原神游戏配置，包含方向标记插件，帮助玩家在观看攻略视频时快速定位方向",
+      "author": "FloatWebPlayer",
+      "targetGame": "原神",
+      "version": "1.0.0",
+      "pluginIds": ["genshin-direction-marker"]
     }
   ]
 }

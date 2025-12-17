@@ -164,7 +164,28 @@ namespace FloatWebPlayer.Views
             {
                 _currentProfileId = profileId;
                 RefreshPluginList();
+                UpdateProfileButtons();
             }
+        }
+
+        /// <summary>
+        /// 更新 Profile 操作按钮状态
+        /// </summary>
+        private void UpdateProfileButtons()
+        {
+            if (string.IsNullOrEmpty(_currentProfileId))
+            {
+                BtnEditProfile.IsEnabled = false;
+                BtnDeleteProfile.IsEnabled = false;
+                return;
+            }
+
+            // 编辑按钮始终可用
+            BtnEditProfile.IsEnabled = true;
+
+            // 删除按钮对默认 Profile 禁用
+            var isDefault = ProfileManager.Instance.IsDefaultProfile(_currentProfileId);
+            BtnDeleteProfile.IsEnabled = !isDefault;
         }
 
         /// <summary>
@@ -302,6 +323,117 @@ namespace FloatWebPlayer.Views
                 {
                     PluginAssociationManager.Instance.RemovePluginFromProfile(pluginId, _currentProfileId);
                     RefreshPluginList();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 新建 Profile 按钮点击
+        /// </summary>
+        private void BtnNewProfile_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ProfileCreateDialog();
+            dialog.Owner = Window.GetWindow(this);
+            
+            if (dialog.ShowDialog() == true && dialog.IsConfirmed && !string.IsNullOrEmpty(dialog.ProfileId))
+            {
+                // 刷新 Profile 列表
+                RefreshProfileList();
+                
+                // 选中新创建的 Profile
+                SelectProfile(dialog.ProfileId);
+            }
+        }
+
+        /// <summary>
+        /// 编辑 Profile 按钮点击
+        /// </summary>
+        private void BtnEditProfile_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_currentProfileId))
+            {
+                MessageBox.Show("请先选择一个 Profile", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var profile = ProfileManager.Instance.GetProfileById(_currentProfileId);
+            if (profile == null)
+            {
+                MessageBox.Show("Profile 不存在", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var dialog = new ProfileEditDialog(profile);
+            dialog.Owner = Window.GetWindow(this);
+            
+            if (dialog.ShowDialog() == true && dialog.IsConfirmed)
+            {
+                // 刷新 Profile 列表以显示更新后的名称
+                RefreshProfileList();
+            }
+        }
+
+        /// <summary>
+        /// 删除 Profile 按钮点击
+        /// </summary>
+        private void BtnDeleteProfile_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_currentProfileId))
+            {
+                MessageBox.Show("请先选择一个 Profile", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 检查是否是默认 Profile
+            if (ProfileManager.Instance.IsDefaultProfile(_currentProfileId))
+            {
+                MessageBox.Show("默认 Profile 不能删除", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var profile = ProfileManager.Instance.GetProfileById(_currentProfileId);
+            var profileName = profile?.Name ?? _currentProfileId;
+
+            // 显示确认对话框
+            var result = MessageBox.Show(
+                $"确定要删除 Profile \"{profileName}\" 吗？\n\n此操作将删除该 Profile 及其所有插件关联，但不会卸载插件本体。",
+                "确认删除",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            // 执行删除
+            var deleteResult = ProfileManager.Instance.DeleteProfile(_currentProfileId);
+            
+            if (deleteResult.IsSuccess)
+            {
+                // 刷新 Profile 列表（会自动切换到默认 Profile）
+                RefreshProfileList();
+                MessageBox.Show($"Profile \"{profileName}\" 已删除", "删除成功", 
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show($"删除失败: {deleteResult.ErrorMessage}", "错误", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 选中指定的 Profile
+        /// </summary>
+        private void SelectProfile(string profileId)
+        {
+            for (int i = 0; i < ProfileSelector.Items.Count; i++)
+            {
+                if (ProfileSelector.Items[i] is ComboBoxItem item && 
+                    item.Tag is string id && 
+                    id.Equals(profileId, StringComparison.OrdinalIgnoreCase))
+                {
+                    ProfileSelector.SelectedIndex = i;
+                    break;
                 }
             }
         }
@@ -450,6 +582,7 @@ namespace FloatWebPlayer.Views
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
     }
 
     /// <summary>

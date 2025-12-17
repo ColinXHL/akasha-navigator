@@ -1,6 +1,7 @@
 <UserControl x:Class="FloatWebPlayer.Views.AvailablePluginsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:FloatWebPlayer.Helpers"
              Background="Transparent"
              Cursor="Arrow">
     
@@ -100,9 +101,20 @@
             </Style.Triggers>
         </Style>
 
+        <!-- 值转换器 -->
+        <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <helpers:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+
         <!-- 状态标签样式 - 可用 -->
         <Style x:Key="AvailableTagStyle" TargetType="Border">
             <Setter Property="Background" Value="#1A2A3A"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="8,3"/>
+        </Style>
+
+        <!-- 状态标签样式 - 已安装 -->
+        <Style x:Key="InstalledTagStyle" TargetType="Border">
+            <Setter Property="Background" Value="#2A3A2A"/>
             <Setter Property="CornerRadius" Value="3"/>
             <Setter Property="Padding" Value="8,3"/>
         </Style>
@@ -223,8 +235,15 @@
                                                        VerticalAlignment="Center" Margin="8,0,0,0"/>
                                         </StackPanel>
                                         
-                                        <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}">
+                                        <!-- 可安装标签：未安装时显示 -->
+                                        <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
+                                                Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                                             <TextBlock Text="可安装" Foreground="#60A5FA" FontSize="11"/>
+                                        </Border>
+                                        <!-- 已安装标签：已安装时显示 -->
+                                        <Border Grid.Column="1" Style="{StaticResource InstalledTagStyle}"
+                                                Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="已安装" Foreground="#4ADE80" FontSize="11"/>
                                         </Border>
                                     </Grid>
 
@@ -239,8 +258,14 @@
 
                                     <!-- 第三行：操作按钮 -->
                                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
+                                        <!-- 安装按钮：未安装时显示 -->
                                         <Button Content="📥 安装" Style="{StaticResource PrimaryButtonStyle}"
-                                                Click="BtnInstall_Click" Tag="{Binding Id}"/>
+                                                Click="BtnInstall_Click" Tag="{Binding}"
+                                                Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                        <!-- 卸载按钮：已安装时显示 -->
+                                        <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
+                                                Click="BtnUninstall_Click" Tag="{Binding}"
+                                                Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

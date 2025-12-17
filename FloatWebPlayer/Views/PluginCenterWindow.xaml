@@ -202,11 +202,8 @@
                         <!-- 我的 Profile 页面 -->
                         <local:MyProfilesPage x:Name="MyProfilesPage" Visibility="Collapsed"/>
                         
-                        <!-- Profile 市场页面占位 -->
-                        <StackPanel x:Name="ProfileMarketPlaceholder" Visibility="Collapsed">
-                            <TextBlock Text="Profile 市场" FontSize="18" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,16"/>
-                            <TextBlock Text="此功能正在开发中..." Foreground="#888" FontSize="13"/>
-                        </StackPanel>
+                        <!-- Profile 市场页面 -->
+                        <local:ProfileMarketPage x:Name="ProfileMarketPage" Visibility="Collapsed"/>
                     </Grid>
                 </Border>
             </Grid>
