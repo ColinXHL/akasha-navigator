@@ -91,7 +91,6 @@ jobs:
   build_installer:
     runs-on: windows-latest
     needs: [validate, build_dist]
-
     steps:
       - uses: actions/checkout@v4
 
@@ -103,7 +102,12 @@ jobs:
       - name: 📦 Unpack
         run: |
           cd dist
+          Write-Host "当前目录：$(Get-Location)"
+          Write-Host "Unpack 前文件列表："
+          Get-ChildItem -Recurse | ForEach-Object { Write-Host $_.FullName }
           7z x "FloatWebPlayer_v${{ needs.validate.outputs.version }}.7z"
+          Write-Host "Unpack 后文件列表："
+          Get-ChildItem -Recurse | ForEach-Object { Write-Host $_.FullName }
 
       - name: 📥 Download kachina-builder
         uses: robinraju/release-downloader@v1.8
@@ -115,6 +119,14 @@ jobs:
       - name: 🧰 Build Installer
         run: |
           cd dist
+          Write-Host "当前目录：$(Get-Location)"
+          Write-Host "准备打包目录内容："
+          Get-ChildItem -Recurse | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "检查 kachina-builder.exe 是否存在："
+          if (Test-Path "..\kachina-builder.exe") { Write-Host "✅ 找到 kachina-builder.exe" } else { Write-Host "❌ 未找到 kachina-builder.exe" }
+          Write-Host "检查要打包的目录是否存在："
+          if (Test-Path "FloatWebPlayer") { Write-Host "✅ FloatWebPlayer 目录存在" } else { Write-Host "❌ FloatWebPlayer 目录不存在" }
+          # 执行打包
           ..\kachina-builder.exe pack `
             -c ..\Build\kachina.config.json `
             -d FloatWebPlayer `
