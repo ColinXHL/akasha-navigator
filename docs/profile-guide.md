@@ -217,5 +217,6 @@ Profile 是配置容器，可以包含多个插件。一个插件可以被多个
 ---
 
 相关文档：
-- [插件 API 文档](plugin-api.md)
+- [插件开发指南](plugin-development.md)
+- [API 参考](api/README.md)
 - [插件发布指南](plugin-marketplace.md)

@@ -323,5 +323,6 @@ my-plugin/
 ---
 
 相关文档：
-- [插件 API 文档](plugin-api.md)
+- [插件开发指南](plugin-development.md)
+- [API 参考](api/README.md)
 - [Profile 创建指南](profile-guide.md)

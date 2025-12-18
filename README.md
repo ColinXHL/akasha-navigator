@@ -97,6 +97,13 @@ SandronePlayer · 悬浮攻略播放器，一个基于 WPF + WebView2 的 Window
 
 > 💡 快捷键可在设置中自定义，支持组合键（Ctrl、Alt、Shift）。
 
+## 文档
+
+- [用户指南](docs/user-guide.md) - 安装、使用、常见问题
+- [插件开发指南](docs/plugin-development.md) - 插件开发入门
+- [API 参考](docs/api/README.md) - 插件 API 文档
+- [Profile 创建指南](docs/profile-guide.md) - 创建和发布 Profile
+
 ## 从源码构建
 
 ```powershell

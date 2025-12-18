@@ -92,6 +92,13 @@ Your system needs to meet the following requirements:
 
 > 💡 Hotkeys are fully customizable in Settings. Modifier keys (Ctrl, Alt, Shift) are supported.
 
+## Documentation
+
+- [User Guide](docs/user-guide.md) - Installation, usage, FAQ
+- [Plugin Development](docs/plugin-development.md) - Getting started with plugins
+- [API Reference](docs/api/README.md) - Plugin API documentation
+- [Profile Guide](docs/profile-guide.md) - Creating and publishing profiles
+
 ## Build from Source
 
 ```powershell
