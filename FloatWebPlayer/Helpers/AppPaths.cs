@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace FloatWebPlayer.Helpers
 {
@@ -130,6 +132,34 @@ namespace FloatWebPlayer.Helpers
             Directory.CreateDirectory(DataDirectory);
             Directory.CreateDirectory(ProfilesDirectory);
             Directory.CreateDirectory(InstalledPluginsDirectory);
+
+            // 为 WebView2 数据文件夹设置写权限
+            EnsureWebView2FolderPermissions();
+        }
+
+        /// <summary>
+        /// 确保 WebView2 数据文件夹具有写权限
+        /// 解决某些环境下 WebView2 无法写入缓存/Cookie 的问题
+        /// </summary>
+        private static void EnsureWebView2FolderPermissions()
+        {
+            try
+            {
+                var info = new DirectoryInfo(WebView2DataDirectory);
+                var access = info.GetAccessControl();
+                access.AddAccessRule(new FileSystemAccessRule(
+                    "Everyone",
+                    FileSystemRights.FullControl,
+                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                    PropagationFlags.None,
+                    AccessControlType.Allow));
+                info.SetAccessControl(access);
+            }
+            catch
+            {
+                // 权限设置失败时静默处理，不影响程序启动
+                // 可能是普通用户权限不足，WebView2 仍可能正常工作
+            }
         }
     }
 }
