@@ -37,7 +37,7 @@ SandronePlayer · A floating web player built with WPF + WebView2 for Windows, d
   * **Cookie Persistence**: Stay logged in to Bilibili and other websites
 
 * Plugin System
-  * **JavaScript Plugins**: JS plugin architecture powered by Jint engine
+  * **JavaScript Plugins**: JS plugin architecture powered by V8 engine
   * **Permission Control**: Plugins declare required permissions (subtitle, overlay, player, window, storage, network, events)
   * **Plugin Marketplace**: Subscribe to sources and install plugins with one click
   * **Hot Reload**: Reload plugins during development without restarting
@@ -123,7 +123,7 @@ This project would not be possible without:
 * [kachina-installer](https://github.com/YuehaiTeam/kachina-installer)
 * [better-genshin-impact](https://github.com/babalae/better-genshin-impact)
 * [Microsoft WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
-* [Jint](https://github.com/sebastienros/jint) - JavaScript Interpreter
+* [ClearScript](https://github.com/nicksoftware/ClearScript) - V8 JavaScript Engine
 
 ## License
 

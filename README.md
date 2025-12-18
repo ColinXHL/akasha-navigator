@@ -42,7 +42,7 @@ SandronePlayer · 悬浮攻略播放器，一个基于 WPF + WebView2 的 Window
   * **Cookie 持久化**：保持 B 站等网站的登录状态
 
 * 插件系统
-  * **JavaScript 插件**：基于 Jint 引擎的 JS 插件架构
+  * **JavaScript 插件**：基于 V8 引擎的 JS 插件架构
   * **权限控制**：插件需声明所需权限（字幕、覆盖层、播放器、窗口、存储、网络、事件）
   * **插件市场**：支持订阅源，一键安装插件
   * **热重载**：开发时无需重启即可重载插件
@@ -128,7 +128,7 @@ dotnet test
 * [kachina-installer](https://github.com/YuehaiTeam/kachina-installer)
 * [better-genshin-impact](https://github.com/babalae/better-genshin-impact)
 * [Microsoft WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
-* [Jint](https://github.com/sebastienros/jint) - JavaScript 解释器
+* [ClearScript](https://github.com/nicksoftware/ClearScript) - V8 JavaScript 引擎
 
 ## 许可证
 
