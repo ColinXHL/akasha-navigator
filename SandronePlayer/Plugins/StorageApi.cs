@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using Microsoft.ClearScript;
 
 namespace SandronePlayer.Plugins
 {
@@ -47,6 +48,7 @@ namespace SandronePlayer.Plugins
         /// <param name="key">键名</param>
         /// <param name="data">数据对象</param>
         /// <returns>是否成功</returns>
+        [ScriptMember("save")]
         public bool Save(string key, object data)
         {
             if (!ValidateKey(key))
@@ -72,6 +74,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="key">键名</param>
         /// <returns>数据对象，不存在或失败返回 null</returns>
+        [ScriptMember("load")]
         public object? Load(string key)
         {
             if (!ValidateKey(key))
@@ -98,6 +101,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="key">键名</param>
         /// <returns>是否成功</returns>
+        [ScriptMember("delete")]
         public bool Delete(string key)
         {
             if (!ValidateKey(key))
@@ -124,6 +128,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="key">键名</param>
         /// <returns>是否存在</returns>
+        [ScriptMember("exists")]
         public bool Exists(string key)
         {
             if (!ValidateKey(key))
@@ -137,6 +142,7 @@ namespace SandronePlayer.Plugins
         /// 列出所有存储的键名
         /// </summary>
         /// <returns>键名数组</returns>
+        [ScriptMember("list")]
         public string[] List()
         {
             try

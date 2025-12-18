@@ -14,6 +14,22 @@ namespace SandronePlayer.Services
     /// </summary>
     public class SubtitleService
     {
+        #region Static HttpClient
+
+        /// <summary>
+        /// 静态 HttpClient，应用生命周期内复用，避免 socket 耗尽
+        /// </summary>
+        private static readonly System.Net.Http.HttpClient _httpClient;
+
+        static SubtitleService()
+        {
+            _httpClient = new System.Net.Http.HttpClient();
+            _httpClient.DefaultRequestHeaders.Add("Referer", "https://www.bilibili.com/");
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+        }
+
+        #endregion
+
         #region Singleton
 
         private static SubtitleService? _instance;
@@ -65,6 +81,11 @@ namespace SandronePlayer.Services
         private SubtitleData? _currentSubtitleData;
         private SubtitleEntry? _currentSubtitle;
         private CoreWebView2? _attachedWebView;
+        
+        /// <summary>
+        /// 缓存的字幕数组，避免重复创建
+        /// </summary>
+        private SubtitleEntry[]? _cachedSubtitleArray;
 
         #endregion
 
@@ -228,7 +249,7 @@ namespace SandronePlayer.Services
         }
 
         /// <summary>
-        /// 获取所有字幕（返回不可变副本）
+        /// 获取所有字幕（返回缓存的不可变数组）
         /// </summary>
         public IReadOnlyList<SubtitleEntry> GetAllSubtitles()
         {
@@ -237,8 +258,8 @@ namespace SandronePlayer.Services
                 if (_currentSubtitleData == null)
                     return Array.Empty<SubtitleEntry>();
 
-                // 返回副本以防止外部修改
-                return _currentSubtitleData.Body.ToArray();
+                // 返回缓存的数组，避免重复创建
+                return _cachedSubtitleArray ??= _currentSubtitleData.Body.ToArray();
             }
         }
 
@@ -251,6 +272,7 @@ namespace SandronePlayer.Services
             {
                 _currentSubtitleData = null;
                 _currentSubtitle = null;
+                _cachedSubtitleArray = null; // 清除缓存
             }
 
             SubtitleCleared?.Invoke(this, EventArgs.Empty);
@@ -315,6 +337,7 @@ namespace SandronePlayer.Services
             {
                 _currentSubtitleData = data;
                 _currentSubtitle = null;
+                _cachedSubtitleArray = null; // 使缓存失效
             }
 
             LogService.Instance.Info("SubtitleService", $"字幕数据已加载，共 {data.Body.Count} 条字幕，语言: {data.Language}");
@@ -485,11 +508,7 @@ namespace SandronePlayer.Services
         {
             try
             {
-                using var httpClient = new System.Net.Http.HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Referer", "https://www.bilibili.com/");
-                httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-
-                var response = await httpClient.GetStringAsync(url);
+                var response = await _httpClient.GetStringAsync(url);
                 
                 if (string.IsNullOrEmpty(response))
                 {
@@ -717,11 +736,7 @@ namespace SandronePlayer.Services
 
                 LogService.Instance.Debug("SubtitleService", $"开始请求字幕内容: {url.Substring(0, Math.Min(80, url.Length))}...");
 
-                using var httpClient = new System.Net.Http.HttpClient();
-                httpClient.DefaultRequestHeaders.Add("Referer", "https://www.bilibili.com/");
-                httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-
-                var response = await httpClient.GetStringAsync(url);
+                var response = await _httpClient.GetStringAsync(url);
                 
                 if (string.IsNullOrEmpty(response))
                 {
@@ -831,9 +846,11 @@ namespace SandronePlayer.Services
             if (_attachedWebView == webView)
             {
                 _attachedWebView = null;
+                // 清理字幕数据，释放内存
+                Clear();
             }
 
-            LogService.Instance.Debug("SubtitleService", "已从 WebView2 分离");
+            LogService.Instance.Debug("SubtitleService", "已从 WebView2 分离并清理数据");
         }
 
         #endregion

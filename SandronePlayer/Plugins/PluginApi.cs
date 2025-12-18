@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Microsoft.ClearScript;
 using SandronePlayer.Models;
 using SandronePlayer.Views;
 
@@ -44,18 +45,21 @@ namespace SandronePlayer.Plugins
         /// 核心 API（日志、版本等）
         /// 无需权限
         /// </summary>
+        [ScriptMember("core")]
         public CoreApi Core { get; }
 
         /// <summary>
         /// 配置 API
         /// 无需权限
         /// </summary>
+        [ScriptMember("config")]
         public ConfigApi Config { get; }
 
         /// <summary>
         /// Profile 信息（只读）
         /// 无需权限
         /// </summary>
+        [ScriptMember("profile")]
         public ProfileInfo Profile { get; }
 
         #endregion
@@ -66,6 +70,7 @@ namespace SandronePlayer.Plugins
         /// 覆盖层 API
         /// 需要 "overlay" 权限
         /// </summary>
+        [ScriptMember("overlay")]
         public OverlayApi? Overlay => HasPermission(PluginPermissions.Overlay) ? _overlayApi : null;
         private readonly OverlayApi? _overlayApi;
 
@@ -73,6 +78,7 @@ namespace SandronePlayer.Plugins
         /// 字幕 API
         /// 需要 "subtitle" 权限
         /// </summary>
+        [ScriptMember("subtitle")]
         public SubtitleApi? Subtitle => HasPermission(PluginPermissions.Subtitle) ? _subtitleApi : null;
         private readonly SubtitleApi? _subtitleApi;
 
@@ -84,6 +90,7 @@ namespace SandronePlayer.Plugins
         /// 播放器控制 API
         /// 需要 "player" 权限
         /// </summary>
+        [ScriptMember("player")]
         public PlayerApi? Player => HasPermission(PluginPermissions.Player) ? _playerApi : null;
         private readonly PlayerApi? _playerApi;
 
@@ -91,6 +98,7 @@ namespace SandronePlayer.Plugins
         /// 窗口控制 API
         /// 需要 "window" 权限
         /// </summary>
+        [ScriptMember("window")]
         public WindowApi? Window => HasPermission(PluginPermissions.Window) ? _windowApi : null;
         private readonly WindowApi? _windowApi;
 
@@ -98,6 +106,7 @@ namespace SandronePlayer.Plugins
         /// 数据存储 API
         /// 需要 "storage" 权限
         /// </summary>
+        [ScriptMember("storage")]
         public StorageApi? Storage => HasPermission(PluginPermissions.Storage) ? _storageApi : null;
         private readonly StorageApi? _storageApi;
 
@@ -105,6 +114,7 @@ namespace SandronePlayer.Plugins
         /// HTTP 网络请求 API
         /// 需要 "network" 权限
         /// </summary>
+        [ScriptMember("http")]
         public HttpApi? Http => HasPermission(PluginPermissions.Network) ? _httpApi : null;
         private readonly HttpApi? _httpApi;
 
@@ -112,6 +122,7 @@ namespace SandronePlayer.Plugins
         /// 事件系统 API
         /// 需要 "events" 权限
         /// </summary>
+        [ScriptMember("event")]
         public EventApi? Event => HasPermission(PluginPermissions.Events) ? _eventApi : null;
         private readonly EventApi? _eventApi;
 
@@ -212,6 +223,7 @@ namespace SandronePlayer.Plugins
         /// 输出日志（快捷方法）
         /// </summary>
         /// <param name="message">日志内容</param>
+        [ScriptMember("log")]
         public void Log(object message)
         {
             Core.Log(message);

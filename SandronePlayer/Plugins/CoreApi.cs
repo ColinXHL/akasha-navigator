@@ -1,4 +1,5 @@
 using System;
+using Microsoft.ClearScript;
 
 namespace SandronePlayer.Plugins
 {
@@ -20,6 +21,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 主程序版本
         /// </summary>
+        [ScriptMember("version")]
         public string Version => AppConstants.Version;
 
         #endregion
@@ -43,6 +45,7 @@ namespace SandronePlayer.Plugins
         /// 输出日志信息到主程序日志系统
         /// </summary>
         /// <param name="message">日志内容</param>
+        [ScriptMember("log")]
         public void Log(object message)
         {
             var text = message?.ToString() ?? "null";
@@ -53,6 +56,7 @@ namespace SandronePlayer.Plugins
         /// 输出警告日志
         /// </summary>
         /// <param name="message">警告内容</param>
+        [ScriptMember("warn")]
         public void Warn(object message)
         {
             var text = message?.ToString() ?? "null";
@@ -63,6 +67,7 @@ namespace SandronePlayer.Plugins
         /// 输出错误日志
         /// </summary>
         /// <param name="message">错误内容</param>
+        [ScriptMember("error")]
         public void Error(object message)
         {
             var text = message?.ToString() ?? "null";

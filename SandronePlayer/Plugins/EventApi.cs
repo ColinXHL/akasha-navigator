@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.ClearScript;
 
 namespace SandronePlayer.Plugins
 {
@@ -14,6 +15,8 @@ namespace SandronePlayer.Plugins
 
         private readonly PluginContext _context;
         private readonly Dictionary<string, List<Action<object>>> _listeners;
+        // V8 引擎的 JavaScript 回调函数列表
+        private readonly Dictionary<string, List<dynamic>> _jsListeners;
 
         #endregion
 
@@ -53,6 +56,7 @@ namespace SandronePlayer.Plugins
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _listeners = new Dictionary<string, List<Action<object>>>(StringComparer.OrdinalIgnoreCase);
+            _jsListeners = new Dictionary<string, List<dynamic>>(StringComparer.OrdinalIgnoreCase);
         }
 
         #endregion
@@ -60,7 +64,7 @@ namespace SandronePlayer.Plugins
         #region Public Methods
 
         /// <summary>
-        /// 注册事件监听器
+        /// 注册事件监听器（C# 版本，用于内部调用和测试）
         /// </summary>
         /// <param name="eventName">事件名称</param>
         /// <param name="callback">回调函数</param>
@@ -78,16 +82,44 @@ namespace SandronePlayer.Plugins
             if (!list.Contains(callback))
             {
                 list.Add(callback);
-                Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: registered listener for '{eventName}'");
+                Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: registered C# listener for '{eventName}'");
             }
         }
 
         /// <summary>
-        /// 取消事件监听
+        /// 注册事件监听器（V8 JavaScript 版本）
+        /// </summary>
+        /// <param name="eventName">事件名称</param>
+        /// <param name="callback">回调函数（支持 V8 JavaScript 函数）</param>
+        [ScriptMember("on")]
+        public void OnJs(string eventName, object callback)
+        {
+            if (string.IsNullOrWhiteSpace(eventName) || callback == null)
+                return;
+
+            // 如果是 Action<object>，使用 C# 版本
+            if (callback is Action<object> action)
+            {
+                On(eventName, action);
+                return;
+            }
+
+            if (!_jsListeners.TryGetValue(eventName, out var list))
+            {
+                list = new List<dynamic>();
+                _jsListeners[eventName] = list;
+            }
+
+            list.Add(callback);
+            Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: registered JS listener for '{eventName}'");
+        }
+
+        /// <summary>
+        /// 取消事件监听（C# 版本）
         /// </summary>
         /// <param name="eventName">事件名称</param>
         /// <param name="callback">回调函数（为 null 时移除该事件的所有监听器）</param>
-        public void Off(string eventName, Action<object>? callback = null)
+        public void Off(string eventName, Action<object>? callback)
         {
             if (string.IsNullOrWhiteSpace(eventName))
                 return;
@@ -97,15 +129,57 @@ namespace SandronePlayer.Plugins
 
             if (callback == null)
             {
-                // 移除该事件的所有监听器
                 list.Clear();
+                // 同时清理 JS 监听器
+                if (_jsListeners.TryGetValue(eventName, out var jsList))
+                {
+                    jsList.Clear();
+                }
                 Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: removed all listeners for '{eventName}'");
             }
             else
             {
-                // 移除指定的监听器
                 list.Remove(callback);
-                Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: removed listener for '{eventName}'");
+                Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: removed C# listener for '{eventName}'");
+            }
+        }
+
+        /// <summary>
+        /// 取消事件监听（V8 JavaScript 版本）
+        /// </summary>
+        /// <param name="eventName">事件名称</param>
+        /// <param name="callback">回调函数（为 null 时移除该事件的所有监听器）</param>
+        [ScriptMember("off")]
+        public void OffJs(string eventName, object? callback = null)
+        {
+            if (string.IsNullOrWhiteSpace(eventName))
+                return;
+
+            // 如果是 Action<object>，使用 C# 版本
+            if (callback is Action<object> action)
+            {
+                Off(eventName, action);
+                return;
+            }
+
+            // 清理 JavaScript 监听器
+            if (_jsListeners.TryGetValue(eventName, out var jsList))
+            {
+                if (callback == null)
+                {
+                    jsList.Clear();
+                    // 同时清理 C# 监听器
+                    if (_listeners.TryGetValue(eventName, out var list))
+                    {
+                        list.Clear();
+                    }
+                    Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: removed all listeners for '{eventName}'");
+                }
+                else
+                {
+                    jsList.Remove(callback);
+                    Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: removed JS listener for '{eventName}'");
+                }
             }
         }
 
@@ -123,25 +197,52 @@ namespace SandronePlayer.Plugins
             if (string.IsNullOrWhiteSpace(eventName))
                 return;
 
-            if (!_listeners.TryGetValue(eventName, out var list) || list.Count == 0)
-                return;
+            var hasListeners = false;
+            var totalCount = 0;
 
-            Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: emitting '{eventName}' to {list.Count} listeners");
-
-            // 复制列表以避免在迭代时修改
-            var callbacks = list.ToArray();
-            foreach (var callback in callbacks)
+            // 调用 C# 监听器
+            if (_listeners.TryGetValue(eventName, out var list) && list.Count > 0)
             {
-                try
+                hasListeners = true;
+                totalCount += list.Count;
+                var callbacks = list.ToArray();
+                foreach (var callback in callbacks)
                 {
-                    callback(data);
+                    try
+                    {
+                        callback(data);
+                    }
+                    catch (Exception ex)
+                    {
+                        Services.LogService.Instance.Error($"Plugin:{_context.PluginId}", 
+                            $"EventApi: C# callback for '{eventName}' threw exception: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
+            }
+
+            // 调用 JavaScript 监听器
+            if (_jsListeners.TryGetValue(eventName, out var jsList) && jsList.Count > 0)
+            {
+                hasListeners = true;
+                totalCount += jsList.Count;
+                var jsCallbacks = jsList.ToArray();
+                foreach (var jsCallback in jsCallbacks)
                 {
-                    // 捕获异常，记录日志，继续执行其他回调
-                    Services.LogService.Instance.Error($"Plugin:{_context.PluginId}", 
-                        $"EventApi: callback for '{eventName}' threw exception: {ex.Message}");
+                    try
+                    {
+                        jsCallback(data);
+                    }
+                    catch (Exception ex)
+                    {
+                        Services.LogService.Instance.Error($"Plugin:{_context.PluginId}", 
+                            $"EventApi: JS callback for '{eventName}' threw exception: {ex.Message}");
+                    }
                 }
+            }
+
+            if (hasListeners)
+            {
+                Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"EventApi: emitted '{eventName}' to {totalCount} listeners");
             }
         }
 
@@ -151,6 +252,7 @@ namespace SandronePlayer.Plugins
         internal void ClearAllListeners()
         {
             _listeners.Clear();
+            _jsListeners.Clear();
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "EventApi: cleared all listeners");
         }
 
@@ -163,13 +265,16 @@ namespace SandronePlayer.Plugins
         }
 
         /// <summary>
-        /// 获取指定事件的监听器数量
+        /// 获取指定事件的监听器数量（包括 C# 和 JS 监听器）
         /// </summary>
         internal int GetListenerCount(string eventName)
         {
+            var count = 0;
             if (_listeners.TryGetValue(eventName, out var list))
-                return list.Count;
-            return 0;
+                count += list.Count;
+            if (_jsListeners.TryGetValue(eventName, out var jsList))
+                count += jsList.Count;
+            return count;
         }
 
         #endregion

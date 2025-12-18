@@ -1,4 +1,5 @@
 using System;
+using Microsoft.ClearScript;
 using SandronePlayer.Helpers;
 using SandronePlayer.Views;
 
@@ -74,6 +75,7 @@ namespace SandronePlayer.Plugins
         /// 设置窗口透明度
         /// </summary>
         /// <param name="opacity">透明度（0.2 到 1.0）</param>
+        [ScriptMember("setOpacity")]
         public void SetOpacity(double opacity)
         {
             var window = _getWindow();
@@ -111,6 +113,7 @@ namespace SandronePlayer.Plugins
         /// 获取当前窗口透明度
         /// </summary>
         /// <returns>透明度（0.2 到 1.0）</returns>
+        [ScriptMember("getOpacity")]
         public double GetOpacity()
         {
             var window = _getWindow();
@@ -141,6 +144,7 @@ namespace SandronePlayer.Plugins
         /// 设置鼠标穿透模式
         /// </summary>
         /// <param name="enabled">是否启用穿透</param>
+        [ScriptMember("setClickThrough")]
         public void SetClickThrough(bool enabled)
         {
             var window = _getWindow();
@@ -173,6 +177,7 @@ namespace SandronePlayer.Plugins
         /// 获取当前穿透模式状态
         /// </summary>
         /// <returns>是否启用穿透</returns>
+        [ScriptMember("isClickThrough")]
         public bool IsClickThrough()
         {
             var window = _getWindow();
@@ -194,6 +199,7 @@ namespace SandronePlayer.Plugins
         /// 设置窗口置顶状态
         /// </summary>
         /// <param name="topmost">是否置顶</param>
+        [ScriptMember("setTopmost")]
         public void SetTopmost(bool topmost)
         {
             var window = _getWindow();
@@ -217,6 +223,7 @@ namespace SandronePlayer.Plugins
         /// 获取当前置顶状态
         /// </summary>
         /// <returns>是否置顶</returns>
+        [ScriptMember("isTopmost")]
         public bool IsTopmost()
         {
             var window = _getWindow();
@@ -238,6 +245,7 @@ namespace SandronePlayer.Plugins
         /// 获取窗口位置和大小
         /// </summary>
         /// <returns>包含 x, y, width, height 的对象</returns>
+        [ScriptMember("getBounds")]
         public object GetBounds()
         {
             var window = _getWindow();

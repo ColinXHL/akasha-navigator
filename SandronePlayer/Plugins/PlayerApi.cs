@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.ClearScript;
 using SandronePlayer.Views;
 using Microsoft.Web.WebView2.Core;
 
@@ -232,6 +233,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 开始播放
         /// </summary>
+        [ScriptMember("play")]
         public void Play()
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "PlayerApi.Play()");
@@ -256,6 +258,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 暂停播放
         /// </summary>
+        [ScriptMember("pause")]
         public void Pause()
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "PlayerApi.Pause()");
@@ -280,6 +283,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 切换播放/暂停状态
         /// </summary>
+        [ScriptMember("togglePlay")]
         public void TogglePlay()
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "PlayerApi.TogglePlay()");
@@ -319,6 +323,7 @@ namespace SandronePlayer.Plugins
         /// 跳转到指定时间
         /// </summary>
         /// <param name="seconds">目标时间（秒）</param>
+        [ScriptMember("seek")]
         public void Seek(double seconds)
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.Seek({seconds})");
@@ -344,6 +349,7 @@ namespace SandronePlayer.Plugins
         /// 相对跳转
         /// </summary>
         /// <param name="seconds">偏移量（秒，正数前进，负数后退）</param>
+        [ScriptMember("seekRelative")]
         public void SeekRelative(double seconds)
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SeekRelative({seconds})");
@@ -366,6 +372,7 @@ namespace SandronePlayer.Plugins
         /// 获取当前播放时间
         /// </summary>
         /// <returns>当前时间（秒）</returns>
+        [ScriptMember("getCurrentTime")]
         public double GetCurrentTime()
         {
             const string script = @"
@@ -391,6 +398,7 @@ namespace SandronePlayer.Plugins
         /// 获取视频总时长
         /// </summary>
         /// <returns>总时长（秒）</returns>
+        [ScriptMember("getDuration")]
         public double GetDuration()
         {
             const string script = @"
@@ -420,6 +428,7 @@ namespace SandronePlayer.Plugins
         /// 设置播放速度
         /// </summary>
         /// <param name="rate">播放速度（1.0 为正常速度）</param>
+        [ScriptMember("setPlaybackRate")]
         public void SetPlaybackRate(double rate)
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SetPlaybackRate({rate})");
@@ -445,6 +454,7 @@ namespace SandronePlayer.Plugins
         /// 获取当前播放速度
         /// </summary>
         /// <returns>播放速度</returns>
+        [ScriptMember("getPlaybackRate")]
         public double GetPlaybackRate()
         {
             const string script = @"
@@ -474,6 +484,7 @@ namespace SandronePlayer.Plugins
         /// 设置音量
         /// </summary>
         /// <param name="volume">音量（0.0 到 1.0）</param>
+        [ScriptMember("setVolume")]
         public void SetVolume(double volume)
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SetVolume({volume})");
@@ -499,6 +510,7 @@ namespace SandronePlayer.Plugins
         /// 获取当前音量
         /// </summary>
         /// <returns>音量（0.0 到 1.0）</returns>
+        [ScriptMember("getVolume")]
         public double GetVolume()
         {
             const string script = @"
@@ -524,6 +536,7 @@ namespace SandronePlayer.Plugins
         /// 设置静音状态
         /// </summary>
         /// <param name="muted">是否静音</param>
+        [ScriptMember("setMuted")]
         public void SetMuted(bool muted)
         {
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SetMuted({muted})");
@@ -546,6 +559,7 @@ namespace SandronePlayer.Plugins
         /// 获取静音状态
         /// </summary>
         /// <returns>是否静音</returns>
+        [ScriptMember("isMuted")]
         public bool IsMuted()
         {
             const string script = @"

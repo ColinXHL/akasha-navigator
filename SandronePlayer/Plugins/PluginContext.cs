@@ -1,20 +1,20 @@
 using System;
 using System.IO;
 using SandronePlayer.Models;
-using Jint;
-using Jint.Runtime;
+using Microsoft.ClearScript;
+using Microsoft.ClearScript.V8;
 
 namespace SandronePlayer.Plugins
 {
     /// <summary>
     /// 插件上下文
-    /// 每个插件实例的运行时上下文，封装 Jint Engine 实例
+    /// 每个插件实例的运行时上下文，封装 V8 Engine 实例
     /// </summary>
     public class PluginContext : IDisposable
     {
         #region Fields
 
-        private Engine? _jsEngine;
+        private V8ScriptEngine? _jsEngine;
         private bool _disposed;
         private bool _isLoaded;
 
@@ -83,36 +83,20 @@ namespace SandronePlayer.Plugins
         #region Engine Initialization
 
         /// <summary>
-        /// 初始化 Jint 引擎
+        /// 初始化 V8 引擎
         /// </summary>
         private void InitializeEngine()
         {
-            _jsEngine = new Engine(options =>
-            {
-                // 注意：不使用 TimeoutInterval，因为它是累积超时
-                // 一旦总执行时间超过限制，所有后续调用都会失败
-                // 我们的插件脚本都是简单的回调，不需要超时保护
-                
-                // 限制递归深度（防止无限递归）
-                options.LimitRecursion(100);
-                
-                // 限制内存使用
-                options.LimitMemory(50_000_000); // 50MB
-                
-                // 限制单次语句执行数量（防止无限循环）
-                options.MaxStatements(100_000);
-                
-                // 启用严格模式
-                options.Strict();
-            });
+            _jsEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging);
+            
+            // 限制内存使用 (50MB)
+            _jsEngine.MaxRuntimeHeapSize = (UIntPtr)50_000_000;
+            
+            // 限制递归深度
+            _jsEngine.MaxRuntimeStackUsage = (UIntPtr)(100 * 1024); // 100KB stack
 
-            // 注入基础 console.log 用于调试
-            _jsEngine.SetValue("console", new
-            {
-                log = new Action<object>(msg => Log($"[JS] {msg}")),
-                warn = new Action<object>(msg => Log($"[JS WARN] {msg}")),
-                error = new Action<object>(msg => Log($"[JS ERROR] {msg}"))
-            });
+            // 注入基础 console 用于调试
+            _jsEngine.AddHostObject("console", new ConsoleProxy(PluginId));
         }
 
         #endregion
@@ -142,9 +126,9 @@ namespace SandronePlayer.Plugins
                 _jsEngine.Execute(script);
                 return true;
             }
-            catch (JavaScriptException ex)
+            catch (ScriptEngineException ex)
             {
-                LastError = $"JavaScript 错误: {ex.Message} (行 {ex.Location.Start.Line})";
+                LastError = $"JavaScript 错误: {ex.Message}";
                 Log(LastError);
                 return false;
             }
@@ -169,8 +153,7 @@ namespace SandronePlayer.Plugins
 
             try
             {
-                var func = _jsEngine.GetValue(functionName);
-                if (func.IsUndefined() || !func.IsObject())
+                if (!HasFunction(functionName))
                 {
                     // 函数不存在不算错误，只是跳过
                     return true;
@@ -179,15 +162,14 @@ namespace SandronePlayer.Plugins
                 _jsEngine.Invoke(functionName, args);
                 return true;
             }
-            catch (JavaScriptException ex)
+            catch (ScriptEngineException ex)
             {
-                LastError = $"调用 {functionName} 失败: {ex.Message} (行 {ex.Location.Start.Line}, 列 {ex.Location.Start.Column})";
+                LastError = $"调用 {functionName} 失败: {ex.Message}";
                 Log(LastError);
                 if (ex.InnerException != null)
                 {
                     Log($"  内部异常: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
                 }
-                // 异常被捕获，不影响主程序
                 return false;
             }
             catch (Exception ex)
@@ -198,7 +180,6 @@ namespace SandronePlayer.Plugins
                 {
                     Log($"  内部异常: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
                 }
-                // 异常被捕获，不影响主程序
                 return false;
             }
         }
@@ -213,8 +194,8 @@ namespace SandronePlayer.Plugins
 
             try
             {
-                var func = _jsEngine.GetValue(functionName);
-                return !func.IsUndefined() && func.IsObject();
+                var result = _jsEngine.Evaluate($"typeof {functionName} === 'function'");
+                return result is bool b && b;
             }
             catch
             {
@@ -222,8 +203,107 @@ namespace SandronePlayer.Plugins
             }
         }
 
+        /// <summary>
+        /// 执行 JavaScript 表达式并返回结果
+        /// </summary>
+        /// <param name="expression">JS 表达式</param>
+        /// <returns>执行结果</returns>
+        public object? Evaluate(string expression)
+        {
+            if (_disposed || _jsEngine == null)
+                return null;
+
+            try
+            {
+                return _jsEngine.Evaluate(expression);
+            }
+            catch (Exception ex)
+            {
+                Log($"Evaluate 失败: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 创建 JavaScript 原生数组
+        /// </summary>
+        /// <returns>JS Array 对象</returns>
+        public dynamic? CreateJsArray()
+        {
+            if (_disposed || _jsEngine == null)
+                return null;
+
+            try
+            {
+                return _jsEngine.Evaluate("[]");
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 创建 JavaScript 原生对象
+        /// </summary>
+        /// <returns>JS Object</returns>
+        public dynamic? CreateJsObject()
+        {
+            if (_disposed || _jsEngine == null)
+                return null;
+
+            try
+            {
+                return _jsEngine.Evaluate("({})");
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         #endregion
 
+        #region Memory Management
+
+        /// <summary>
+        /// 主动触发 V8 垃圾回收
+        /// </summary>
+        public void CollectGarbage()
+        {
+            if (_disposed || _jsEngine == null)
+                return;
+
+            try
+            {
+                _jsEngine.CollectGarbage(true);
+                Log("已触发 V8 垃圾回收");
+            }
+            catch (Exception ex)
+            {
+                Log($"垃圾回收失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 获取当前堆内存使用量（字节）
+        /// </summary>
+        public ulong GetHeapSize()
+        {
+            if (_disposed || _jsEngine == null)
+                return 0;
+
+            try
+            {
+                return _jsEngine.GetRuntimeHeapInfo().UsedHeapSize;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        #endregion
 
         #region Lifecycle
 
@@ -237,7 +317,7 @@ namespace SandronePlayer.Plugins
                 return;
 
             // 将 API 注入到 JS 全局作用域
-            _jsEngine.SetValue("api", api);
+            _jsEngine.AddHostObject("api", api);
         }
 
         /// <summary>
@@ -326,7 +406,8 @@ namespace SandronePlayer.Plugins
                     CallOnUnload();
                 }
 
-                // Jint Engine 不需要显式释放，但清空引用
+                // V8 引擎需要显式释放
+                _jsEngine?.Dispose();
                 _jsEngine = null;
             }
 
@@ -339,6 +420,29 @@ namespace SandronePlayer.Plugins
         ~PluginContext()
         {
             Dispose(false);
+        }
+
+        #endregion
+
+        #region Console Proxy
+
+        /// <summary>
+        /// Console 代理类，用于 JS 中的 console.log 等
+        /// </summary>
+        private class ConsoleProxy
+        {
+            private readonly string _pluginId;
+
+            public ConsoleProxy(string pluginId)
+            {
+                _pluginId = pluginId;
+            }
+
+            public void log(object? msg) => Services.LogService.Instance.Info($"Plugin:{_pluginId}", $"[JS] {msg}");
+            public void warn(object? msg) => Services.LogService.Instance.Warn($"Plugin:{_pluginId}", $"[JS WARN] {msg}");
+            public void error(object? msg) => Services.LogService.Instance.Error($"Plugin:{_pluginId}", $"[JS ERROR] {msg}");
+            public void info(object? msg) => log(msg);
+            public void debug(object? msg) => Services.LogService.Instance.Debug($"Plugin:{_pluginId}", $"[JS DEBUG] {msg}");
         }
 
         #endregion

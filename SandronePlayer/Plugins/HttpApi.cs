@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.ClearScript;
 
 namespace SandronePlayer.Plugins
 {
@@ -45,6 +46,7 @@ namespace SandronePlayer.Plugins
         /// <param name="url">请求 URL</param>
         /// <param name="options">请求选项（可选）：{ headers: {}, timeout: 30000 }</param>
         /// <returns>响应结果对象：{ success, status, data, error?, headers }</returns>
+        [ScriptMember("get")]
         public object Get(string url, object? options = null)
         {
             return ExecuteRequest(HttpMethod.Get, url, null, options);
@@ -57,6 +59,7 @@ namespace SandronePlayer.Plugins
         /// <param name="body">请求体（可选）</param>
         /// <param name="options">请求选项（可选）：{ headers: {}, timeout: 30000, contentType: "application/json" }</param>
         /// <returns>响应结果对象：{ success, status, data, error?, headers }</returns>
+        [ScriptMember("post")]
         public object Post(string url, object? body = null, object? options = null)
         {
             return ExecuteRequest(HttpMethod.Post, url, body, options);

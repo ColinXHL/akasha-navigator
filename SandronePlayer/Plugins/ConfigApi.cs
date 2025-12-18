@@ -1,4 +1,5 @@
 using System;
+using Microsoft.ClearScript;
 using SandronePlayer.Models;
 
 namespace SandronePlayer.Plugins
@@ -39,6 +40,7 @@ namespace SandronePlayer.Plugins
         /// <param name="key">配置键（支持点号路径）</param>
         /// <param name="defaultValue">默认值（可选）</param>
         /// <returns>配置值或默认值</returns>
+        [ScriptMember("get")]
         public object? Get(string key, object? defaultValue = null)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -77,6 +79,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="key">配置键（支持点号路径）</param>
         /// <param name="value">配置值</param>
+        [ScriptMember("set")]
         public void Set(string key, object? value)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -100,6 +103,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="key">配置键</param>
         /// <returns>是否存在</returns>
+        [ScriptMember("has")]
         public bool Has(string key)
         {
             return _config.ContainsKey(key);
@@ -110,6 +114,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="key">配置键</param>
         /// <returns>是否成功移除</returns>
+        [ScriptMember("remove")]
         public bool Remove(string key)
         {
             var result = _config.Remove(key);

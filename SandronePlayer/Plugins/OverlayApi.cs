@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using Microsoft.ClearScript;
 using SandronePlayer.Services;
 using SandronePlayer.Views;
 
@@ -45,6 +46,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="x">X 坐标</param>
         /// <param name="y">Y 坐标</param>
+        [ScriptMember("setPosition")]
         public void SetPosition(int x, int y)
         {
             EnsureOverlay();
@@ -56,6 +58,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="width">宽度</param>
         /// <param name="height">高度</param>
+        [ScriptMember("setSize")]
         public void SetSize(int width, int height)
         {
             if (width <= 0 || height <= 0)
@@ -70,6 +73,7 @@ namespace SandronePlayer.Plugins
         /// 获取覆盖层窗口的位置和大小（逻辑像素）
         /// </summary>
         /// <returns>包含 x, y, width, height 的对象</returns>
+        [ScriptMember("getRect")]
         public object GetRect()
         {
             EnsureOverlay();
@@ -98,6 +102,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 显示覆盖层窗口
         /// </summary>
+        [ScriptMember("show")]
         public void Show()
         {
             EnsureOverlay();
@@ -107,6 +112,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 隐藏覆盖层窗口
         /// </summary>
+        [ScriptMember("hide")]
         public void Hide()
         {
             InvokeOnUI(() => _overlay?.Hide());
@@ -121,6 +127,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="direction">方向：north/northeast/east/southeast/south/southwest/west/northwest</param>
         /// <param name="duration">显示时长（毫秒），0 表示常驻</param>
+        [ScriptMember("showMarker")]
         public void ShowMarker(string direction, int duration = 0)
         {
             Services.LogService.Instance.Debug("OverlayApi", $"ShowMarker called: direction={direction}, duration={duration}");
@@ -154,6 +161,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 清除所有方向标记
         /// </summary>
+        [ScriptMember("clearMarkers")]
         public void ClearMarkers()
         {
             InvokeOnUI(() => _overlay?.ClearMarkers());
@@ -164,6 +172,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="size">标记大小（像素），范围 16-64</param>
         /// <param name="color">标记颜色（十六进制，如 #FFFF6B6B）</param>
+        [ScriptMember("setMarkerStyle")]
         public void SetMarkerStyle(double size, string color)
         {
             EnsureOverlay();
@@ -210,6 +219,7 @@ namespace SandronePlayer.Plugins
         /// </summary>
         /// <param name="path">图片路径（相对于插件目录或绝对路径），图片应指向右/东方向</param>
         /// <returns>是否设置成功</returns>
+        [ScriptMember("setMarkerImage")]
         public bool SetMarkerImage(string path)
         {
             Services.LogService.Instance.Debug("OverlayApi", $"SetMarkerImage called with path: {path}");
@@ -266,6 +276,7 @@ namespace SandronePlayer.Plugins
         /// <param name="y">Y 坐标</param>
         /// <param name="options">样式选项（可选）</param>
         /// <returns>元素 ID</returns>
+        [ScriptMember("drawText")]
         public string DrawText(string text, double x, double y, object? options = null)
         {
             if (string.IsNullOrEmpty(text))
@@ -295,6 +306,7 @@ namespace SandronePlayer.Plugins
         /// <param name="height">高度</param>
         /// <param name="options">样式选项（可选）</param>
         /// <returns>元素 ID</returns>
+        [ScriptMember("drawRect")]
         public string DrawRect(double x, double y, double width, double height, object? options = null)
         {
             if (width <= 0 || height <= 0)
@@ -323,6 +335,7 @@ namespace SandronePlayer.Plugins
         /// <param name="y">Y 坐标</param>
         /// <param name="options">样式选项（可选）</param>
         /// <returns>元素 ID，失败返回空字符串</returns>
+        [ScriptMember("drawImage")]
         public string DrawImage(string path, double x, double y, object? options = null)
         {
             if (string.IsNullOrEmpty(path))
@@ -360,6 +373,7 @@ namespace SandronePlayer.Plugins
         /// 移除指定绘图元素
         /// </summary>
         /// <param name="elementId">元素 ID</param>
+        [ScriptMember("removeElement")]
         public void RemoveElement(string elementId)
         {
             if (string.IsNullOrEmpty(elementId))
@@ -374,6 +388,7 @@ namespace SandronePlayer.Plugins
         /// <summary>
         /// 清除该插件的所有绘图元素
         /// </summary>
+        [ScriptMember("clear")]
         public void Clear()
         {
             InvokeOnUI(() =>
@@ -390,6 +405,7 @@ namespace SandronePlayer.Plugins
         /// 进入编辑模式
         /// 编辑模式下可拖拽移动和缩放覆盖层
         /// </summary>
+        [ScriptMember("enterEditMode")]
         public void EnterEditMode()
         {
             EnsureOverlay();
@@ -407,6 +423,7 @@ namespace SandronePlayer.Plugins
         /// 退出编辑模式
         /// 退出时自动保存位置和大小到配置
         /// </summary>
+        [ScriptMember("exitEditMode")]
         public void ExitEditMode()
         {
             InvokeOnUI(() =>
