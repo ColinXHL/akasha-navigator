@@ -234,19 +234,24 @@ namespace FloatWebPlayer.Views
 
         /// <summary>
         /// 恢复父级模态窗口
+        /// 恢复顺序：先恢复底层窗口（SettingsWindow），再恢复上层窗口（PluginCenterWindow）
+        /// 这样可以保持正确的窗口层级关系
         /// </summary>
         private void RestoreParentModalWindows()
         {
-            // 按相反顺序恢复窗口
+            // 先恢复 SettingsWindow（底层窗口）
             if (_parentSettings != null)
             {
                 _parentSettings.Show();
                 _parentSettings = null;
             }
+            
+            // 再恢复 PluginCenterWindow（上层窗口，但不激活）
+            // PluginSettingsWindow 会在调用方的 Show() 和 Activate() 中获得焦点
             if (_parentPluginCenter != null)
             {
                 _parentPluginCenter.Show();
-                _parentPluginCenter.Activate();
+                // 不调用 Activate()，让 PluginSettingsWindow 保持焦点
                 _parentPluginCenter = null;
             }
         }
@@ -527,18 +532,17 @@ namespace FloatWebPlayer.Views
         /// <param name="pluginName">插件名称</param>
         /// <param name="pluginDirectory">插件源码目录</param>
         /// <param name="configDirectory">插件配置目录</param>
-        /// <param name="owner">父窗口（仅用于定位，不设置 Owner 以避免关闭时影响父窗口）</param>
+        /// <param name="owner">父窗口，设置 Owner 以建立父子关系，关闭时焦点自动回到父窗口</param>
         public static void ShowSettings(string pluginId, string pluginName, string pluginDirectory, string configDirectory, Window? owner = null)
         {
             var window = new PluginSettingsWindow(pluginId, pluginName, pluginDirectory, configDirectory);
             
             if (owner != null)
             {
-                // 不设置 Owner，只用于计算居中位置
-                // 这样关闭设置窗口时不会影响父窗口
-                window.WindowStartupLocation = WindowStartupLocation.Manual;
-                window.Left = owner.Left + (owner.Width - window.Width) / 2;
-                window.Top = owner.Top + (owner.Height - window.Height) / 2;
+                // 设置 Owner 以建立父子关系
+                // 这样关闭设置窗口时焦点会自动回到 owner 窗口
+                window.Owner = owner;
+                window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             }
 
             window.Show();

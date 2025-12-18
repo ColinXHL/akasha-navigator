@@ -159,6 +159,8 @@ namespace FloatWebPlayer
             _controlBarWindow.PluginCenterRequested += (s, e) =>
             {
                 var pluginCenterWindow = new PluginCenterWindow();
+                // 设置 Owner 为 PlayerWindow，确保插件中心显示在 PlayerWindow 之上
+                pluginCenterWindow.Owner = _playerWindow;
                 pluginCenterWindow.ShowDialog();
             };
 
@@ -166,6 +168,8 @@ namespace FloatWebPlayer
             _controlBarWindow.SettingsRequested += (s, e) =>
             {
                 var settingsWindow = new SettingsWindow();
+                // 设置 Owner 为 PlayerWindow，确保设置窗口显示在 PlayerWindow 之上
+                settingsWindow.Owner = _playerWindow;
                 settingsWindow.ShowDialog();
             };
 

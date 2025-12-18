@@ -34,6 +34,10 @@ namespace FloatWebPlayer.Helpers
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = Brushes.Transparent;
+            
+            // 设置 Topmost=true，确保管理窗口显示在其他应用程序之上
+            // 通过 Owner 关系确保显示在 PlayerWindow 之上
+            Topmost = true;
 
             Loaded += OnWindowLoaded;
         }
@@ -62,16 +66,14 @@ namespace FloatWebPlayer.Helpers
             var container = GetMainContainer();
             if (container == null)
             {
-                onComplete?.Invoke();
-                Close();
+                ActivateOwnerAndClose(onComplete);
                 return;
             }
 
             var scaleTransform = container.RenderTransform as ScaleTransform;
             if (scaleTransform == null)
             {
-                onComplete?.Invoke();
-                Close();
+                ActivateOwnerAndClose(onComplete);
                 return;
             }
 
@@ -115,11 +117,28 @@ namespace FloatWebPlayer.Helpers
 
             storyboard.Completed += (s, e) =>
             {
-                onComplete?.Invoke();
-                Close();
+                ActivateOwnerAndClose(onComplete);
             };
 
             storyboard.Begin();
+        }
+
+        /// <summary>
+        /// 激活 Owner 窗口并关闭当前窗口
+        /// 这确保焦点正确返回到父窗口，而不是被其他窗口（如 Topmost 的 PlayerWindow）抢走
+        /// </summary>
+        private void ActivateOwnerAndClose(Action? onComplete)
+        {
+            onComplete?.Invoke();
+            
+            // 在关闭前激活 Owner 窗口，确保焦点正确返回
+            // 这是处理 Topmost 窗口干扰焦点的标准做法
+            if (Owner != null && Owner.IsVisible)
+            {
+                Owner.Activate();
+            }
+            
+            Close();
         }
 
         /// <summary>
