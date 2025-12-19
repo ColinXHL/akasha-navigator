@@ -2,7 +2,7 @@
   <h1 align="center">
     <a href="https://github.com/ColinXHL/sandrone-player"><img src="assets/sandrone-player-logo.png" width="128"></a>
     <br/>
-    <a href="https://github.com/ColinXHL/sandrone-player">SandronePlayer</a>
+    <a href="https://github.com/ColinXHL/sandrone-player">木偶播播</a>
   </h1>
 </div>
 
@@ -29,7 +29,7 @@
 
 [English](./README-en.md) | [中文](./README.md)
 
-SandronePlayer · 悬浮攻略播放器，一个基于 WPF + WebView2 的 Windows 悬浮网页播放器，专为游戏时观看攻略视频设计。
+木偶播播 · 悬浮攻略播放器，一个基于 WPF + WebView2 的 Windows 悬浮网页播放器，专为游戏时观看攻略视频设计。
 
 ## 功能
 
