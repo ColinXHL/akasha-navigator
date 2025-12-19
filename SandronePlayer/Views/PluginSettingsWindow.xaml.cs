@@ -23,7 +23,6 @@ namespace SandronePlayer.Views
         private readonly PluginConfig _config;
         private readonly SettingsUiDefinition? _settingsDefinition;
         private SettingsUiRenderer? _renderer;
-        private bool _hasChanges;
 
         #endregion
 
@@ -114,8 +113,7 @@ namespace SandronePlayer.Views
         /// </summary>
         private void OnSettingValueChanged(object? sender, SettingsValueChangedEventArgs e)
         {
-            _hasChanges = true;
-            // 不立即保存，等用户点击保存按钮
+            // 值变更时不立即保存，等用户点击保存按钮
         }
 
         /// <summary>
@@ -486,7 +484,6 @@ namespace SandronePlayer.Views
         private void BtnReset_Click(object sender, RoutedEventArgs e)
         {
             ResetToDefaults();
-            _hasChanges = true;
         }
 
         /// <summary>
@@ -530,7 +527,6 @@ namespace SandronePlayer.Views
                 NotificationService.Instance.Success("设置已保存");
             }
 
-            _hasChanges = false;
             CloseWithAnimation();
         }
 
