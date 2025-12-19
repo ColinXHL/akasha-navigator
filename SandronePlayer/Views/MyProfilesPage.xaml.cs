@@ -470,6 +470,38 @@ namespace SandronePlayer.Views
         }
 
         /// <summary>
+        /// 打开插件设置（Profile 特定配置）
+        /// </summary>
+        private void BtnPluginSettings_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string pluginId && !string.IsNullOrEmpty(_currentProfileId))
+            {
+                // 获取插件信息
+                var pluginInfo = PluginLibrary.Instance.GetInstalledPluginInfo(pluginId);
+                if (pluginInfo == null)
+                {
+                    NotificationService.Instance.Error($"找不到插件 {pluginId}");
+                    return;
+                }
+
+                // 获取插件源码目录
+                var pluginDirectory = PluginLibrary.Instance.GetPluginDirectory(pluginId);
+                
+                // 获取当前 Profile 的配置目录
+                var configDirectory = PluginHost.Instance.GetPluginConfigDirectory(_currentProfileId, pluginId);
+
+                // 打开插件设置窗口
+                PluginSettingsWindow.ShowSettings(
+                    pluginId,
+                    pluginInfo.Name,
+                    pluginDirectory,
+                    configDirectory,
+                    Window.GetWindow(this)
+                );
+            }
+        }
+
+        /// <summary>
         /// 将插件添加回 Profile（用于从原始列表移除的插件）
         /// </summary>
         private void BtnAddBackPlugin_Click(object sender, RoutedEventArgs e)
@@ -782,6 +814,14 @@ namespace SandronePlayer.Views
         /// 添加按钮可见性（仅从原始列表移除的插件显示）
         /// </summary>
         public Visibility AddBackButtonVisibility => IsRemovedFromOriginal ? Visibility.Visible : Visibility.Collapsed;
+
+        /// <summary>
+        /// 设置按钮可见性（仅已安装且未从原始列表移除时显示）
+        /// </summary>
+        public Visibility SettingsButtonVisibility => 
+            (Status == PluginInstallStatus.Installed || Status == PluginInstallStatus.Disabled) && !IsRemovedFromOriginal 
+                ? Visibility.Visible 
+                : Visibility.Collapsed;
 
         /// <summary>
         /// 状态文本

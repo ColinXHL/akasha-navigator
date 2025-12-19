@@ -48,9 +48,10 @@ namespace SandronePlayer.Plugins
 
             try
             {
-                // 使用 PluginConfig 的 Get 方法
-                var value = _config.Get<object?>(key);
-                Services.LogService.Instance.Debug("ConfigApi", $"Get({key}) = {value ?? "null"}, defaultValue = {defaultValue ?? "null"}");
+                // 使用 PluginConfig 的 GetRaw 方法获取原始值
+                var value = _config.GetRaw(key);
+                var valueType = value?.GetType().Name ?? "null";
+                Services.LogService.Instance.Debug("ConfigApi", $"Get({key}) = {value ?? "null"} (type={valueType}), defaultValue = {defaultValue ?? "null"}, settings = {_config.Settings.ToJsonString()}");
                 return value ?? defaultValue;
             }
             catch (Exception ex)

@@ -128,9 +128,23 @@ namespace SandronePlayer.Plugins
         /// <param name="direction">方向：north/northeast/east/southeast/south/southwest/west/northwest</param>
         /// <param name="duration">显示时长（毫秒），0 表示常驻</param>
         [ScriptMember("showMarker")]
-        public void ShowMarker(string direction, int duration = 0)
+        public void ShowMarker(string direction, object? durationObj = null)
         {
-            Services.LogService.Instance.Debug("OverlayApi", $"ShowMarker called: direction={direction}, duration={duration}");
+            // 将 duration 转换为 int，支持从 JavaScript 传入的各种数字类型
+            int duration = 0;
+            if (durationObj != null)
+            {
+                try
+                {
+                    duration = Convert.ToInt32(durationObj);
+                }
+                catch
+                {
+                    duration = 0;
+                }
+            }
+
+            Services.LogService.Instance.Debug("OverlayApi", $"ShowMarker called: direction={direction}, durationObj={durationObj} (type={durationObj?.GetType().Name}), duration={duration}");
 
             if (string.IsNullOrWhiteSpace(direction))
             {

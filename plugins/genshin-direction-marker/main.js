@@ -97,7 +97,8 @@ function onLoad(api) {
     var size = api.config.get("overlay.size", 212);
     var duration = api.config.get("markerDuration", 0);
 
-    api.log("覆盖层位置和大小: x=" + x + ", y=" + y + ", size=" + size + ", duration=" + duration);
+    api.log("覆盖层位置和大小: x=" + x + ", y=" + y + ", size=" + size);
+    api.log("duration 值: " + duration + ", 类型: " + typeof duration + ", === 0: " + (duration === 0) + ", == 0: " + (duration == 0));
 
     // 从配置读取标记样式
     var markerSize = api.config.get("marker.size", 32);
@@ -109,7 +110,13 @@ function onLoad(api) {
     api.log("设置覆盖层位置和大小...");
     api.overlay.setPosition(x, y);
     api.overlay.setSize(size, size);
-    api.overlay.show();
+    // 只有常驻模式（duration == 0）才在启动时显示覆盖层
+    // 非常驻模式等待第一次方向词匹配时再显示
+    var isPermanentMode = (duration == 0 || duration === null || duration === undefined);
+    api.log("isPermanentMode: " + isPermanentMode);
+    if (isPermanentMode) {
+        api.overlay.show();
+    }
     api.log("覆盖层设置完成");
     
     // 应用标记样式
@@ -149,8 +156,14 @@ function onLoad(api) {
         api.log("markerImage 配置为空，跳过设置");
     }
     
-    // 初始化时显示北方向标记，让用户知道遮罩层已生效
-    api.overlay.showMarker("north", duration);
+    // 如果 duration 为 0（常驻模式），初始化时显示北方向标记，让用户知道遮罩层已生效
+    // 如果设置了显示时长，则不显示初始标记，等待字幕中出现方向词时再显示
+    if (isPermanentMode) {
+        api.log("常驻模式：显示初始北方向标记");
+        api.overlay.showMarker("north", 0);
+    } else {
+        api.log("非常驻模式：不显示初始标记，等待方向词匹配");
+    }
     
     // 字幕加载时，预处理并统计方向信息
     api.subtitle.onLoaded(function(subtitleData) {

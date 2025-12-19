@@ -163,10 +163,14 @@
                             Style="{StaticResource ActionButtonStyle}"
                             HorizontalAlignment="Left"
                             Click="BtnReset_Click"/>
-                    <Button x:Name="BtnClose" Content="关闭" 
-                            Style="{StaticResource ActionButtonStyle}"
-                            HorizontalAlignment="Right"
-                            Click="BtnClose_Click"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="BtnCancel" Content="取消" 
+                                Style="{StaticResource ActionButtonStyle}"
+                                Click="BtnCancel_Click" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnSave" Content="保存" 
+                                Style="{StaticResource ActionButtonStyle}"
+                                Click="BtnSave_Click"/>
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

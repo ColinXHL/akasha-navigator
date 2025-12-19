@@ -486,6 +486,11 @@
                                         <Button Content="添加" Style="{StaticResource PrimaryButtonStyle}"
                                                 Click="BtnAddBackPlugin_Click" Tag="{Binding PluginId}"
                                                 Visibility="{Binding AddBackButtonVisibility}" Margin="0,0,8,0"/>
+                                        <!-- 设置按钮（仅已安装时显示） -->
+                                        <Button Content="⚙️ 设置" Style="{StaticResource ActionButtonStyle}"
+                                                Click="BtnPluginSettings_Click" Tag="{Binding PluginId}"
+                                                ToolTip="插件设置"
+                                                Visibility="{Binding SettingsButtonVisibility}" Margin="0,0,8,0"/>
                                         <!-- 移除按钮 -->
                                         <Button Content="{Binding RemoveButtonText}" Style="{StaticResource DangerButtonStyle}"
                                                 Click="BtnRemovePlugin_Click" Tag="{Binding PluginId}"

@@ -53,6 +53,14 @@ namespace SandronePlayer.Views
             var configPath = Path.Combine(configDirectory, AppConstants.PluginConfigFileName);
             _config = PluginConfig.LoadFromFile(configPath, pluginId);
 
+            // 加载插件清单以获取默认配置
+            var manifestPath = Path.Combine(pluginDirectory, AppConstants.PluginManifestFileName);
+            var manifestResult = PluginManifest.LoadFromFile(manifestPath);
+            if (manifestResult.IsSuccess && manifestResult.Manifest?.DefaultConfig != null)
+            {
+                _config.ApplyDefaults(manifestResult.Manifest.DefaultConfig);
+            }
+
             // 加载设置 UI 定义
             var settingsUiPath = Path.Combine(pluginDirectory, "settings_ui.json");
             _settingsDefinition = SettingsUiDefinition.LoadFromFile(settingsUiPath);
@@ -107,12 +115,7 @@ namespace SandronePlayer.Views
         private void OnSettingValueChanged(object? sender, SettingsValueChangedEventArgs e)
         {
             _hasChanges = true;
-
-            // 立即保存配置
-            SaveConfig();
-
-            // 通知插件配置已变更
-            NotifyPluginConfigChanged(e.Key, e.Value);
+            // 不立即保存，等用户点击保存按钮
         }
 
         /// <summary>
@@ -362,16 +365,8 @@ namespace SandronePlayer.Views
                 }
             }
 
-            // 保存配置
-            SaveConfig();
-
-            // 刷新 UI
+            // 刷新 UI（不保存，等用户点击保存按钮）
             _renderer?.RefreshValues();
-
-            // 通知插件
-            NotifyPluginConfigChanged(null, null);
-
-            _hasChanges = true;
         }
 
         /// <summary>
@@ -491,19 +486,51 @@ namespace SandronePlayer.Views
         private void BtnReset_Click(object sender, RoutedEventArgs e)
         {
             ResetToDefaults();
+            _hasChanges = true;
         }
 
         /// <summary>
-        /// 关闭按钮点击
+        /// 关闭按钮点击（X 按钮）
         /// </summary>
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
-            // 如果有变更，通知插件
-            if (_hasChanges)
+            // 直接关闭，不保存
+            CloseWithAnimation();
+        }
+
+        /// <summary>
+        /// 取消按钮点击
+        /// </summary>
+        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            // 直接关闭，不保存
+            CloseWithAnimation();
+        }
+
+        /// <summary>
+        /// 保存按钮点击
+        /// </summary>
+        private void BtnSave_Click(object sender, RoutedEventArgs e)
+        {
+            // 保存配置
+            SaveConfig();
+
+            // 通知插件配置已变更
+            NotifyPluginConfigChanged(null, null);
+
+            // 重新加载当前 Profile 的插件
+            var currentProfileId = ProfileManager.Instance.CurrentProfile?.Id;
+            if (!string.IsNullOrEmpty(currentProfileId))
             {
-                NotifyPluginConfigChanged(null, null);
+                PluginHost.Instance.LoadPluginsForProfile(currentProfileId);
+                NotificationService.Instance.Success("设置已保存，插件已重新加载");
+            }
+            else
+            {
+                NotificationService.Instance.Success("设置已保存");
             }
 
+            _hasChanges = false;
             CloseWithAnimation();
         }
 

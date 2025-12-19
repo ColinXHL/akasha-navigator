@@ -100,6 +100,60 @@ namespace SandronePlayer.Models
         }
 
         /// <summary>
+        /// 获取配置值（返回原始类型）
+        /// 支持点号分隔的路径，如 "overlay.x"
+        /// 返回 .NET 原始类型（int、double、string、bool）而不是 JsonElement
+        /// </summary>
+        /// <param name="key">配置键（支持点号路径）</param>
+        /// <returns>配置值或 null</returns>
+        public object? GetRaw(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return null;
+
+            try
+            {
+                var node = GetNodeByPath(key);
+                if (node == null)
+                    return null;
+
+                // 根据 JsonNode 类型返回对应的 .NET 原始类型
+                return node switch
+                {
+                    JsonValue jsonValue => GetValueFromJsonValue(jsonValue),
+                    JsonObject => node.Deserialize<Dictionary<string, object?>>(_jsonOptions),
+                    JsonArray => node.Deserialize<List<object?>>(_jsonOptions),
+                    _ => null
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 从 JsonValue 获取原始值
+        /// </summary>
+        private static object? GetValueFromJsonValue(JsonValue jsonValue)
+        {
+            // 尝试获取各种原始类型
+            if (jsonValue.TryGetValue<bool>(out var boolVal))
+                return boolVal;
+            if (jsonValue.TryGetValue<int>(out var intVal))
+                return intVal;
+            if (jsonValue.TryGetValue<long>(out var longVal))
+                return longVal;
+            if (jsonValue.TryGetValue<double>(out var doubleVal))
+                return doubleVal;
+            if (jsonValue.TryGetValue<string>(out var strVal))
+                return strVal;
+            
+            // 回退到字符串表示
+            return jsonValue.ToString();
+        }
+
+        /// <summary>
         /// 设置配置值
         /// 支持点号分隔的路径，如 "overlay.x"
         /// </summary>

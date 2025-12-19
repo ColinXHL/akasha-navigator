@@ -137,7 +137,7 @@ namespace SandronePlayer.Views
         }
 
         /// <summary>
-        /// 设置按钮点击
+        /// 设置按钮点击（全局默认配置）
         /// </summary>
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
@@ -151,10 +151,10 @@ namespace SandronePlayer.Views
                     return;
                 }
 
-                // 获取插件目录
+                // 获取插件源码目录（同时也是全局配置目录）
                 var pluginDirectory = PluginLibrary.Instance.GetPluginDirectory(pluginId);
                 
-                // 获取配置目录（使用插件库目录作为配置目录）
+                // 全局配置保存在插件库目录中
                 var configDirectory = pluginDirectory;
 
                 // 打开插件设置窗口

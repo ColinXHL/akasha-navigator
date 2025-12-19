@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using SandronePlayer.Helpers;
 using SandronePlayer.Models;
@@ -380,11 +381,63 @@ namespace SandronePlayer.Services
                 SaveIndex();
             }
 
+            // 复制全局配置到 Profile 配置目录
+            CopyGlobalConfigToProfile(pluginId, profileId);
+
             // 触发事件
             OnAssociationChanged(new AssociationChangedEventArgs(
                 AssociationChangeType.Added, pluginId, profileId));
 
             return true;
+        }
+
+        /// <summary>
+        /// 复制全局插件配置到 Profile 配置目录
+        /// </summary>
+        /// <param name="pluginId">插件ID</param>
+        /// <param name="profileId">Profile ID</param>
+        private void CopyGlobalConfigToProfile(string pluginId, string profileId)
+        {
+            try
+            {
+                // 全局配置路径（插件库目录）
+                var globalConfigPath = Path.Combine(
+                    PluginLibrary.Instance.GetPluginDirectory(pluginId),
+                    AppConstants.PluginConfigFileName);
+
+                // Profile 配置目录
+                var profileConfigDir = PluginHost.Instance.GetPluginConfigDirectory(profileId, pluginId);
+                var profileConfigPath = Path.Combine(profileConfigDir, AppConstants.PluginConfigFileName);
+
+                // 如果 Profile 配置已存在，不覆盖
+                if (File.Exists(profileConfigPath))
+                {
+                    LogService.Instance.Debug("PluginAssociationManager", 
+                        $"Profile 配置已存在，跳过复制: {profileConfigPath}");
+                    return;
+                }
+
+                // 确保目录存在
+                Directory.CreateDirectory(profileConfigDir);
+
+                // 如果全局配置存在，复制它
+                if (File.Exists(globalConfigPath))
+                {
+                    File.Copy(globalConfigPath, profileConfigPath);
+                    LogService.Instance.Debug("PluginAssociationManager", 
+                        $"已复制全局配置到 Profile: {globalConfigPath} -> {profileConfigPath}");
+                }
+                else
+                {
+                    LogService.Instance.Debug("PluginAssociationManager", 
+                        $"全局配置不存在，将使用默认配置: {globalConfigPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.Instance.Error("PluginAssociationManager", 
+                    $"复制全局配置失败: {ex.Message}");
+            }
         }
 
         /// <summary>
