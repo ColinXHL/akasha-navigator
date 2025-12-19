@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>..\assets\icons\akasha-navigator-icon-256x256.ico</ApplicationIcon>
+    <ApplicationIcon>..\assets\icons\akasha-navigator.ico</ApplicationIcon>
     <Version>0.2.2</Version>
   </PropertyGroup>
 
