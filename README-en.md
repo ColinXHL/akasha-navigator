@@ -1,8 +1,8 @@
 <div align="center">
   <h1 align="center">
-    <a href="https://github.com/ColinXHL/sandrone-player"><img src="assets/sandrone-player-logo.png" width="128"></a>
+    <a href="https://github.com/ColinXHL/akasha-navigator"><img src="assets/akasha-navigator-logo.png" width="128"></a>
     <br/>
-    <a href="https://github.com/ColinXHL/sandrone-player">SandronePlayer</a>
+    <a href="https://github.com/ColinXHL/akasha-navigator">AkashaNavigator</a>
   </h1>
 </div>
 
@@ -10,8 +10,8 @@
 
 <div align="center">
   <a href="https://dotnet.microsoft.com/zh-cn/download/dotnet/latest/runtime"><img alt="Windows" src="https://img.shields.io/badge/platform-Windows-blue?logo=windowsxp&style=flat-square&color=1E9BFA" /></a>
-  <a href="https://github.com/ColinXHL/sandrone-player/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/ColinXHL/sandrone-player/total?logo=github&style=flat-square&color=1E9BFA"></a>
-  <a href="https://github.com/ColinXHL/sandrone-player/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ColinXHL/sandrone-player?logo=visualstudio&style=flat-square&color=1E9BFA"></a>
+  <a href="https://github.com/ColinXHL/akasha-navigator/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/ColinXHL/akasha-navigator/total?logo=github&style=flat-square&color=1E9BFA"></a>
+  <a href="https://github.com/ColinXHL/akasha-navigator/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ColinXHL/akasha-navigator?logo=visualstudio&style=flat-square&color=1E9BFA"></a>
 </div>
 
 <br/>
@@ -24,7 +24,7 @@
 
 [English](./README-en.md) | [中文](./README.md)
 
-SandronePlayer · A floating web player built with WPF + WebView2 for Windows, designed for watching tutorial/guide videos while gaming.
+AkashaNavigator · A floating web player built with WPF + WebView2 for Windows, designed for watching tutorial/guide videos while gaming.
 
 ## Features
 
@@ -64,7 +64,7 @@ SandronePlayer · A floating web player built with WPF + WebView2 for Windows, d
 ## Download
 
 > [!NOTE]
-> Download: [⚡Github Download](https://github.com/ColinXHL/sandrone-player/releases)
+> Download: [⚡Github Download](https://github.com/ColinXHL/akasha-navigator/releases)
 >
 > Portable version - all data stored in `User/` folder relative to executable.
 
@@ -103,14 +103,14 @@ Your system needs to meet the following requirements:
 
 ```powershell
 # Clone the repository
-git clone https://github.com/ColinXHL/sandrone-player.git
-cd sandrone-player
+git clone https://github.com/ColinXHL/akasha-navigator.git
+cd akasha-navigator
 
 # Build
 dotnet build -c Release
 
 # Run
-dotnet run --project SandronePlayer
+dotnet run --project AkashaNavigator
 
 # Run Tests
 dotnet test
@@ -138,4 +138,4 @@ This project would not be possible without:
 
 ## Feedback
 
-Submit an [Issue](https://github.com/ColinXHL/sandrone-player/issues)
+Submit an [Issue](https://github.com/ColinXHL/akasha-navigator/issues)

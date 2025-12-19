@@ -1,6 +1,6 @@
 # 插件开发指南
 
-本文档介绍如何为 SandronePlayer 开发插件。
+本文档介绍如何为 AkashaNavigator 开发插件。
 
 ## 目录
 

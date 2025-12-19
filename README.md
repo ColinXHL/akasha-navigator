@@ -1,8 +1,8 @@
 <div align="center">
   <h1 align="center">
-    <a href="https://github.com/ColinXHL/sandrone-player"><img src="assets/sandrone-player-logo.png" width="128"></a>
+    <a href="https://github.com/ColinXHL/akasha-navigator"><img src="assets/akasha-navigator-logo.png" width="128"></a>
     <br/>
-    <a href="https://github.com/ColinXHL/sandrone-player">木偶播播</a>
+    <a href="https://github.com/ColinXHL/akasha-navigator">虚空导航</a>
   </h1>
 </div>
 
@@ -10,8 +10,8 @@
 
 <div align="center">
   <a href="https://dotnet.microsoft.com/zh-cn/download/dotnet/latest/runtime"><img alt="Windows" src="https://img.shields.io/badge/platform-Windows-blue?logo=windowsxp&style=flat-square&color=1E9BFA" /></a>
-  <a href="https://github.com/ColinXHL/sandrone-player/releases"><img alt="下载数" src="https://img.shields.io/github/downloads/ColinXHL/sandrone-player/total?logo=github&style=flat-square&color=1E9BFA"></a>
-  <a href="https://github.com/ColinXHL/sandrone-player/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ColinXHL/sandrone-player?logo=visualstudio&style=flat-square&color=1E9BFA"></a>
+  <a href="https://github.com/ColinXHL/akasha-navigator/releases"><img alt="下载数" src="https://img.shields.io/github/downloads/ColinXHL/akasha-navigator/total?logo=github&style=flat-square&color=1E9BFA"></a>
+  <a href="https://github.com/ColinXHL/akasha-navigator/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ColinXHL/akasha-navigator?logo=visualstudio&style=flat-square&color=1E9BFA"></a>
 </div>
 
 <br/>
@@ -29,7 +29,7 @@
 
 [English](./README-en.md) | [中文](./README.md)
 
-木偶播播 · 悬浮攻略播放器，一个基于 WPF + WebView2 的 Windows 悬浮网页播放器，专为游戏时观看攻略视频设计。
+虚空导航 · 悬浮攻略播放器，一个基于 WPF + WebView2 的 Windows 悬浮网页播放器，专为游戏时观看攻略视频设计。
 
 ## 功能
 
@@ -69,7 +69,7 @@
 ## 下载
 
 > [!NOTE]
-> 下载地址：[⚡Github 下载](https://github.com/ColinXHL/sandrone-player/releases)
+> 下载地址：[⚡Github 下载](https://github.com/ColinXHL/akasha-navigator/releases)
 >
 > 便携版，所有数据存储在程序目录的 `User/` 文件夹中。
 
@@ -108,14 +108,14 @@
 
 ```powershell
 # 克隆仓库
-git clone https://github.com/ColinXHL/sandrone-player.git
-cd sandrone-player
+git clone https://github.com/ColinXHL/akasha-navigator.git
+cd akasha-navigator
 
 # 构建
 dotnet build -c Release
 
 # 运行
-dotnet run --project SandronePlayer
+dotnet run --project AkashaNavigator
 
 # 运行测试
 dotnet test
@@ -143,4 +143,4 @@ dotnet test
 
 ## 问题反馈
 
-提 [Issue](https://github.com/ColinXHL/sandrone-player/issues)
+提 [Issue](https://github.com/ColinXHL/akasha-navigator/issues)

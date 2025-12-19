@@ -1,6 +1,6 @@
-# SandronePlayer 用户指南
+# AkashaNavigator 用户指南
 
-SandronePlayer 是一款 Windows 悬浮网页播放器，专为游戏时观看攻略视频设计。
+AkashaNavigator 是一款 Windows 悬浮网页播放器，专为游戏时观看攻略视频设计。
 
 ## 目录
 
@@ -23,9 +23,9 @@ SandronePlayer 是一款 Windows 悬浮网页播放器，专为游戏时观看�
 
 ### 安装步骤
 
-1. 从 [GitHub Releases](https://github.com/ColinXHL/sandrone-player/releases) 下载最新版本
+1. 从 [GitHub Releases](https://github.com/ColinXHL/akasha-navigator/releases) 下载最新版本
 2. 解压到任意目录
-3. 以管理员身份运行 `SandronePlayer.exe`
+3. 以管理员身份运行 `AkashaNavigator.exe`
 
 > ⚠️ **为什么需要管理员权限？**
 > 游戏通常以管理员权限运行，软件需要相同权限才能在游戏中使用全局快捷键。
@@ -35,8 +35,8 @@ SandronePlayer 是一款 Windows 悬浮网页播放器，专为游戏时观看�
 所有数据存储在程序目录的 `User/` 文件夹中：
 
 ```
-SandronePlayer/
-├── SandronePlayer.exe
+AkashaNavigator/
+├── AkashaNavigator.exe
 └── User/
     ├── Data/           # 历史记录、收藏夹
     ├── Profiles/       # Profile 配置
@@ -153,7 +153,7 @@ Profile 是针对特定游戏的配置方案，包含窗口位置、快捷键、
 
 ### Q: 快捷键在游戏中不起作用？
 
-确保以管理员身份运行 SandronePlayer。
+确保以管理员身份运行 AkashaNavigator。
 
 ### Q: 视频无法播放？
 
@@ -163,7 +163,7 @@ Profile 是针对特定游戏的配置方案，包含窗口位置、快捷键、
 
 ### Q: 如何保持 B 站登录状态？
 
-SandronePlayer 会自动保存 Cookie，正常登录后下次启动会保持登录状态。
+AkashaNavigator 会自动保存 Cookie，正常登录后下次启动会保持登录状态。
 
 ### Q: 窗口位置没有保存？
 

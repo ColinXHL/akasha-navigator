@@ -1,6 +1,6 @@
 # 插件 API 参考
 
-SandronePlayer 插件系统基于 V8 JavaScript 引擎，支持 ES6+ 语法。
+AkashaNavigator 插件系统基于 V8 JavaScript 引擎，支持 ES6+ 语法。
 
 ## API 列表
 
