@@ -1,0 +1,67 @@
+<helpers:AnimatedWindow x:Class="AkashaNavigator.Views.Dialogs.PluginSelectorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:helpers="clr-namespace:AkashaNavigator.Helpers"
+        Title="选择插件"
+        Width="500"
+        Height="400"
+        WindowStartupLocation="CenterOwner"
+        Foreground="White"
+        ResizeMode="NoResize">
+
+    <Border Background="#1E1E1E" BorderBrush="#333" BorderThickness="1" CornerRadius="8">
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- 标题 -->
+            <TextBlock Grid.Row="0" Text="选择要添加的插件" FontSize="16" FontWeight="SemiBold" 
+                       Foreground="White" Margin="0,0,0,16"/>
+
+            <!-- 插件列表 -->
+            <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewer}" 
+                          VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="PluginList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource PluginItemStyle}" 
+                                    MouseLeftButtonUp="PluginItem_Click" Tag="{Binding Id}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                              VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="🔌" FontSize="13" Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding Name}" Foreground="White" 
+                                                       FontSize="13" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}" 
+                                                       Foreground="#666" FontSize="11" Margin="6,0,0,0"/>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}" Foreground="#888" FontSize="11"
+                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                                   Margin="0,4,0,0" Visibility="{Binding HasDescriptionVisibility}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- 按钮区域 -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="取消" Style="{StaticResource SecondaryButtonStyle}" 
+                        Click="BtnCancel_Click" Margin="0,0,8,0"/>
+                <Button x:Name="BtnConfirm" Content="添加选中的插件" Style="{StaticResource PrimaryButtonStyle}" 
+                        Click="BtnConfirm_Click" IsEnabled="False"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</helpers:AnimatedWindow>

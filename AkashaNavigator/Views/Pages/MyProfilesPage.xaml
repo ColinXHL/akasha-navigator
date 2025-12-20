@@ -1,0 +1,243 @@
+<UserControl x:Class="AkashaNavigator.Views.Pages.MyProfilesPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:AkashaNavigator.Helpers"
+             Background="Transparent"
+             Cursor="Arrow">
+    
+    <UserControl.Resources>
+        <!-- 值转换器 -->
+        <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <helpers:ZeroToVisibleConverter x:Key="ZeroToVisibleConverter"/>
+
+        <!-- 本地主按钮样式 (继承全局 ActionButtonStyle) -->
+        <Style x:Key="LocalPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#0078D4"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1084D8"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#006CBD"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 本地危险按钮样式 (继承全局 ActionButtonStyle) -->
+        <Style x:Key="LocalDangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#5C2020"/>
+            <Setter Property="Foreground" Value="#F87171"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#7F1D1D"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#991B1B"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 本地警告按钮样式 (继承全局 ActionButtonStyle) -->
+        <Style x:Key="LocalWarningButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#5C4020"/>
+            <Setter Property="Foreground" Value="#FBBF24"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#7F5D1D"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#996B1B"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 本地切换开关样式 (添加 Cursor) -->
+        <Style x:Key="LocalToggleSwitchStyle" TargetType="CheckBox" BasedOn="{StaticResource ToggleSwitchStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Cursor" Value="Hand"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题栏 -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="我的 Profile" FontSize="18" FontWeight="SemiBold" 
+                       Foreground="White" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Profile 选择器 + 操作按钮 -->
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto" MinWidth="200"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="查看 Profile:" Foreground="#AAA" FontSize="13" 
+                       VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <ComboBox x:Name="ProfileSelector" Grid.Column="1" Style="{StaticResource DarkComboBoxStyle}"
+                      ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                      SelectionChanged="ProfileSelector_SelectionChanged" MinWidth="200">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" Foreground="White" VerticalAlignment="Center"/>
+                            <Border Background="#0078D4" CornerRadius="3" Padding="4,1" Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="当前使用" Foreground="White" FontSize="10" VerticalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <!-- Profile 操作按钮：设为当前、编辑、删除 -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                <Button x:Name="BtnSetCurrent" Content="设为当前" Style="{StaticResource LocalPrimaryButtonStyle}"
+                        Click="BtnSetCurrent_Click" ToolTip="将此 Profile 设为当前使用"
+                        Visibility="Collapsed"/>
+                <Button x:Name="BtnEditProfile" Content="✏️" Style="{StaticResource ActionButtonStyle}"
+                        Click="BtnEditProfile_Click" ToolTip="编辑 Profile" Margin="4,0,0,0"/>
+                <Button x:Name="BtnDeleteProfile" Content="🗑️" Style="{StaticResource LocalDangerButtonStyle}"
+                        Click="BtnDeleteProfile_Click" ToolTip="删除 Profile" Margin="4,0,0,0"/>
+            </StackPanel>
+            <!-- 新建 Profile 按钮 -->
+            <Button x:Name="BtnNewProfile" Grid.Column="3" Content="➕ 新建" Style="{StaticResource LocalPrimaryButtonStyle}"
+                    Click="BtnNewProfile_Click" Margin="12,0,0,0"/>
+            <!-- 导入导出按钮 -->
+            <StackPanel Grid.Column="5" Orientation="Horizontal">
+                <Button x:Name="BtnImport" Content="📥 导入" Style="{StaticResource ActionButtonStyle}"
+                        Click="BtnImport_Click" Margin="0,0,8,0"/>
+                <Button x:Name="BtnExport" Content="📤 导出" Style="{StaticResource ActionButtonStyle}"
+                        Click="BtnExport_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Profile 详情区域 -->
+        <ScrollViewer Grid.Row="2" Style="{StaticResource DarkScrollViewer}" 
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="ProfileDetailPanel">
+                <!-- 缺失插件警告 -->
+                <Border x:Name="MissingWarning" Style="{StaticResource WarningTagStyle}" 
+                        Visibility="Collapsed" Margin="0,0,0,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="⚠" Foreground="#FBBF24" FontSize="14" 
+                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="MissingWarningText" Foreground="#FBBF24" FontSize="13"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button x:Name="BtnInstallMissing" Grid.Column="1" Content="一键安装缺失插件" 
+                                Style="{StaticResource LocalWarningButtonStyle}"
+                                Click="BtnInstallMissing_Click"/>
+                    </Grid>
+                </Border>
+
+                <!-- 插件清单标题 -->
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Text="插件清单" FontSize="14" FontWeight="SemiBold" 
+                                   Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="PluginCountText" Foreground="#666" FontSize="12"
+                                   VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </StackPanel>
+                    <Button x:Name="BtnAddPlugin" Grid.Column="1" Content="➕ 添加插件" 
+                            Style="{StaticResource LocalPrimaryButtonStyle}"
+                            Click="BtnAddPlugin_Click"/>
+                </Grid>
+
+                <!-- 无插件提示 -->
+                <TextBlock x:Name="NoPluginsText" Text="此 Profile 没有添加任何插件" 
+                           Foreground="#666" FontSize="13" Margin="0,20,0,0"
+                           HorizontalAlignment="Center" Visibility="Collapsed"/>
+
+                <!-- 插件列表 -->
+                <ItemsControl x:Name="PluginList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource InnerPluginCardStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 启用/禁用开关 -->
+                                    <CheckBox Grid.Column="0" Style="{StaticResource LocalToggleSwitchStyle}"
+                                              IsChecked="{Binding Enabled, Mode=OneWay}"
+                                              IsEnabled="{Binding CanToggle}"
+                                              Checked="PluginToggle_Changed" Unchecked="PluginToggle_Changed"
+                                              Tag="{Binding PluginId}"
+                                              VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+                                    <!-- 插件信息 -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="🔌" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding Name}" Foreground="White" 
+                                                       FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}" 
+                                                       Foreground="#666" FontSize="11" 
+                                                       VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                            <!-- 状态标签 -->
+                                            <Border Margin="8,0,0,0" VerticalAlignment="Center"
+                                                    Style="{Binding StatusTagStyle}">
+                                                <TextBlock Text="{Binding StatusText}" 
+                                                           Foreground="{Binding StatusColor}" FontSize="10"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}" Foreground="#888" FontSize="11"
+                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="400" Margin="0,4,0,0"
+                                                   Visibility="{Binding HasDescriptionVisibility}"/>
+                                    </StackPanel>
+
+                                    <!-- 操作按钮 -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <!-- 安装按钮（仅缺失时显示） -->
+                                        <Button Content="安装" Style="{StaticResource LocalPrimaryButtonStyle}"
+                                                Click="BtnInstallPlugin_Click" Tag="{Binding PluginId}"
+                                                Visibility="{Binding InstallButtonVisibility}" Margin="0,0,8,0"/>
+                                        <!-- 添加按钮（仅从原始列表移除的插件显示） -->
+                                        <Button Content="添加" Style="{StaticResource LocalPrimaryButtonStyle}"
+                                                Click="BtnAddBackPlugin_Click" Tag="{Binding PluginId}"
+                                                Visibility="{Binding AddBackButtonVisibility}" Margin="0,0,8,0"/>
+                                        <!-- 设置按钮（仅已安装时显示） -->
+                                        <Button Content="⚙️ 设置" Style="{StaticResource ActionButtonStyle}"
+                                                Click="BtnPluginSettings_Click" Tag="{Binding PluginId}"
+                                                ToolTip="插件设置"
+                                                Visibility="{Binding SettingsButtonVisibility}" Margin="0,0,8,0"/>
+                                        <!-- 移除按钮 -->
+                                        <Button Content="{Binding RemoveButtonText}" Style="{StaticResource LocalDangerButtonStyle}"
+                                                Click="BtnRemovePlugin_Click" Tag="{Binding PluginId}"
+                                                Visibility="{Binding RemoveButtonVisibility}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

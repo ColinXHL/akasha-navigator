@@ -1,9 +1,10 @@
 using System;
 using System.Windows;
-using AkashaNavigator.Models;
+using AkashaNavigator.Models.Config;
 using AkashaNavigator.Plugins;
 using AkashaNavigator.Services;
-using AkashaNavigator.Views;
+using AkashaNavigator.Views.Windows;
+using AkashaNavigator.Views.Dialogs;
 
 namespace AkashaNavigator
 {

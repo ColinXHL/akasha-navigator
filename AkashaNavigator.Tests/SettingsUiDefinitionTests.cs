@@ -1,21 +1,21 @@
 using System.Text.Json;
-using AkashaNavigator.Models;
+using AkashaNavigator.Models.Config;
 using Xunit;
 
 namespace AkashaNavigator.Tests
 {
-    /// <summary>
-    /// SettingsUiDefinition 单元测试
-    /// </summary>
-    public class SettingsUiDefinitionTests
-    {
-        #region LoadFromJson Tests
+/// <summary>
+/// SettingsUiDefinition 单元测试
+/// </summary>
+public class SettingsUiDefinitionTests
+{
+#region LoadFromJson Tests
 
-        [Fact]
-        public void LoadFromJson_ValidJson_ReturnsDefinition()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void LoadFromJson_ValidJson_ReturnsDefinition()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""基本设置"",
@@ -31,59 +31,59 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition);
-            Assert.NotNull(definition.Sections);
-            Assert.Single(definition.Sections);
-            Assert.Equal("基本设置", definition.Sections[0].Title);
-            Assert.NotNull(definition.Sections[0].Items);
-            Assert.Single(definition.Sections[0].Items);
-            Assert.Equal("checkbox", definition.Sections[0].Items[0].Type);
-            Assert.Equal("enabled", definition.Sections[0].Items[0].Key);
-        }
+        // Assert
+        Assert.NotNull(definition);
+        Assert.NotNull(definition.Sections);
+        Assert.Single(definition.Sections);
+        Assert.Equal("基本设置", definition.Sections[0].Title);
+        Assert.NotNull(definition.Sections[0].Items);
+        Assert.Single(definition.Sections[0].Items);
+        Assert.Equal("checkbox", definition.Sections[0].Items[0].Type);
+        Assert.Equal("enabled", definition.Sections[0].Items[0].Key);
+    }
 
-        [Fact]
-        public void LoadFromJson_EmptyJson_ReturnsNull()
-        {
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson("");
+    [Fact]
+    public void LoadFromJson_EmptyJson_ReturnsNull()
+    {
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson("");
 
-            // Assert
-            Assert.Null(definition);
-        }
+        // Assert
+        Assert.Null(definition);
+    }
 
-        [Fact]
-        public void LoadFromJson_InvalidJson_ReturnsNull()
-        {
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson("{ invalid json }");
+    [Fact]
+    public void LoadFromJson_InvalidJson_ReturnsNull()
+    {
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson("{ invalid json }");
 
-            // Assert
-            Assert.Null(definition);
-        }
+        // Assert
+        Assert.Null(definition);
+    }
 
-        [Fact]
-        public void LoadFromJson_NullJson_ReturnsNull()
-        {
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(null!);
+    [Fact]
+    public void LoadFromJson_NullJson_ReturnsNull()
+    {
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(null!);
 
-            // Assert
-            Assert.Null(definition);
-        }
+        // Assert
+        Assert.Null(definition);
+    }
 
-        #endregion
+#endregion
 
-        #region SettingsItem Tests
+#region SettingsItem Tests
 
-        [Fact]
-        public void SettingsItem_GetDefaultValue_ReturnsCorrectType()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void SettingsItem_GetDefaultValue_ReturnsCorrectType()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""Test"",
@@ -97,24 +97,24 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition?.Sections?[0].Items);
-            var items = definition.Sections[0].Items;
+        // Assert
+        Assert.NotNull(definition?.Sections?[0].Items);
+        var items = definition.Sections[0].Items;
 
-            Assert.True(items[0].GetDefaultValue<bool>());
-            Assert.Equal(42, items[1].GetDefaultValue<int>());
-            Assert.Equal("hello", items[2].GetDefaultValue<string>());
-            Assert.Equal(3.14, items[3].GetDefaultValue<double>(), 2);
-        }
+        Assert.True(items[0].GetDefaultValue<bool>());
+        Assert.Equal(42, items[1].GetDefaultValue<int>());
+        Assert.Equal("hello", items[2].GetDefaultValue<string>());
+        Assert.Equal(3.14, items[3].GetDefaultValue<double>(), 2);
+    }
 
-        [Fact]
-        public void SettingsItem_GetDefaultValue_NoDefault_ReturnsDefault()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void SettingsItem_GetDefaultValue_NoDefault_ReturnsDefault()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""Test"",
@@ -125,24 +125,24 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition?.Sections?[0].Items);
-            var item = definition.Sections[0].Items[0];
-            Assert.False(item.GetDefaultValue<bool>());
-        }
+        // Assert
+        Assert.NotNull(definition?.Sections?[0].Items);
+        var item = definition.Sections[0].Items[0];
+        Assert.False(item.GetDefaultValue<bool>());
+    }
 
-        #endregion
+#endregion
 
-        #region SelectOption Tests
+#region SelectOption Tests
 
-        [Fact]
-        public void LoadFromJson_WithSelectOptions_ParsesCorrectly()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void LoadFromJson_WithSelectOptions_ParsesCorrectly()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""Test"",
@@ -162,28 +162,28 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition?.Sections?[0].Items);
-            var item = definition.Sections[0].Items[0];
-            Assert.Equal("select", item.Type);
-            Assert.NotNull(item.Options);
-            Assert.Equal(2, item.Options.Count);
-            Assert.Equal("arrow", item.Options[0].Value);
-            Assert.Equal("箭头", item.Options[0].Label);
-        }
+        // Assert
+        Assert.NotNull(definition?.Sections?[0].Items);
+        var item = definition.Sections[0].Items[0];
+        Assert.Equal("select", item.Type);
+        Assert.NotNull(item.Options);
+        Assert.Equal(2, item.Options.Count);
+        Assert.Equal("arrow", item.Options[0].Value);
+        Assert.Equal("箭头", item.Options[0].Label);
+    }
 
-        #endregion
+#endregion
 
-        #region NumberBox Constraints Tests
+#region NumberBox Constraints Tests
 
-        [Fact]
-        public void LoadFromJson_WithNumberConstraints_ParsesCorrectly()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void LoadFromJson_WithNumberConstraints_ParsesCorrectly()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""Test"",
@@ -202,26 +202,26 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition?.Sections?[0].Items);
-            var item = definition.Sections[0].Items[0];
-            Assert.Equal(0, item.Min);
-            Assert.Equal(10000, item.Max);
-            Assert.Equal(100, item.Step);
-        }
+        // Assert
+        Assert.NotNull(definition?.Sections?[0].Items);
+        var item = definition.Sections[0].Items[0];
+        Assert.Equal(0, item.Min);
+        Assert.Equal(10000, item.Max);
+        Assert.Equal(100, item.Step);
+    }
 
-        #endregion
+#endregion
 
-        #region Button Action Tests
+#region Button Action Tests
 
-        [Fact]
-        public void LoadFromJson_WithButtonAction_ParsesCorrectly()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void LoadFromJson_WithButtonAction_ParsesCorrectly()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""Test"",
@@ -236,37 +236,37 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition?.Sections?[0].Items);
-            var item = definition.Sections[0].Items[0];
-            Assert.Equal("button", item.Type);
-            Assert.Equal("enterEditMode", item.Action);
-        }
+        // Assert
+        Assert.NotNull(definition?.Sections?[0].Items);
+        var item = definition.Sections[0].Items[0];
+        Assert.Equal("button", item.Type);
+        Assert.Equal("enterEditMode", item.Action);
+    }
 
-        [Fact]
-        public void SettingsButtonActions_IsBuiltInAction_ReturnsCorrectly()
-        {
-            // Assert
-            Assert.True(SettingsButtonActions.IsBuiltInAction("enterEditMode"));
-            Assert.True(SettingsButtonActions.IsBuiltInAction("resetConfig"));
-            Assert.True(SettingsButtonActions.IsBuiltInAction("openPluginFolder"));
-            Assert.False(SettingsButtonActions.IsBuiltInAction("customAction"));
-            Assert.False(SettingsButtonActions.IsBuiltInAction(null));
-            Assert.False(SettingsButtonActions.IsBuiltInAction(""));
-        }
+    [Fact]
+    public void SettingsButtonActions_IsBuiltInAction_ReturnsCorrectly()
+    {
+        // Assert
+        Assert.True(SettingsButtonActions.IsBuiltInAction("enterEditMode"));
+        Assert.True(SettingsButtonActions.IsBuiltInAction("resetConfig"));
+        Assert.True(SettingsButtonActions.IsBuiltInAction("openPluginFolder"));
+        Assert.False(SettingsButtonActions.IsBuiltInAction("customAction"));
+        Assert.False(SettingsButtonActions.IsBuiltInAction(null));
+        Assert.False(SettingsButtonActions.IsBuiltInAction(""));
+    }
 
-        #endregion
+#endregion
 
-        #region Group Tests
+#region Group Tests
 
-        [Fact]
-        public void LoadFromJson_WithNestedGroup_ParsesCorrectly()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void LoadFromJson_WithNestedGroup_ParsesCorrectly()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""Test"",
@@ -284,29 +284,29 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition?.Sections?[0].Items);
-            var groupItem = definition.Sections[0].Items[0];
-            Assert.Equal("group", groupItem.Type);
-            Assert.Equal("覆盖层设置", groupItem.Label);
-            Assert.NotNull(groupItem.Items);
-            Assert.Equal(2, groupItem.Items.Count);
-            Assert.Equal("x", groupItem.Items[0].Key);
-            Assert.Equal("y", groupItem.Items[1].Key);
-        }
+        // Assert
+        Assert.NotNull(definition?.Sections?[0].Items);
+        var groupItem = definition.Sections[0].Items[0];
+        Assert.Equal("group", groupItem.Type);
+        Assert.Equal("覆盖层设置", groupItem.Label);
+        Assert.NotNull(groupItem.Items);
+        Assert.Equal(2, groupItem.Items.Count);
+        Assert.Equal("x", groupItem.Items[0].Key);
+        Assert.Equal("y", groupItem.Items[1].Key);
+    }
 
-        #endregion
+#endregion
 
-        #region Multiple Sections Tests
+#region Multiple Sections Tests
 
-        [Fact]
-        public void LoadFromJson_MultipleSections_ParsesCorrectly()
-        {
-            // Arrange
-            var json = @"{
+    [Fact]
+    public void LoadFromJson_MultipleSections_ParsesCorrectly()
+    {
+        // Arrange
+        var json = @"{
                 ""sections"": [
                     {
                         ""title"": ""基本设置"",
@@ -323,16 +323,16 @@ namespace AkashaNavigator.Tests
                 ]
             }";
 
-            // Act
-            var definition = SettingsUiDefinition.LoadFromJson(json);
+        // Act
+        var definition = SettingsUiDefinition.LoadFromJson(json);
 
-            // Assert
-            Assert.NotNull(definition?.Sections);
-            Assert.Equal(2, definition.Sections.Count);
-            Assert.Equal("基本设置", definition.Sections[0].Title);
-            Assert.Equal("高级设置", definition.Sections[1].Title);
-        }
-
-        #endregion
+        // Assert
+        Assert.NotNull(definition?.Sections);
+        Assert.Equal(2, definition.Sections.Count);
+        Assert.Equal("基本设置", definition.Sections[0].Title);
+        Assert.Equal("高级设置", definition.Sections[1].Title);
     }
+
+#endregion
+}
 }

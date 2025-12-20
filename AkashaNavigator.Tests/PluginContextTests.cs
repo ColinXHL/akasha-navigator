@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using AkashaNavigator.Models;
+using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Plugins;
 using FsCheck;
 using FsCheck.Xunit;

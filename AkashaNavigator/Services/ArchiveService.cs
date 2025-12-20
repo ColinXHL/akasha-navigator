@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Models;
+using AkashaNavigator.Models.Archive;
 
 namespace AkashaNavigator.Services
 {

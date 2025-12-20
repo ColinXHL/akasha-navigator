@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using AkashaNavigator.Models;
+using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Plugins;
 using FsCheck;
 using FsCheck.Xunit;

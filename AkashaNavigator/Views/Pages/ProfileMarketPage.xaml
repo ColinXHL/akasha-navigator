@@ -1,0 +1,175 @@
+<UserControl x:Class="AkashaNavigator.Views.Pages.ProfileMarketPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:helpers="clr-namespace:AkashaNavigator.Helpers"
+             Background="Transparent"
+             Cursor="Arrow">
+    
+    <UserControl.Resources>
+        <!-- 值转换器 -->
+        <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <helpers:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+        <helpers:ZeroToVisibleConverter x:Key="ZeroToVisibleConverter"/>
+
+        <!-- 本地主按钮样式 (继承全局 ActionButtonStyle) -->
+        <Style x:Key="LocalPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#0078D4"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1084D8"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#006CBD"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题栏 -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Profile 市场" FontSize="18" FontWeight="SemiBold" 
+                       Foreground="White" VerticalAlignment="Center"/>
+            <Button x:Name="BtnManageSources" Grid.Column="1" Content="⚙ 订阅源管理" 
+                    Style="{StaticResource ActionButtonStyle}"
+                    Click="BtnManageSources_Click"/>
+        </Grid>
+
+        <!-- 搜索框 -->
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="SearchBox" Grid.Column="0"
+                     Style="{StaticResource SearchBoxStyle}" Tag="搜索 Profile..."
+                     TextChanged="SearchBox_TextChanged"/>
+            <Button x:Name="BtnRefresh" Grid.Column="1" Content="🔄 刷新" 
+                    Style="{StaticResource ActionButtonStyle}"
+                    Click="BtnRefresh_Click" Margin="8,0,0,0"/>
+        </Grid>
+
+        <!-- 内容区域 -->
+        <ScrollViewer Grid.Row="2" Style="{StaticResource DarkScrollViewer}" 
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- 加载状态 -->
+                <TextBlock x:Name="LoadingText" Text="正在加载..." 
+                           Foreground="#888" FontSize="13" 
+                           HorizontalAlignment="Center" Margin="0,40,0,40"
+                           Visibility="Collapsed"/>
+
+                <!-- 错误提示 -->
+                <Border x:Name="ErrorBorder" Visibility="Collapsed"
+                        Background="#3A1A1A" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ErrorText" Grid.Column="0"
+                                   Foreground="#F87171" FontSize="13" 
+                                   TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Content="重试" 
+                                Style="{StaticResource ActionButtonStyle}"
+                                Click="BtnRefresh_Click" Margin="12,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- 无 Profile 提示 -->
+                <TextBlock x:Name="NoSourcesText" 
+                           Text="暂无可用的 Profile，可点击「订阅源管理」添加第三方订阅源" 
+                           Foreground="#888" FontSize="13" 
+                           HorizontalAlignment="Center" Margin="0,40,0,40"
+                           Visibility="Collapsed"/>
+
+                <!-- 无结果提示 -->
+                <TextBlock x:Name="NoResultsText" 
+                           Text="没有找到匹配的 Profile" 
+                           Foreground="#666" FontSize="13" 
+                           HorizontalAlignment="Center" Margin="0,40,0,40"
+                           Visibility="Collapsed"/>
+
+                <!-- Profile 列表 -->
+                <ItemsControl x:Name="ProfileList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource InnerPluginCardStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Profile 信息 -->
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="📦" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding Name}" Foreground="White" 
+                                                       FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}" 
+                                                       Foreground="#666" FontSize="11" 
+                                                       VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                            <!-- 目标游戏标签 -->
+                                            <Border Margin="8,0,0,0" VerticalAlignment="Center"
+                                                    Background="#1A3A5A" CornerRadius="3" Padding="6,2"
+                                                    Visibility="{Binding HasTargetGame, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="{Binding TargetGame}" 
+                                                           Foreground="#60A5FA" FontSize="10"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}" Foreground="#888" FontSize="11"
+                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="400" Margin="0,4,0,0"
+                                                   Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                            <TextBlock Text="{Binding Author, StringFormat='作者: {0}'}" 
+                                                       Foreground="#666" FontSize="11"
+                                                       Visibility="{Binding HasAuthor, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <TextBlock Text=" · " Foreground="#444" FontSize="11"
+                                                       Visibility="{Binding HasAuthor, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <TextBlock Text="{Binding PluginCount, StringFormat='{}{0} 个插件'}" 
+                                                       Foreground="#666" FontSize="11"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- 操作按钮 -->
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Content="详情" Style="{StaticResource ActionButtonStyle}"
+                                                Click="BtnProfileDetails_Click" 
+                                                Tag="{Binding}" Margin="0,0,8,0"/>
+                                        <!-- 安装按钮：未安装时显示 -->
+                                        <Button Content="安装" Style="{StaticResource LocalPrimaryButtonStyle}"
+                                                Click="BtnProfileInstall_Click" 
+                                                Tag="{Binding}"
+                                                Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                        <!-- 卸载按钮：已安装且非默认 Profile 时显示 -->
+                                        <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
+                                                Click="BtnProfileUninstall_Click" 
+                                                Tag="{Binding}"
+                                                Visibility="{Binding CanUninstall, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <!-- 已安装标签：已安装但是默认 Profile 时显示 -->
+                                        <Border Background="#2A3A2A" CornerRadius="4" Padding="12,6"
+                                                Visibility="{Binding IsDefaultAndInstalled, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="已安装" Foreground="#4ADE80" FontSize="12"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
