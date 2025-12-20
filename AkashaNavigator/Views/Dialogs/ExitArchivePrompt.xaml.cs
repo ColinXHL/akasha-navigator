@@ -20,6 +20,11 @@ public partial class ExitArchivePrompt : AnimatedWindow
     public enum PromptResult
     {
         /// <summary>
+        /// 取消操作，不做任何事情
+        /// </summary>
+        Cancel,
+
+        /// <summary>
         /// 继续退出应用
         /// </summary>
         Exit,
@@ -42,7 +47,7 @@ public partial class ExitArchivePrompt : AnimatedWindow
     /// <summary>
     /// 用户选择的操作结果
     /// </summary>
-    public PromptResult Result { get; private set; } = PromptResult.Exit;
+    public PromptResult Result { get; private set; } = PromptResult.Cancel;
 
     /// <summary>
     /// 当前页面 URL
@@ -107,11 +112,11 @@ public partial class ExitArchivePrompt : AnimatedWindow
     }
 
     /// <summary>
-    /// 关闭按钮点击 - 继续退出应用
+    /// 关闭按钮点击 - 取消操作，不做任何事情
     /// </summary>
     private void BtnClose_Click(object sender, RoutedEventArgs e)
     {
-        Result = PromptResult.Exit;
+        Result = PromptResult.Cancel;
         CloseWithAnimation();
     }
 

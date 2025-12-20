@@ -72,12 +72,19 @@
                                           HorizontalScrollBarVisibility="Hidden"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsFocused" Value="True">
-                                <Setter TargetName="border" Property="BorderBrush" Value="#0078D4"/>
-                            </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="BorderBrush" Value="#505050"/>
                             </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#0078D4"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsFocused" Value="True"/>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#1A8FE8"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -184,7 +191,7 @@
                             Style="{StaticResource NavButtonStyle}"
                             Click="BtnBookmark_Click"
                             ToolTip="收藏"
-                            Margin="0,0,4,0">
+                            Margin="0,0,8,0">
                         <TextBlock Text="☆" FontSize="14"/>
                     </Button>
 
@@ -193,7 +200,7 @@
                             Style="{StaticResource NavButtonStyle}"
                             Click="BtnArchive_Click"
                             ToolTip="归档"
-                            Margin="0,0,4,0">
+                            Margin="0,0,8,0">
                         <TextBlock Text="📁" FontSize="14"/>
                     </Button>
 
@@ -201,7 +208,8 @@
                     <Button x:Name="BtnMenu"
                             Style="{StaticResource NavButtonStyle}"
                             Click="BtnMenu_Click"
-                            ToolTip="菜单">
+                            ToolTip="菜单"
+                            Margin="0,0,4,0">
                         <TextBlock Text="≡" FontSize="16" FontWeight="Bold"/>
                         <Button.ContextMenu>
                             <ContextMenu x:Name="MainMenu" Style="{StaticResource DarkContextMenuStyle}">
@@ -218,7 +226,7 @@
                 </StackPanel>
 
                 <!-- 中间：URL 地址栏 + 前往按钮 -->
-                <Grid Margin="8,0">
+                <Grid Margin="12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>

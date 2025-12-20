@@ -934,6 +934,11 @@ public partial class PlayerWindow : Window
                     // 根据用户选择执行相应操作
                     switch (exitPrompt.Result)
                     {
+                    case ExitArchivePrompt.PromptResult.Cancel:
+                        // 取消退出，不做任何操作
+                        e.Cancel = true;
+                        return;
+
                     case ExitArchivePrompt.PromptResult.OpenArchiveManager:
                         // 取消退出，打开归档管理窗口
                         e.Cancel = true;

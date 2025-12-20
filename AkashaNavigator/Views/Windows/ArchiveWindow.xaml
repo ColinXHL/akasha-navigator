@@ -135,7 +135,7 @@
             </Border>
 
             <!-- 内容区 -->
-            <Grid Grid.Row="1" Margin="10,10,10,16">
+            <Grid Grid.Row="1" Margin="10,10,10,16" MouseLeftButtonDown="ContentArea_MouseLeftButtonDown">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>

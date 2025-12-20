@@ -618,7 +618,7 @@ public partial class ArchiveWindow : AnimatedWindow
     }
 
     /// <summary>
-    /// 树容器点击事件 - 点击空白区域取消选中
+    /// 树容器点击事件 - 点击空白区域取消选中并使搜索框失去焦点
     /// </summary>
     private void TreeContainer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -636,6 +636,42 @@ public partial class ArchiveWindow : AnimatedWindow
 
         // 点击在空白区域，清除选中
         ClearTreeViewSelection();
+
+        // 使搜索框失去焦点
+        ClearSearchBoxFocus();
+    }
+
+    /// <summary>
+    /// 使搜索框失去焦点
+    /// </summary>
+    private void ClearSearchBoxFocus()
+    {
+        if (SearchBox.IsFocused)
+        {
+            // 将焦点移到其他元素
+            ArchiveTree.Focus();
+        }
+    }
+
+    /// <summary>
+    /// 内容区点击事件 - 使搜索框失去焦点
+    /// </summary>
+    private void ContentArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // 检查点击是否在搜索框上
+        var hitElement = e.OriginalSource as DependencyObject;
+        while (hitElement != null)
+        {
+            if (hitElement is TextBox)
+            {
+                // 点击在搜索框上，不处理
+                return;
+            }
+            hitElement = System.Windows.Media.VisualTreeHelper.GetParent(hitElement);
+        }
+
+        // 使搜索框失去焦点
+        ClearSearchBoxFocus();
     }
 
     /// <summary>
