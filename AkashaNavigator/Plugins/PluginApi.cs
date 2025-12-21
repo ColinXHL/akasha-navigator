@@ -147,11 +147,11 @@ public class PluginApi
         _permissions =
             new HashSet<string>(_manifest.Permissions ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
 
+        Services.LogService.Instance.Debug("PluginApi", "Plugin {PluginId} permissions: [{Permissions}]",
+                                           context.PluginId, string.Join(", ", _permissions));
         Services.LogService.Instance.Debug(
-            "PluginApi", $"Plugin {context.PluginId} permissions: [{string.Join(", ", _permissions)}]");
-        Services.LogService.Instance.Debug(
-            "PluginApi",
-            $"HasPermission('overlay') = {HasPermission(PluginPermissions.Overlay)}, HasPermission('audio') = {HasPermission(PluginPermissions.Audio)}");
+            "PluginApi", "HasPermission('overlay') = {HasOverlay}, HasPermission('audio') = {HasAudio}",
+            HasPermission(PluginPermissions.Overlay), HasPermission(PluginPermissions.Audio));
 
         // 创建共享的事件管理器
         _eventManager = new EventManager();
@@ -180,13 +180,16 @@ public class PluginApi
         _subtitleApi.SetEventManager(_eventManager);
 
         Services.LogService.Instance.Debug(
-            "PluginApi", $"_overlayApi is null = {_overlayApi == null}, Overlay property is null = {Overlay == null}");
+            "PluginApi", "_overlayApi is null = {OverlayNull}, Overlay property is null = {OverlayPropNull}",
+            _overlayApi == null, Overlay == null);
         Services.LogService.Instance.Debug(
-            "PluginApi",
-            $"_subtitleApi is null = {_subtitleApi == null}, Subtitle property is null = {Subtitle == null}");
-        Services.LogService.Instance.Debug(
-            "PluginApi",
-            $"New APIs initialized: Player={Player != null}, Window={Window != null}, Storage={Storage != null}, Http={Http != null}, Event={Event != null}");
+            "PluginApi", "_subtitleApi is null = {SubtitleNull}, Subtitle property is null = {SubtitlePropNull}",
+            _subtitleApi == null, Subtitle == null);
+        Services.LogService.Instance.Debug("PluginApi",
+                                           "New APIs initialized: Player={HasPlayer}, Window={HasWindow}, " +
+                                               "Storage={HasStorage}, Http={HasHttp}, Event={HasEvent}",
+                                           Player != null, Window != null, Storage != null, Http != null,
+                                           Event != null);
     }
 
 #endregion
@@ -235,7 +238,7 @@ public class PluginApi
     [ScriptMember("log")]
     public void Log(object message)
     {
-        Core.Log(message);
+        Core.Logger.Info(message);
     }
 
 #endregion
@@ -258,11 +261,12 @@ public class PluginApi
         // 确保幂等性：如果已经清理过，直接返回
         if (_isCleanedUp)
         {
-            Services.LogService.Instance.Debug("PluginApi", $"Plugin {_context.PluginId} already cleaned up, skipping");
+            Services.LogService.Instance.Debug("PluginApi", "Plugin {PluginId} already cleaned up, skipping",
+                                               _context.PluginId);
             return;
         }
 
-        Services.LogService.Instance.Debug("PluginApi", $"Cleaning up plugin {_context.PluginId}");
+        Services.LogService.Instance.Debug("PluginApi", "Cleaning up plugin {PluginId}", _context.PluginId);
 
         // 清理已初始化的子 API，使用 try-catch 确保一个 API 失败不影响其他 API 的清理
         // 只清理那些实际被初始化的 API（即不为 null 的 API）
@@ -287,7 +291,7 @@ public class PluginApi
         TryCleanupApi("EventManager", () => _eventManager.Clear());
 
         _isCleanedUp = true;
-        Services.LogService.Instance.Debug("PluginApi", $"Plugin {_context.PluginId} cleanup completed");
+        Services.LogService.Instance.Debug("PluginApi", "Plugin {PluginId} cleanup completed", _context.PluginId);
     }
 
     /// <summary>
@@ -300,11 +304,12 @@ public class PluginApi
         try
         {
             cleanupAction?.Invoke();
-            Services.LogService.Instance.Debug("PluginApi", $"  - {apiName} cleaned up successfully");
+            Services.LogService.Instance.Debug("PluginApi", "  - {ApiName} cleaned up successfully", apiName);
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error("PluginApi", $"  - Failed to cleanup {apiName}: {ex.Message}");
+            Services.LogService.Instance.Error("PluginApi", "  - Failed to cleanup {ApiName}: {ErrorMessage}", apiName,
+                                               ex.Message);
             // 继续清理其他 API，不抛出异常
         }
     }

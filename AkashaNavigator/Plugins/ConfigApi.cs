@@ -66,7 +66,7 @@ public class ConfigApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error("ConfigApi", $"Get({key}) failed: {ex.Message}");
+            Services.LogService.Instance.Error("ConfigApi", "Get({Key}) failed: {ErrorMessage}", key, ex.Message);
             return defaultValue;
         }
     }
@@ -127,8 +127,8 @@ public class ConfigApi
                 }
                 catch (Exception ex)
                 {
-                    Services.LogService.Instance.Error("ConfigApi",
-                                                       $"Failed to emit configChanged event: {ex.Message}");
+                    Services.LogService.Instance.Error(
+                        "ConfigApi", "Failed to emit configChanged event: {ErrorMessage}", ex.Message);
                 }
             }
         }

@@ -83,8 +83,8 @@ public class EventManager
 
         if (callback == null)
         {
-            Services.LogService.Instance.Warn("EventManager",
-                                              $"On() called with null callback for event '{eventName}'");
+            Services.LogService.Instance.Warn("EventManager", "On() called with null callback for event '{EventName}'",
+                                              eventName);
             return -1;
         }
 
@@ -105,7 +105,8 @@ public class EventManager
             _subscriptionToEvent[subscriptionId] = eventName;
 
             Services.LogService.Instance.Debug(
-                "EventManager", $"Registered listener for '{eventName}' with subscription ID {subscriptionId}");
+                "EventManager", "Registered listener for '{EventName}' with subscription ID {SubscriptionId}",
+                eventName, subscriptionId);
 
             return subscriptionId;
         }
@@ -129,8 +130,8 @@ public class EventManager
             // 查找订阅 ID 对应的事件名
             if (!_subscriptionToEvent.TryGetValue(subscriptionId, out var eventName))
             {
-                Services.LogService.Instance.Debug("EventManager",
-                                                   $"Off() called with unknown subscription ID {subscriptionId}");
+                Services.LogService.Instance.Debug(
+                    "EventManager", "Off() called with unknown subscription ID {SubscriptionId}", subscriptionId);
                 return false;
             }
 
@@ -142,7 +143,8 @@ public class EventManager
                     _subscriptionToEvent.Remove(subscriptionId);
                     Services.LogService.Instance.Debug(
                         "EventManager",
-                        $"Removed listener with subscription ID {subscriptionId} from event '{eventName}'");
+                        "Removed listener with subscription ID {SubscriptionId} from event '{EventName}'",
+                        subscriptionId, eventName);
                     return true;
                 }
             }
@@ -176,7 +178,8 @@ public class EventManager
                 // 清空该事件的所有监听器
                 eventListeners.Clear();
 
-                Services.LogService.Instance.Debug("EventManager", $"Removed all listeners for event '{eventName}'");
+                Services.LogService.Instance.Debug("EventManager", "Removed all listeners for event '{EventName}'",
+                                                   eventName);
             }
         }
     }
@@ -236,16 +239,17 @@ public class EventManager
             catch (Exception ex)
             {
                 // 记录错误但继续调用其他回调
-                Services.LogService.Instance.Error(
-                    "EventManager",
-                    $"Callback for event '{eventName}' (subscription ID {kvp.Key}) threw exception: {ex.Message}");
+                Services.LogService.Instance.Error("EventManager",
+                                                   "Callback for event '{EventName}' (subscription ID " +
+                                                       "{SubscriptionId}) threw exception: {ErrorMessage}",
+                                                   eventName, kvp.Key, ex.Message);
             }
         }
 
         if (invokedCount > 0)
         {
-            Services.LogService.Instance.Debug("EventManager",
-                                               $"Emitted event '{eventName}' to {invokedCount} listeners");
+            Services.LogService.Instance.Debug(
+                "EventManager", "Emitted event '{EventName}' to {InvokedCount} listeners", eventName, invokedCount);
         }
     }
 

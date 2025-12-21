@@ -61,7 +61,8 @@ public class StorageApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error($"Plugin:{_context.PluginId}", $"StorageApi.Save failed: {ex.Message}");
+            Services.LogService.Instance.Error("Plugin:{PluginId}", "StorageApi.Save failed: {ErrorMessage}",
+                                               _context.PluginId, ex.Message);
             return false;
         }
     }
@@ -88,7 +89,8 @@ public class StorageApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error($"Plugin:{_context.PluginId}", $"StorageApi.Load failed: {ex.Message}");
+            Services.LogService.Instance.Error("Plugin:{PluginId}", "StorageApi.Load failed: {ErrorMessage}",
+                                               _context.PluginId, ex.Message);
             return null;
         }
     }
@@ -115,8 +117,8 @@ public class StorageApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error($"Plugin:{_context.PluginId}",
-                                               $"StorageApi.Delete failed: {ex.Message}");
+            Services.LogService.Instance.Error("Plugin:{PluginId}", "StorageApi.Delete failed: {ErrorMessage}",
+                                               _context.PluginId, ex.Message);
             return false;
         }
     }
@@ -159,7 +161,8 @@ public class StorageApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error($"Plugin:{_context.PluginId}", $"StorageApi.List failed: {ex.Message}");
+            Services.LogService.Instance.Error("Plugin:{PluginId}", "StorageApi.List failed: {ErrorMessage}",
+                                               _context.PluginId, ex.Message);
             return Array.Empty<string>();
         }
     }
@@ -175,7 +178,7 @@ public class StorageApi
     {
         // StorageApi 没有需要清理的缓存或引用
         // 文件系统操作不需要特殊清理
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "StorageApi: cleaned up");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "StorageApi: cleaned up", _context.PluginId);
     }
 
 #endregion
@@ -190,15 +193,16 @@ public class StorageApi
     {
         if (string.IsNullOrWhiteSpace(key))
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}", "StorageApi: key cannot be empty");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "StorageApi: key cannot be empty",
+                                              _context.PluginId);
             return false;
         }
 
         // 检查路径遍历模式（安全验证）
         if (ContainsPathTraversal(key))
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "StorageApi: key contains path traversal pattern");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "StorageApi: key contains path traversal pattern",
+                                              _context.PluginId);
             return false;
         }
 
@@ -208,8 +212,9 @@ public class StorageApi
         {
             if (Array.IndexOf(invalidChars, c) >= 0)
             {
-                Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                                  $"StorageApi: key contains invalid character '{c}'");
+                Services.LogService.Instance.Warn("Plugin:{PluginId}",
+                                                  "StorageApi: key contains invalid character '{InvalidChar}'",
+                                                  _context.PluginId, c);
                 return false;
             }
         }

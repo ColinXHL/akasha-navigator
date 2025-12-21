@@ -279,7 +279,8 @@ public class DataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("DataService", $"加载历史记录失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Warn("DataService", "加载历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                     ex.Message);
             _historyCache = new();
         }
         _historyCacheLoaded = true;
@@ -297,7 +298,8 @@ public class DataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("DataService", $"加载收藏夹失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Warn("DataService", "加载收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                     ex.Message);
             _bookmarkCache = new();
         }
         _bookmarkCacheLoaded = true;
@@ -312,7 +314,8 @@ public class DataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("DataService", $"保存历史记录失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Debug("DataService", "保存历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                      ex.Message);
         }
     }
 
@@ -325,7 +328,8 @@ public class DataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("DataService", $"保存收藏夹失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Debug("DataService", "保存收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                      ex.Message);
         }
     }
 

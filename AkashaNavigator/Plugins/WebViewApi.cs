@@ -52,7 +52,7 @@ public class WebViewApi
     {
         if (string.IsNullOrWhiteSpace(css))
         {
-            LogService.Instance.Warn($"Plugin:{_pluginId}", "WebViewApi.InjectCSS: css is empty");
+            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectCSS: css is empty", _pluginId);
             return false;
         }
 
@@ -63,7 +63,7 @@ public class WebViewApi
             var playerWindow = GetPlayerWindow();
             if (playerWindow?.WebView?.CoreWebView2 == null)
             {
-                LogService.Instance.Warn($"Plugin:{_pluginId}", "WebViewApi.InjectCSS: WebView not available");
+                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectCSS: WebView not available", _pluginId);
                 return false;
             }
 
@@ -85,12 +85,13 @@ public class WebViewApi
             // 根据时机执行注入
             ExecuteWithTiming(playerWindow, script, timing);
 
-            LogService.Instance.Debug($"Plugin:{_pluginId}", $"CSS injected (timing: {timing})");
+            LogService.Instance.Debug("Plugin:{PluginId}", "CSS injected (timing: {Timing})", _pluginId, timing);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error($"Plugin:{_pluginId}", $"WebViewApi.InjectCSS error: {ex.Message}");
+            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.InjectCSS error: {ErrorMessage}", _pluginId,
+                                      ex.Message);
             return false;
         }
     }
@@ -105,7 +106,7 @@ public class WebViewApi
     {
         if (string.IsNullOrWhiteSpace(script))
         {
-            LogService.Instance.Warn($"Plugin:{_pluginId}", "WebViewApi.InjectScript: script is empty");
+            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectScript: script is empty", _pluginId);
             return false;
         }
 
@@ -116,7 +117,8 @@ public class WebViewApi
             var playerWindow = GetPlayerWindow();
             if (playerWindow?.WebView?.CoreWebView2 == null)
             {
-                LogService.Instance.Warn($"Plugin:{_pluginId}", "WebViewApi.InjectScript: WebView not available");
+                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectScript: WebView not available",
+                                         _pluginId);
                 return false;
             }
 
@@ -137,12 +139,13 @@ public class WebViewApi
             // 根据时机执行注入
             ExecuteWithTiming(playerWindow, wrappedScript, timing);
 
-            LogService.Instance.Debug($"Plugin:{_pluginId}", $"Script injected (timing: {timing})");
+            LogService.Instance.Debug("Plugin:{PluginId}", "Script injected (timing: {Timing})", _pluginId, timing);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error($"Plugin:{_pluginId}", $"WebViewApi.InjectScript error: {ex.Message}");
+            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.InjectScript error: {ErrorMessage}", _pluginId,
+                                      ex.Message);
             return false;
         }
     }
@@ -156,7 +159,7 @@ public class WebViewApi
     {
         if (string.IsNullOrWhiteSpace(script))
         {
-            LogService.Instance.Warn($"Plugin:{_pluginId}", "WebViewApi.ExecuteScript: script is empty");
+            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScript: script is empty", _pluginId);
             return null;
         }
 
@@ -165,7 +168,8 @@ public class WebViewApi
             var playerWindow = GetPlayerWindow();
             if (playerWindow?.WebView?.CoreWebView2 == null)
             {
-                LogService.Instance.Warn($"Plugin:{_pluginId}", "WebViewApi.ExecuteScript: WebView not available");
+                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScript: WebView not available",
+                                         _pluginId);
                 return null;
             }
 
@@ -180,7 +184,8 @@ public class WebViewApi
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error($"Plugin:{_pluginId}", $"WebViewApi.ExecuteScript error: {ex.Message}");
+            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.ExecuteScript error: {ErrorMessage}", _pluginId,
+                                      ex.Message);
             throw;
         }
     }

@@ -96,7 +96,8 @@ public class PlayerApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}", "PlayerApi: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "PlayerApi: PlayerWindow not available",
+                                              _context.PluginId);
             return null;
         }
 
@@ -108,8 +109,8 @@ public class PlayerApi
                                  var webView = GetWebViewFromWindow(window);
                                  if (webView?.CoreWebView2 == null)
                                  {
-                                     Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                                                       "PlayerApi: WebView2 not initialized");
+                                     Services.LogService.Instance.Warn(
+                                         "Plugin:{PluginId}", "PlayerApi: WebView2 not initialized", _context.PluginId);
                                      return null;
                                  }
 
@@ -119,8 +120,9 @@ public class PlayerApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error($"Plugin:{_context.PluginId}",
-                                               $"PlayerApi: Script execution failed: {ex.Message}");
+            Services.LogService.Instance.Error("Plugin:{PluginId}",
+                                               "PlayerApi: Script execution failed: {ErrorMessage}", _context.PluginId,
+                                               ex.Message);
             return null;
         }
     }
@@ -150,7 +152,8 @@ public class PlayerApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}", "PlayerApi: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "PlayerApi: PlayerWindow not available",
+                                              _context.PluginId);
             return;
         }
 
@@ -162,8 +165,8 @@ public class PlayerApi
                     var webView = GetWebViewFromWindow(window);
                     if (webView?.CoreWebView2 == null)
                     {
-                        Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                                          "PlayerApi: WebView2 not initialized");
+                        Services.LogService.Instance.Warn("Plugin:{PluginId}", "PlayerApi: WebView2 not initialized",
+                                                          _context.PluginId);
                         return;
                     }
 
@@ -171,8 +174,9 @@ public class PlayerApi
                 }
                 catch (Exception ex)
                 {
-                    Services.LogService.Instance.Error($"Plugin:{_context.PluginId}",
-                                                       $"PlayerApi: Script execution failed: {ex.Message}");
+                    Services.LogService.Instance.Error("Plugin:{PluginId}",
+                                                       "PlayerApi: Script execution failed: {ErrorMessage}",
+                                                       _context.PluginId, ex.Message);
                 }
             });
     }
@@ -185,7 +189,8 @@ public class PlayerApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}", "PlayerApi: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "PlayerApi: PlayerWindow not available",
+                                              _context.PluginId);
             return null;
         }
 
@@ -197,8 +202,8 @@ public class PlayerApi
                                                 if (webView?.CoreWebView2 == null)
                                                 {
                                                     Services.LogService.Instance.Warn(
-                                                        $"Plugin:{_context.PluginId}",
-                                                        "PlayerApi: WebView2 not initialized");
+                                                        "Plugin:{PluginId}", "PlayerApi: WebView2 not initialized",
+                                                        _context.PluginId);
                                                     return null;
                                                 }
 
@@ -209,8 +214,9 @@ public class PlayerApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error($"Plugin:{_context.PluginId}",
-                                               $"PlayerApi: Script execution failed: {ex.Message}");
+            Services.LogService.Instance.Error("Plugin:{PluginId}",
+                                               "PlayerApi: Script execution failed: {ErrorMessage}", _context.PluginId,
+                                               ex.Message);
             return null;
         }
     }
@@ -224,7 +230,7 @@ public class PlayerApi
         // 清空 EventManager 引用
         _eventManager = null;
 
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "PlayerApi: cleaned up");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi: cleaned up", _context.PluginId);
     }
 
 #endregion
@@ -237,7 +243,7 @@ public class PlayerApi
     [ScriptMember("play")]
     public void Play()
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "PlayerApi.Play()");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.Play()", _context.PluginId);
 
         const string script = @"
                 (function() {
@@ -262,7 +268,7 @@ public class PlayerApi
     [ScriptMember("pause")]
     public void Pause()
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "PlayerApi.Pause()");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.Pause()", _context.PluginId);
 
         const string script = @"
                 (function() {
@@ -287,7 +293,7 @@ public class PlayerApi
     [ScriptMember("togglePlay")]
     public void TogglePlay()
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "PlayerApi.TogglePlay()");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.TogglePlay()", _context.PluginId);
 
         const string script = @"
                 (function() {
@@ -326,7 +332,8 @@ public class PlayerApi
     [ScriptMember("seek")]
     public void Seek(double seconds)
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.Seek({seconds})");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.Seek({Seconds})", _context.PluginId,
+                                           seconds);
 
         // 确保时间非负
         var targetTime = Math.Max(0, seconds);
@@ -352,7 +359,8 @@ public class PlayerApi
     [ScriptMember("seekRelative")]
     public void SeekRelative(double seconds)
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SeekRelative({seconds})");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.SeekRelative({Seconds})", _context.PluginId,
+                                           seconds);
 
         string script = $@"
                 (function() {{
@@ -431,7 +439,8 @@ public class PlayerApi
     [ScriptMember("setPlaybackRate")]
     public void SetPlaybackRate(double rate)
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SetPlaybackRate({rate})");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.SetPlaybackRate({Rate})", _context.PluginId,
+                                           rate);
 
         // 钳制播放速度到合理范围
         var clampedRate = Math.Clamp(rate, 0.25, 4.0);
@@ -487,7 +496,8 @@ public class PlayerApi
     [ScriptMember("setVolume")]
     public void SetVolume(double volume)
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SetVolume({volume})");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.SetVolume({Volume})", _context.PluginId,
+                                           volume);
 
         // 钳制音量到有效范围
         var clampedVolume = Math.Clamp(volume, 0.0, 1.0);
@@ -539,7 +549,8 @@ public class PlayerApi
     [ScriptMember("setMuted")]
     public void SetMuted(bool muted)
     {
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"PlayerApi.SetMuted({muted})");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "PlayerApi.SetMuted({Muted})", _context.PluginId,
+                                           muted);
 
         string script = $@"
                 (function() {{

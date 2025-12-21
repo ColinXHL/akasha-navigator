@@ -79,7 +79,7 @@ public class NotificationService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("NotificationService", $"显示通知失败: {ex.Message}");
+            LogService.Instance.Error("NotificationService", ex, "显示通知失败");
         }
     }
 
@@ -132,7 +132,7 @@ public class NotificationService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("NotificationService", $"显示对话框失败: {ex.Message}");
+            LogService.Instance.Error("NotificationService", ex, "显示对话框失败");
             tcs.TrySetResult(false);
         }
 

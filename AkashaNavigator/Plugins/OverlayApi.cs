@@ -142,9 +142,10 @@ public class OverlayApi
             }
         }
 
-        Services.LogService.Instance.Debug(
-            "OverlayApi",
-            $"ShowMarker called: direction={direction}, durationObj={durationObj} (type={durationObj?.GetType().Name}), duration={duration}");
+        Services.LogService.Instance.Debug("OverlayApi",
+                                           "ShowMarker called: direction={Direction}, durationObj={DurationObj} " +
+                                               "(type={DurationObjType}), duration={Duration}",
+                                           direction, durationObj, durationObj?.GetType().Name, duration);
 
         if (string.IsNullOrWhiteSpace(direction))
         {
@@ -155,20 +156,21 @@ public class OverlayApi
         var dir = ParseDirection(direction);
         if (dir == null)
         {
-            Services.LogService.Instance.Warn("OverlayApi", $"ShowMarker: invalid direction '{direction}'");
+            Services.LogService.Instance.Warn("OverlayApi", "ShowMarker: invalid direction '{Direction}'", direction);
             return;
         }
 
-        Services.LogService.Instance.Debug("OverlayApi", $"ShowMarker: parsed direction = {dir.Value}");
+        Services.LogService.Instance.Debug("OverlayApi", "ShowMarker: parsed direction = {Direction}", dir.Value);
 
         EnsureOverlay();
-        Services.LogService.Instance.Debug("OverlayApi",
-                                           $"ShowMarker: overlay ensured, _overlay is null = {_overlay == null}");
+        Services.LogService.Instance.Debug("OverlayApi", "ShowMarker: overlay ensured, _overlay is null = {IsNull}",
+                                           _overlay == null);
 
         InvokeOnUI(() =>
                    {
                        Services.LogService.Instance.Debug(
-                           "OverlayApi", $"ShowMarker: InvokeOnUI executing, _overlay is null = {_overlay == null}");
+                           "OverlayApi", "ShowMarker: InvokeOnUI executing, _overlay is null = {IsNull}",
+                           _overlay == null);
                        _overlay?.Show();
                        _overlay?.ShowDirectionMarker(dir.Value, duration);
                    });
@@ -191,16 +193,17 @@ public class OverlayApi
     [ScriptMember("setMarkerStyle")]
     public void SetMarkerStyle(object? options)
     {
-        Services.LogService.Instance.Debug("OverlayApi", $"SetMarkerStyle called, options is null = {options == null}");
+        Services.LogService.Instance.Debug("OverlayApi", "SetMarkerStyle called, options is null = {IsNull}",
+                                           options == null);
 
         if (options == null)
             return;
 
-        Services.LogService.Instance.Debug("OverlayApi",
-                                           $"SetMarkerStyle: options type = {options.GetType().FullName}");
+        Services.LogService.Instance.Debug("OverlayApi", "SetMarkerStyle: options type = {OptionsType}",
+                                           options.GetType().FullName);
 
         var dict = JsTypeConverter.ToDictionary(options);
-        Services.LogService.Instance.Debug("OverlayApi", $"SetMarkerStyle: dict is null = {dict == null}");
+        Services.LogService.Instance.Debug("OverlayApi", "SetMarkerStyle: dict is null = {IsNull}", dict == null);
 
         if (dict == null || dict.Count == 0)
             return;
@@ -210,15 +213,16 @@ public class OverlayApi
 
         if (dict.TryGetValue("size", out var sizeValue) && sizeValue != null)
         {
-            Services.LogService.Instance.Debug(
-                "OverlayApi", $"SetMarkerStyle: sizeValue = {sizeValue}, type = {sizeValue.GetType().Name}");
+            Services.LogService.Instance.Debug("OverlayApi",
+                                               "SetMarkerStyle: sizeValue = {SizeValue}, type = {SizeType}", sizeValue,
+                                               sizeValue.GetType().Name);
             size = Convert.ToDouble(sizeValue);
         }
         if (dict.TryGetValue("color", out var colorValue) && colorValue != null)
             color = colorValue.ToString() ?? "#FFFF6B6B";
 
-        Services.LogService.Instance.Debug("OverlayApi",
-                                           $"SetMarkerStyle: calling internal SetMarkerStyleInternal({size}, {color})");
+        Services.LogService.Instance.Debug(
+            "OverlayApi", "SetMarkerStyle: calling internal SetMarkerStyleInternal({Size}, {Color})", size, color);
         SetMarkerStyleInternal(size, color);
         Services.LogService.Instance.Debug("OverlayApi", "SetMarkerStyle: completed");
     }
@@ -242,8 +246,9 @@ public class OverlayApi
     [ScriptMember("setMarkerImage")]
     public bool SetMarkerImage(string path)
     {
-        Services.LogService.Instance.Debug("OverlayApi", $"SetMarkerImage called with path: {path}");
-        Services.LogService.Instance.Debug("OverlayApi", $"Plugin directory: {_context.PluginDirectory}");
+        Services.LogService.Instance.Debug("OverlayApi", "SetMarkerImage called with path: {Path}", path);
+        Services.LogService.Instance.Debug("OverlayApi", "Plugin directory: {PluginDirectory}",
+                                           _context.PluginDirectory);
 
         if (string.IsNullOrEmpty(path))
         {
@@ -258,11 +263,12 @@ public class OverlayApi
             fullPath = System.IO.Path.Combine(_context.PluginDirectory, path);
         }
 
-        Services.LogService.Instance.Debug("OverlayApi", $"SetMarkerImage: resolved full path: {fullPath}");
+        Services.LogService.Instance.Debug("OverlayApi", "SetMarkerImage: resolved full path: {FullPath}", fullPath);
 
         if (!System.IO.File.Exists(fullPath))
         {
-            Services.LogService.Instance.Error("OverlayApi", $"SetMarkerImage: Image file not found: {fullPath}");
+            Services.LogService.Instance.Error("OverlayApi", "SetMarkerImage: Image file not found: {FullPath}",
+                                               fullPath);
             return false;
         }
 
@@ -273,16 +279,16 @@ public class OverlayApi
         InvokeOnUI(() =>
                    {
                        Services.LogService.Instance.Debug(
-                           "OverlayApi", $"SetMarkerImage: InvokeOnUI, _overlay is null = {_overlay == null}");
+                           "OverlayApi", "SetMarkerImage: InvokeOnUI, _overlay is null = {IsNull}", _overlay == null);
                        if (_overlay != null)
                        {
                            result = _overlay.SetMarkerImage(fullPath);
                            Services.LogService.Instance.Debug(
-                               "OverlayApi", $"SetMarkerImage: overlay.SetMarkerImage returned {result}");
+                               "OverlayApi", "SetMarkerImage: overlay.SetMarkerImage returned {Result}", result);
                        }
                    });
 
-        Services.LogService.Instance.Debug("OverlayApi", $"SetMarkerImage: returning {result}");
+        Services.LogService.Instance.Debug("OverlayApi", "SetMarkerImage: returning {Result}", result);
         return result;
     }
 
@@ -372,7 +378,7 @@ public class OverlayApi
 
         if (!System.IO.File.Exists(fullPath))
         {
-            Services.LogService.Instance.Error("OverlayApi", $"DrawImage: Image file not found: {fullPath}");
+            Services.LogService.Instance.Error("OverlayApi", "DrawImage: Image file not found: {FullPath}", fullPath);
             return string.Empty;
         }
 
@@ -463,21 +469,22 @@ public class OverlayApi
     /// </summary>
     private void EnsureOverlay()
     {
-        Services.LogService.Instance.Debug("OverlayApi",
-                                           $"EnsureOverlay called, _overlay is null = {_overlay == null}");
+        Services.LogService.Instance.Debug("OverlayApi", "EnsureOverlay called, _overlay is null = {IsNull}",
+                                           _overlay == null);
 
         if (_overlay != null)
             return;
 
         InvokeOnUI(() =>
                    {
-                       Services.LogService.Instance.Debug(
-                           "OverlayApi", $"EnsureOverlay: InvokeOnUI executing for plugin {_context.PluginId}");
+                       Services.LogService.Instance.Debug("OverlayApi",
+                                                          "EnsureOverlay: InvokeOnUI executing for plugin {PluginId}",
+                                                          _context.PluginId);
 
                        _overlay = OverlayManager.Instance.GetOverlay(_context.PluginId);
-                       Services.LogService.Instance.Debug(
-                           "OverlayApi",
-                           $"EnsureOverlay: GetOverlay returned {(_overlay == null ? "null" : "existing overlay")}");
+                       Services.LogService.Instance.Debug("OverlayApi",
+                                                          "EnsureOverlay: GetOverlay returned {OverlayStatus}",
+                                                          _overlay == null ? "null" : "existing overlay");
 
                        if (_overlay == null)
                        {

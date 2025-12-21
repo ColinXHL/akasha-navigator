@@ -16,6 +16,7 @@ public class ScriptMemberValidatorTests
     [InlineData("warn", true)]
     [InlineData("error", true)]
     [InlineData("version", true)]
+    [InlineData("logger", true)]
     [InlineData("get", true)]
     [InlineData("set", true)]
     [InlineData("has", true)]
@@ -117,15 +118,13 @@ public class ScriptMemberValidatorTests
     {
         var result = ScriptMemberValidator.ValidateType(typeof(CoreApi));
 
-        // CoreApi 应该有 version 属性和 log, warn, error 方法
-        Assert.True(result.TotalMembers >= 4, $"Expected at least 4 members, got {result.TotalMembers}");
+        // CoreApi 应该有 version 属性和 logger 属性
+        Assert.True(result.TotalMembers >= 2, $"Expected at least 2 members, got {result.TotalMembers}");
 
         // 检查是否有 camelCase 命名的成员
         var memberNames = result.Members.Select(m => m.ScriptMemberName).ToList();
         Assert.Contains("version", memberNames);
-        Assert.Contains("log", memberNames);
-        Assert.Contains("warn", memberNames);
-        Assert.Contains("error", memberNames);
+        Assert.Contains("logger", memberNames); // LogProxy 属性
     }
 
     [Fact]

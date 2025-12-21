@@ -100,7 +100,7 @@ public partial class ProfileSelectorDialog : AnimatedWindow
             catch (Exception ex)
             {
                 LogService.Instance.Error("ProfileSelectorDialog",
-                                          $"添加插件到 Profile {profileId} 失败: {ex.Message}");
+                                          "添加插件到 Profile {ProfileId} 失败: {ErrorMessage}", profileId, ex.Message);
             }
         }
 

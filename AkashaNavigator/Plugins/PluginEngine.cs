@@ -141,7 +141,8 @@ public static class PluginEngine
         // 设置搜索路径
         engine.DocumentSettings.SearchPath = string.Join(";", searchPaths);
 
-        LogService.Instance.Debug("PluginEngine", $"Module search paths: {engine.DocumentSettings.SearchPath}");
+        LogService.Instance.Debug("PluginEngine", "Module search paths: {SearchPath}",
+                                  engine.DocumentSettings.SearchPath);
     }
 
 #endregion
@@ -537,8 +538,8 @@ public class OverlayApiLite
 
         if (!File.Exists(fullPath))
         {
-            LogService.Instance.Error($"Plugin:{_context.PluginId}",
-                                      $"setMarkerImage: Image file not found: {fullPath}");
+            LogService.Instance.Error($"Plugin:{_context.PluginId}", "setMarkerImage: Image file not found: {FullPath}",
+                                      fullPath);
             return false;
         }
 
@@ -621,7 +622,7 @@ public class OverlayApiLite
                     catch (Exception ex)
                     {
                         LogService.Instance.Error($"Plugin:{_context.PluginId}",
-                                                  $"Animation frame callback error: {ex.Message}");
+                                                  "Animation frame callback error: {ErrorMessage}", ex.Message);
                     }
                 };
 
@@ -1019,7 +1020,7 @@ public class StorageApiLite
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error($"Plugin:{_context.PluginId}", $"Storage save failed: {ex.Message}");
+            LogService.Instance.Error($"Plugin:{_context.PluginId}", "Storage save failed: {ErrorMessage}", ex.Message);
             return false;
         }
     }
@@ -1036,7 +1037,7 @@ public class StorageApiLite
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error($"Plugin:{_context.PluginId}", $"Storage load failed: {ex.Message}");
+            LogService.Instance.Error($"Plugin:{_context.PluginId}", "Storage load failed: {ErrorMessage}", ex.Message);
             return null;
         }
     }
@@ -1154,7 +1155,8 @@ public class SubtitleApiLite
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error($"Plugin:{_context.PluginId}", $"CreateJsArray failed: {ex.Message}");
+            LogService.Instance.Error($"Plugin:{_context.PluginId}", "CreateJsArray failed: {ErrorMessage}",
+                                      ex.Message);
             // 回退到 C# 数组
             return entries.Select(e => (object) new { from = e.From, to = e.To, content = e.Content }).ToArray();
         }

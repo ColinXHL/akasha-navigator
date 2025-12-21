@@ -1,10 +1,12 @@
 using System;
+using System.IO;
 using System.Windows;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Plugins;
 using AkashaNavigator.Services;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Views.Dialogs;
+using Serilog;
 
 namespace AkashaNavigator
 {
@@ -30,6 +32,9 @@ public partial class App : System.Windows.Application
     /// </summary>
     private void Application_Startup(object sender, StartupEventArgs e)
     {
+        // 配置 Serilog 日志系统
+        ConfigureSerilog();
+
         // 执行数据迁移（如果需要）
         ExecuteDataMigration();
 
@@ -305,6 +310,29 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// 配置 Serilog 日志系统
+    /// </summary>
+    private void ConfigureSerilog()
+    {
+        var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+        var logFile = Path.Combine(logDirectory, "akasha-navigator-.log");
+
+        Log.Logger =
+            new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo
+                .File(logFile,
+                      outputTemplate: ("[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] " +
+                                       "[{SourceContext}]{NewLine}{Message}{NewLine}{Exception}{NewLine}"),
+                      rollingInterval: RollingInterval.Day, retainedFileCountLimit: 31,
+                      retainedFileTimeLimit: TimeSpan.FromDays(21))
+                .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+
+        Log.Information("Serilog 日志系统已初始化");
+    }
+
+    /// <summary>
     /// 执行数据迁移
     /// </summary>
     private void ExecuteDataMigration()
@@ -324,22 +352,22 @@ public partial class App : System.Windows.Application
             {
             case MigrationResultStatus.Success:
                 LogService.Instance.Info(
-                    "App",
-                    $"数据迁移成功: {result.MigratedPluginCount} 个插件, {result.MigratedProfileCount} 个 Profile");
+                    "App", "数据迁移成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
+                    result.MigratedPluginCount, result.MigratedProfileCount);
                 break;
 
             case MigrationResultStatus.PartialSuccess:
                 LogService.Instance.Warn(
-                    "App",
-                    $"数据迁移部分成功: {result.MigratedPluginCount} 个插件, {result.MigratedProfileCount} 个 Profile");
+                    "App", "数据迁移部分成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
+                    result.MigratedPluginCount, result.MigratedProfileCount);
                 foreach (var warning in result.Warnings)
                 {
-                    LogService.Instance.Warn("App", $"迁移警告: {warning}");
+                    LogService.Instance.Warn("App", "迁移警告: {Warning}", warning);
                 }
                 break;
 
             case MigrationResultStatus.Failed:
-                LogService.Instance.Error("App", $"数据迁移失败: {result.ErrorMessage}");
+                LogService.Instance.Error("App", "数据迁移失败: {ErrorMessage}", result.ErrorMessage);
                 MessageBox.Show($"数据迁移失败：{result.ErrorMessage}\n\n应用将继续运行，但部分插件可能无法正常工作。",
                                 "迁移警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                 break;
@@ -351,7 +379,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("App", $"数据迁移过程中发生异常: {ex.Message}");
+            LogService.Instance.Error("App", ex, "数据迁移过程中发生异常");
             // 不阻止应用启动，只记录错误
         }
     }
@@ -369,6 +397,9 @@ public partial class App : System.Windows.Application
 
         // 卸载所有插件
         PluginHost.Instance.UnloadAllPlugins();
+
+        // 关闭并刷新 Serilog 日志
+        Log.CloseAndFlush();
 
         base.OnExit(e);
     }

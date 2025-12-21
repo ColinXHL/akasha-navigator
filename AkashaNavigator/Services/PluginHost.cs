@@ -122,7 +122,7 @@ public class PluginHost : IDisposable
         var pluginReferences = PluginAssociationManager.Instance.GetPluginsInProfile(profileId);
         if (pluginReferences.Count == 0)
         {
-            Log($"Profile '{profileId}' 没有关联任何插件");
+            Log("Profile '{ProfileId}' 没有关联任何插件", profileId);
             return;
         }
 
@@ -132,14 +132,14 @@ public class PluginHost : IDisposable
             // 跳过禁用的插件
             if (!reference.Enabled)
             {
-                Log($"插件 {reference.PluginId} 已禁用，跳过加载");
+                Log("插件 {PluginId} 已禁用，跳过加载", reference.PluginId);
                 continue;
             }
 
             // 3. 检查插件是否已安装（从 PluginLibrary）
             if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
             {
-                Log($"插件 {reference.PluginId} 未安装，跳过加载");
+                Log("插件 {PluginId} 未安装，跳过加载", reference.PluginId);
                 continue;
             }
 
@@ -153,7 +153,7 @@ public class PluginHost : IDisposable
             LoadPlugin(pluginDir, configDir, reference.PluginId);
         }
 
-        Log($"已加载 {_loadedPlugins.Count} 个插件 (Profile: {profileId})");
+        Log("已加载 {PluginCount} 个插件 (Profile: {ProfileId})", _loadedPlugins.Count, profileId);
     }
 
     /// <summary>
@@ -197,7 +197,7 @@ public class PluginHost : IDisposable
             SavePluginConfig(config, plugin.ConfigDirectory);
         }
 
-        Log($"插件 {pluginId} 已{(enabled ? "启用" : "禁用")}");
+        Log("插件 {PluginId} 已{Status}", pluginId, enabled ? "启用" : "禁用");
     }
 
     /// <summary>
@@ -262,7 +262,7 @@ public class PluginHost : IDisposable
             }
             catch (Exception ex)
             {
-                Log($"广播事件 {eventName} 到插件 {pluginId} 失败: {ex.Message}");
+                Log("广播事件 {EventName} 到插件 {PluginId} 失败: {ErrorMessage}", eventName, pluginId, ex.Message);
             }
         }
     }
@@ -306,21 +306,22 @@ public class PluginHost : IDisposable
         if (string.IsNullOrWhiteSpace(_currentProfileId) ||
             !string.Equals(_currentProfileId, profileId, StringComparison.OrdinalIgnoreCase))
         {
-            Log($"当前 Profile ({_currentProfileId}) 与目标 Profile ({profileId}) 不匹配，跳过启用插件 {pluginId}");
+            Log("当前 Profile ({CurrentProfileId}) 与目标 Profile ({ProfileId}) 不匹配，跳过启用插件 {PluginId}",
+                _currentProfileId, profileId, pluginId);
             return;
         }
 
         // 检查插件是否已加载
         if (_loadedPlugins.Any(p => string.Equals(p.PluginId, pluginId, StringComparison.OrdinalIgnoreCase)))
         {
-            Log($"插件 {pluginId} 已加载，跳过");
+            Log("插件 {PluginId} 已加载，跳过", pluginId);
             return;
         }
 
         // 检查插件是否已安装
         if (!PluginLibrary.Instance.IsInstalled(pluginId))
         {
-            Log($"插件 {pluginId} 未安装，无法启用");
+            Log("插件 {PluginId} 未安装，无法启用", pluginId);
             return;
         }
 
@@ -333,7 +334,7 @@ public class PluginHost : IDisposable
         // 加载插件
         LoadPlugin(pluginDir, configDir, pluginId);
 
-        Log($"插件 {pluginId} 已动态启用");
+        Log("插件 {PluginId} 已动态启用", pluginId);
     }
 
     /// <summary>
@@ -354,7 +355,7 @@ public class PluginHost : IDisposable
         if (plugin == null)
         {
             // 插件未运行，不需要重新加载
-            Log($"插件 {pluginId} 未运行，跳过重新加载");
+            Log("插件 {PluginId} 未运行，跳过重新加载", pluginId);
             return;
         }
 
@@ -364,11 +365,11 @@ public class PluginHost : IDisposable
 
         if (string.IsNullOrWhiteSpace(profileId))
         {
-            Log($"当前没有活动的 Profile，无法重新加载插件 {pluginId}");
+            Log("当前没有活动的 Profile，无法重新加载插件 {PluginId}", pluginId);
             return;
         }
 
-        Log($"开始重新加载插件 {pluginId}...");
+        Log("开始重新加载插件 {PluginId}...", pluginId);
 
         // 1. 卸载插件
         UnloadPlugin(plugin);
@@ -379,7 +380,7 @@ public class PluginHost : IDisposable
         // 2. 检查插件是否仍然安装
         if (!PluginLibrary.Instance.IsInstalled(pluginId))
         {
-            Log($"插件 {pluginId} 已不存在于插件库中，无法重新加载");
+            Log("插件 {PluginId} 已不存在于插件库中，无法重新加载", pluginId);
             return;
         }
 
@@ -394,7 +395,7 @@ public class PluginHost : IDisposable
 
         LoadPlugin(pluginDir, configDir, pluginId);
 
-        Log($"插件 {pluginId} 重新加载完成");
+        Log("插件 {PluginId} 重新加载完成", pluginId);
     }
 
     /// <summary>
@@ -412,7 +413,7 @@ public class PluginHost : IDisposable
 
         if (plugin == null)
         {
-            Log($"插件 {pluginId} 未加载，跳过禁用");
+            Log("插件 {PluginId} 未加载，跳过禁用", pluginId);
             return;
         }
 
@@ -428,7 +429,7 @@ public class PluginHost : IDisposable
         // 从 API 字典移除（UnloadPlugin 已经移除，这里确保清理）
         _pluginApis.Remove(pluginId);
 
-        Log($"插件 {pluginId} 已动态禁用");
+        Log("插件 {PluginId} 已动态禁用", pluginId);
     }
 
     /// <summary>
@@ -448,7 +449,7 @@ public class PluginHost : IDisposable
         if (plugin == null)
         {
             // 插件不存在，静默成功（可能已被卸载）
-            Log($"插件 {pluginId} 不存在，跳过取消订阅");
+            Log("插件 {PluginId} 不存在，跳过取消订阅", pluginId);
             return UnsubscribeResult.Succeeded();
         }
 
@@ -469,25 +470,25 @@ public class PluginHost : IDisposable
             if (Directory.Exists(pluginDir))
             {
                 Directory.Delete(pluginDir, recursive: true);
-                Log($"已删除插件目录: {pluginDir}");
+                Log("已删除插件目录: {PluginDir}", pluginDir);
             }
 
-            Log($"插件 {pluginId} 已取消订阅");
+            Log("插件 {PluginId} 已取消订阅", pluginId);
             return UnsubscribeResult.Succeeded();
         }
         catch (UnauthorizedAccessException ex)
         {
-            Log($"删除插件目录失败（权限不足）: {ex.Message}");
+            Log("删除插件目录失败（权限不足）: {ErrorMessage}", ex.Message);
             return UnsubscribeResult.Failed($"删除插件目录失败：权限不足。请确保没有其他程序正在使用该目录。");
         }
         catch (IOException ex)
         {
-            Log($"删除插件目录失败（文件被占用）: {ex.Message}");
+            Log("删除插件目录失败（文件被占用）: {ErrorMessage}", ex.Message);
             return UnsubscribeResult.Failed($"删除插件目录失败：文件被占用。请关闭相关程序后重试。");
         }
         catch (Exception ex)
         {
-            Log($"取消订阅插件失败: {ex.Message}");
+            Log("取消订阅插件失败: {ErrorMessage}", ex.Message);
             return UnsubscribeResult.Failed($"取消订阅失败：{ex.Message}");
         }
     }
@@ -507,7 +508,7 @@ public class PluginHost : IDisposable
         // 检查源码目录是否存在
         if (!Directory.Exists(sourceDir))
         {
-            Log($"插件源码目录不存在 ({pluginId}): {sourceDir}");
+            Log("插件源码目录不存在 ({PluginId}): {SourceDir}", pluginId, sourceDir);
             return;
         }
 
@@ -517,7 +518,7 @@ public class PluginHost : IDisposable
         var loadResult = PluginManifest.LoadFromFile(manifestPath);
         if (!loadResult.IsSuccess)
         {
-            Log($"加载插件清单失败 ({pluginId}): {loadResult.ErrorMessage}");
+            Log("加载插件清单失败 ({PluginId}): {ErrorMessage}", pluginId, loadResult.ErrorMessage);
             return;
         }
 
@@ -526,7 +527,7 @@ public class PluginHost : IDisposable
         // 检查是否已加载同 ID 插件
         if (_loadedPlugins.Any(p => p.PluginId == manifest.Id))
         {
-            Log($"插件 {manifest.Id} 已加载，跳过");
+            Log("插件 {PluginId} 已加载，跳过", manifest.Id);
             return;
         }
 
@@ -547,7 +548,7 @@ public class PluginHost : IDisposable
         // 如果插件被禁用，跳过加载
         if (!config.Enabled)
         {
-            Log($"插件 {manifest.Id} 已禁用，跳过加载");
+            Log("插件 {PluginId} 已禁用，跳过加载", manifest.Id);
             return;
         }
 
@@ -568,7 +569,7 @@ public class PluginHost : IDisposable
         // 加载脚本
         if (!context.LoadScript())
         {
-            Log($"加载插件脚本失败 ({manifest.Id}): {context.LastError}");
+            Log("加载插件脚本失败 ({PluginId}): {ErrorMessage}", manifest.Id, context.LastError);
             context.Dispose();
             return;
         }
@@ -579,7 +580,7 @@ public class PluginHost : IDisposable
         // 调用 onLoad
         if (!context.CallOnLoad())
         {
-            Log($"插件 {manifest.Id} onLoad 调用失败: {context.LastError}");
+            Log("插件 {PluginId} onLoad 调用失败: {ErrorMessage}", manifest.Id, context.LastError);
             // 即使 onLoad 失败，也保留插件（异常隔离）
         }
 
@@ -587,7 +588,7 @@ public class PluginHost : IDisposable
         _pluginApis[manifest.Id!] = pluginApi;
         PluginLoaded?.Invoke(this, context);
 
-        Log($"插件 {manifest.Name} (v{manifest.Version}) 加载成功");
+        Log("插件 {PluginName} (v{Version}) 加载成功", manifest.Name, manifest.Version);
     }
 
     /// <summary>
@@ -603,7 +604,7 @@ public class PluginHost : IDisposable
         }
         catch (Exception ex)
         {
-            Log($"插件 {pluginId} onUnload 调用失败: {ex.Message}");
+            Log("插件 {PluginId} onUnload 调用失败: {ErrorMessage}", pluginId, ex.Message);
         }
 
         // 清理 PluginApi
@@ -615,7 +616,7 @@ public class PluginHost : IDisposable
             }
             catch (Exception ex)
             {
-                Log($"清理插件 API 失败 ({pluginId}): {ex.Message}");
+                Log("清理插件 API 失败 ({PluginId}): {ErrorMessage}", pluginId, ex.Message);
             }
         }
 
@@ -625,12 +626,12 @@ public class PluginHost : IDisposable
         }
         catch (Exception ex)
         {
-            Log($"释放插件资源失败 ({pluginId}): {ex.Message}");
+            Log("释放插件资源失败 ({PluginId}): {ErrorMessage}", pluginId, ex.Message);
         }
 
         _pluginApis.Remove(pluginId);
         PluginUnloaded?.Invoke(this, pluginId);
-        Log($"插件 {pluginId} 已卸载");
+        Log("插件 {PluginId} 已卸载", pluginId);
     }
 
     /// <summary>
@@ -654,11 +655,11 @@ public class PluginHost : IDisposable
     }
 
     /// <summary>
-    /// 记录日志
+    /// 记录日志（参数化模板）
     /// </summary>
-    private void Log(string message)
+    private void Log(string messageTemplate, params object?[] args)
     {
-        LogService.Instance.Info("PluginHost", message);
+        LogService.Instance.Info("PluginHost", messageTemplate, args);
     }
 
     /// <summary>
@@ -690,7 +691,7 @@ public class PluginHost : IDisposable
         // 当插件更新时，重新加载正在运行的插件
         if (e.ChangeType == PluginLibraryChangeType.Updated)
         {
-            Log($"检测到插件 {e.PluginId} 已更新，尝试重新加载...");
+            Log("检测到插件 {PluginId} 已更新，尝试重新加载...", e.PluginId);
             ReloadPlugin(e.PluginId);
         }
     }

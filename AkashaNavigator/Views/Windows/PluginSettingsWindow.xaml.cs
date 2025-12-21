@@ -298,7 +298,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", $"打开插件目录失败: {ex.Message}");
+            LogService.Instance.Error("PluginSettingsWindow", ex, "打开插件目录失败");
         }
     }
 
@@ -388,7 +388,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", $"保存配置失败: {ex.Message}");
+            LogService.Instance.Error("PluginSettingsWindow", ex, "保存配置失败");
         }
     }
 
@@ -404,7 +404,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", $"通知插件配置变更失败: {ex.Message}");
+            LogService.Instance.Error("PluginSettingsWindow", ex, "通知插件配置变更失败");
         }
     }
 
@@ -420,7 +420,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", $"通知插件动作失败: {ex.Message}");
+            LogService.Instance.Error("PluginSettingsWindow", ex, "通知插件动作失败");
         }
     }
 
@@ -470,14 +470,15 @@ public partial class PluginSettingsWindow : AnimatedWindow
         var currentProfileId = ProfileManager.Instance.CurrentProfile?.Id;
 
         // 调试日志
-        LogService.Instance.Debug(
-            "PluginSettingsWindow",
-            $"保存配置 - pluginId={_pluginId}, _profileId={_profileId ?? "null"}, currentProfileId={currentProfileId ?? "null"}, configDirectory={_configDirectory}");
+        LogService.Instance.Debug("PluginSettingsWindow",
+                                  "保存配置 - pluginId={PluginId}, _profileId={ProfileId}, " +
+                                      "currentProfileId={CurrentProfileId}, configDirectory={ConfigDirectory}",
+                                  _pluginId, _profileId ?? "null", currentProfileId ?? "null", _configDirectory);
 
         var needsReload = !string.IsNullOrEmpty(_profileId) && !string.IsNullOrEmpty(currentProfileId) &&
                           string.Equals(_profileId, currentProfileId, StringComparison.OrdinalIgnoreCase);
 
-        LogService.Instance.Debug("PluginSettingsWindow", $"needsReload={needsReload}");
+        LogService.Instance.Debug("PluginSettingsWindow", "needsReload={NeedsReload}", needsReload);
 
         if (needsReload)
         {

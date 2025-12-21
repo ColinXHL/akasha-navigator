@@ -149,12 +149,12 @@ public class SubtitleService
         }
         catch (JsonException ex)
         {
-            LogService.Instance.Warn("SubtitleService", $"解析字幕 JSON 失败: {ex.Message}");
+            LogService.Instance.Warn("SubtitleService", "解析字幕 JSON 失败: {ErrorMessage}", ex.Message);
             return null;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", "解析字幕时发生异常", ex);
+            LogService.Instance.Error("SubtitleService", ex, "解析字幕时发生异常");
             return null;
         }
     }
@@ -301,9 +301,8 @@ public class SubtitleService
                 _currentSubtitle = newSubtitle;
                 if (newSubtitle != null)
                 {
-                    LogService.Instance.Debug(
-                        "SubtitleService",
-                        $"字幕变化: [{newSubtitle.From:F1}s-{newSubtitle.To:F1}s] {newSubtitle.Content}");
+                    LogService.Instance.Debug("SubtitleService", "字幕变化: [{From:F1}s-{To:F1}s] {Content}",
+                                              newSubtitle.From, newSubtitle.To, newSubtitle.Content);
                 }
                 else
                 {
@@ -331,8 +330,8 @@ public class SubtitleService
             _cachedSubtitleArray = null; // 使缓存失效
         }
 
-        LogService.Instance.Info("SubtitleService",
-                                 $"字幕数据已加载，共 {data.Body.Count} 条字幕，语言: {data.Language}");
+        LogService.Instance.Info("SubtitleService", "字幕数据已加载，共 {SubtitleCount} 条字幕，语言: {Language}",
+                                 data.Body.Count, data.Language);
 
         // 输出前几条字幕作为预览
         if (data.Body.Count > 0)
@@ -341,12 +340,12 @@ public class SubtitleService
             for (int i = 0; i < previewCount; i++)
             {
                 var entry = data.Body[i];
-                LogService.Instance.Debug("SubtitleService",
-                                          $"  字幕预览[{i}]: [{entry.From:F1}s-{entry.To:F1}s] {entry.Content}");
+                LogService.Instance.Debug("SubtitleService", "  字幕预览[{Index}]: [{From:F1}s-{To:F1}s] {Content}", i,
+                                          entry.From, entry.To, entry.Content);
             }
             if (data.Body.Count > 3)
             {
-                LogService.Instance.Debug("SubtitleService", $"  ... 还有 {data.Body.Count - 3} 条字幕");
+                LogService.Instance.Debug("SubtitleService", "  ... 还有 {RemainingCount} 条字幕", data.Body.Count - 3);
             }
         }
 
@@ -398,8 +397,8 @@ public class SubtitleService
             if (!uri.Contains("cid="))
                 return;
 
-            LogService.Instance.Info("SubtitleService",
-                                     $"★ 拦截到 player/v2 API: {uri.Substring(0, Math.Min(100, uri.Length))}...");
+            LogService.Instance.Info("SubtitleService", "★ 拦截到 player/v2 API: {ApiUrl}...",
+                                     uri.Substring(0, Math.Min(100, uri.Length)));
 
             var response = e.Response;
             if (response == null || response.StatusCode != 200)
@@ -428,7 +427,7 @@ public class SubtitleService
 
             // 获取 cid
             var cid = dataEl.TryGetProperty("cid", out var cidEl) ? cidEl.GetInt64().ToString() : "";
-            LogService.Instance.Debug("SubtitleService", $"拦截到 cid: {cid}");
+            LogService.Instance.Debug("SubtitleService", "拦截到 cid: {Cid}", cid);
 
             // 获取字幕列表
             if (!dataEl.TryGetProperty("subtitle", out var subtitleEl))
@@ -442,7 +441,7 @@ public class SubtitleService
             if (subtitles.Count == 0)
                 return;
 
-            LogService.Instance.Info("SubtitleService", $"被动拦截到 {subtitles.Count} 个字幕");
+            LogService.Instance.Info("SubtitleService", "被动拦截到 {SubtitleCount} 个字幕", subtitles.Count);
 
             // 优先选择中文字幕（ai-zh 优先，稳定性更好）
             JsonElement? selectedSubtitle = null;
@@ -484,16 +483,15 @@ public class SubtitleService
 
             var language = selectedSubtitle.Value.TryGetProperty("lan", out var langEl) ? langEl.GetString() ?? "" : "";
 
-            LogService.Instance.Info(
-                "SubtitleService",
-                $"被动拦截字幕 URL: {subtitleUrl.Substring(0, Math.Min(80, subtitleUrl.Length))}...");
+            LogService.Instance.Info("SubtitleService", "被动拦截字幕 URL: {SubtitleUrl}...",
+                                     subtitleUrl.Substring(0, Math.Min(80, subtitleUrl.Length)));
 
             // 请求字幕内容
             await FetchSubtitleContentAsync(subtitleUrl, language);
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("SubtitleService", $"拦截 player/v2 响应时出错: {ex.Message}");
+            LogService.Instance.Debug("SubtitleService", "拦截 player/v2 响应时出错: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -525,7 +523,7 @@ public class SubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", $"请求字幕内容失败: {ex.Message}", ex);
+            LogService.Instance.Error("SubtitleService", ex, "请求字幕内容失败");
         }
     }
 
@@ -665,7 +663,7 @@ public class SubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", "执行字幕获取脚本失败", ex);
+            LogService.Instance.Error("SubtitleService", ex, "执行字幕获取脚本失败");
         }
     }
 
@@ -699,7 +697,8 @@ public class SubtitleService
             case "subtitle_error":
                 if (root.TryGetProperty("error", out var errorElement))
                 {
-                    LogService.Instance.Warn("SubtitleService", $"字幕获取失败: {errorElement.GetString()}");
+                    LogService.Instance.Warn("SubtitleService", "字幕获取失败: {ErrorMessage}",
+                                             errorElement.GetString());
                 }
                 break;
 
@@ -713,7 +712,7 @@ public class SubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", "处理字幕消息失败", ex);
+            LogService.Instance.Error("SubtitleService", ex, "处理字幕消息失败");
         }
     }
 
@@ -730,8 +729,8 @@ public class SubtitleService
                 return;
             }
 
-            LogService.Instance.Debug("SubtitleService",
-                                      $"开始请求字幕内容: {url.Substring(0, Math.Min(80, url.Length))}...");
+            LogService.Instance.Debug("SubtitleService", "开始请求字幕内容: {SubtitleUrl}...",
+                                      url.Substring(0, Math.Min(80, url.Length)));
 
             var response = await _httpClient.GetStringAsync(url);
 
@@ -741,7 +740,7 @@ public class SubtitleService
                 return;
             }
 
-            LogService.Instance.Debug("SubtitleService", $"字幕响应长度: {response.Length}");
+            LogService.Instance.Debug("SubtitleService", "字幕响应长度: {ResponseLength}", response.Length);
 
             // 解析字幕 JSON
             var subtitleData = ParseSubtitleJson(response, url);
@@ -760,7 +759,7 @@ public class SubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", $"请求字幕内容失败: {ex.Message}", ex);
+            LogService.Instance.Error("SubtitleService", ex, "请求字幕内容失败");
         }
     }
 
@@ -815,7 +814,7 @@ public class SubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", "解析字幕数据失败", ex);
+            LogService.Instance.Error("SubtitleService", ex, "解析字幕数据失败");
         }
     }
 

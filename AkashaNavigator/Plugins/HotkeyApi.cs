@@ -78,13 +78,13 @@ public class HotkeyApi
     {
         if (string.IsNullOrWhiteSpace(keyCombo))
         {
-            LogService.Instance.Warn($"Plugin:{_pluginId}", "HotkeyApi.Register: keyCombo is empty");
+            LogService.Instance.Warn("Plugin:{PluginId}", "HotkeyApi.Register: keyCombo is empty", _pluginId);
             return -1;
         }
 
         if (callback == null)
         {
-            LogService.Instance.Warn($"Plugin:{_pluginId}", "HotkeyApi.Register: callback is null");
+            LogService.Instance.Warn("Plugin:{PluginId}", "HotkeyApi.Register: callback is null", _pluginId);
             return -1;
         }
 
@@ -92,8 +92,8 @@ public class HotkeyApi
         var parseResult = HotkeyParser.Parse(keyCombo);
         if (!parseResult.IsValid)
         {
-            LogService.Instance.Warn($"Plugin:{_pluginId}",
-                                     $"HotkeyApi.Register: Invalid keyCombo '{keyCombo}': {parseResult.Error}");
+            LogService.Instance.Warn("Plugin:{PluginId}", "HotkeyApi.Register: Invalid keyCombo '{KeyCombo}': {Error}",
+                                     _pluginId, keyCombo, parseResult.Error);
             return -1;
         }
 
@@ -101,8 +101,9 @@ public class HotkeyApi
         var normalizedCombo = parseResult.NormalizedCombo;
         if (_keyComboToId.ContainsKey(normalizedCombo))
         {
-            LogService.Instance.Warn($"Plugin:{_pluginId}",
-                                     $"HotkeyApi.Register: keyCombo '{keyCombo}' already registered");
+            LogService.Instance.Warn("Plugin:{PluginId}",
+                                     "HotkeyApi.Register: keyCombo '{KeyCombo}' already registered", _pluginId,
+                                     keyCombo);
             return -1;
         }
 
@@ -127,7 +128,8 @@ public class HotkeyApi
             }
             catch (Exception ex)
             {
-                LogService.Instance.Error($"Plugin:{_pluginId}", $"Hotkey callback error: {ex.Message}");
+                LogService.Instance.Error("Plugin:{PluginId}", "Hotkey callback error: {ErrorMessage}", _pluginId,
+                                          ex.Message);
             }
         };
 
@@ -140,7 +142,8 @@ public class HotkeyApi
         _registrations[id] = registration;
         _keyComboToId[normalizedCombo] = id;
 
-        LogService.Instance.Debug($"Plugin:{_pluginId}", $"Hotkey registered: {normalizedCombo} (id={id})");
+        LogService.Instance.Debug("Plugin:{PluginId}", "Hotkey registered: {KeyCombo} (id={Id})", _pluginId,
+                                  normalizedCombo, id);
         return id;
     }
 
@@ -182,7 +185,8 @@ public class HotkeyApi
         _registrations.Remove(id);
         _keyComboToId.Remove(registration.KeyCombo);
 
-        LogService.Instance.Debug($"Plugin:{_pluginId}", $"Hotkey unregistered: {registration.KeyCombo} (id={id})");
+        LogService.Instance.Debug("Plugin:{PluginId}", "Hotkey unregistered: {KeyCombo} (id={Id})", _pluginId,
+                                  registration.KeyCombo, id);
         return true;
     }
 

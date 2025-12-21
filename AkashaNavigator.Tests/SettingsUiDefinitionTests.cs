@@ -37,12 +37,12 @@ public class SettingsUiDefinitionTests
         // Assert
         Assert.NotNull(definition);
         Assert.NotNull(definition.Sections);
-        Assert.Single(definition.Sections);
-        Assert.Equal("基本设置", definition.Sections[0].Title);
-        Assert.NotNull(definition.Sections[0].Items);
-        Assert.Single(definition.Sections[0].Items);
-        Assert.Equal("checkbox", definition.Sections[0].Items[0].Type);
-        Assert.Equal("enabled", definition.Sections[0].Items[0].Key);
+        var section = Assert.Single(definition.Sections);
+        Assert.Equal("基本设置", section.Title);
+        Assert.NotNull(section.Items);
+        var item = Assert.Single(section.Items);
+        Assert.Equal("checkbox", item.Type);
+        Assert.Equal("enabled", item.Key);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class SettingsUiDefinitionTests
 
         // Assert
         Assert.NotNull(definition?.Sections?[0].Items);
-        var items = definition.Sections[0].Items;
+        var items = definition!.Sections![0].Items!;
 
         Assert.True(items[0].GetDefaultValue<bool>());
         Assert.Equal(42, items[1].GetDefaultValue<int>());
@@ -130,7 +130,7 @@ public class SettingsUiDefinitionTests
 
         // Assert
         Assert.NotNull(definition?.Sections?[0].Items);
-        var item = definition.Sections[0].Items[0];
+        var item = definition!.Sections![0].Items![0];
         Assert.False(item.GetDefaultValue<bool>());
     }
 
@@ -167,7 +167,7 @@ public class SettingsUiDefinitionTests
 
         // Assert
         Assert.NotNull(definition?.Sections?[0].Items);
-        var item = definition.Sections[0].Items[0];
+        var item = definition!.Sections![0].Items![0];
         Assert.Equal("select", item.Type);
         Assert.NotNull(item.Options);
         Assert.Equal(2, item.Options.Count);
@@ -207,7 +207,7 @@ public class SettingsUiDefinitionTests
 
         // Assert
         Assert.NotNull(definition?.Sections?[0].Items);
-        var item = definition.Sections[0].Items[0];
+        var item = definition!.Sections![0].Items![0];
         Assert.Equal(0, item.Min);
         Assert.Equal(10000, item.Max);
         Assert.Equal(100, item.Step);
@@ -241,7 +241,7 @@ public class SettingsUiDefinitionTests
 
         // Assert
         Assert.NotNull(definition?.Sections?[0].Items);
-        var item = definition.Sections[0].Items[0];
+        var item = definition!.Sections![0].Items![0];
         Assert.Equal("button", item.Type);
         Assert.Equal("enterEditMode", item.Action);
     }
@@ -289,7 +289,7 @@ public class SettingsUiDefinitionTests
 
         // Assert
         Assert.NotNull(definition?.Sections?[0].Items);
-        var groupItem = definition.Sections[0].Items[0];
+        var groupItem = definition!.Sections![0].Items![0];
         Assert.Equal("group", groupItem.Type);
         Assert.Equal("覆盖层设置", groupItem.Label);
         Assert.NotNull(groupItem.Items);
@@ -328,7 +328,7 @@ public class SettingsUiDefinitionTests
 
         // Assert
         Assert.NotNull(definition?.Sections);
-        Assert.Equal(2, definition.Sections.Count);
+        Assert.Equal(2, definition!.Sections!.Count);
         Assert.Equal("基本设置", definition.Sections[0].Title);
         Assert.Equal("高级设置", definition.Sections[1].Title);
     }

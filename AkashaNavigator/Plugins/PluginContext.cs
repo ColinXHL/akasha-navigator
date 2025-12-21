@@ -153,7 +153,8 @@ public class PluginContext : IDisposable
         PluginEngine.InitializeEngine(_jsEngine, PluginDirectory, ConfigDirectory, libraryPaths, _config!, Manifest,
                                       _engineOptions);
 
-        Log($"引擎初始化完成 (library paths: {libraryPaths?.Length ?? 0}, http_allowed_urls: {Manifest.HttpAllowedUrls?.Count ?? 0})");
+        Log("引擎初始化完成 (library paths: {LibraryPathCount}, http_allowed_urls: {HttpAllowedUrlCount})",
+            libraryPaths?.Length ?? 0, Manifest.HttpAllowedUrls?.Count ?? 0);
     }
 
 #endregion
@@ -172,8 +173,8 @@ public class PluginContext : IDisposable
         var mainFile = Path.Combine(PluginDirectory, Manifest.Main ?? "main.js");
         if (!File.Exists(mainFile))
         {
-            LastError = $"入口文件不存在: {mainFile}";
-            Log(LastError);
+            LastError = "入口文件不存在";
+            Log("入口文件不存在: {MainFile}", mainFile);
             return false;
         }
 
@@ -185,14 +186,14 @@ public class PluginContext : IDisposable
         }
         catch (ScriptEngineException ex)
         {
-            LastError = $"JavaScript 错误: {ex.Message}";
-            Log(LastError);
+            LastError = "JavaScript 错误";
+            Log("JavaScript 错误: {ErrorMessage}", ex.Message);
             return false;
         }
         catch (Exception ex)
         {
-            LastError = $"加载脚本失败: {ex.Message}";
-            Log(LastError);
+            LastError = "加载脚本失败";
+            Log("加载脚本失败: {ErrorMessage}", ex.Message);
             return false;
         }
     }
@@ -221,21 +222,24 @@ public class PluginContext : IDisposable
         }
         catch (ScriptEngineException ex)
         {
-            LastError = $"调用 {functionName} 失败: {ex.Message}";
-            Log(LastError);
+            LastError = "调用函数失败";
+            Log("调用 {FunctionName} 失败: {ErrorMessage}", functionName, ex.Message);
             if (ex.InnerException != null)
             {
-                Log($"  内部异常: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
+                Log("  内部异常: {ExceptionType} - {InnerMessage}", ex.InnerException.GetType().Name,
+                    ex.InnerException.Message);
             }
             return false;
         }
         catch (Exception ex)
         {
-            LastError = $"调用 {functionName} 异常: {ex.GetType().Name} - {ex.Message}";
-            Log(LastError);
+            LastError = "调用函数异常";
+            Log("调用 {FunctionName} 异常: {ExceptionType} - {ErrorMessage}", functionName, ex.GetType().Name,
+                ex.Message);
             if (ex.InnerException != null)
             {
-                Log($"  内部异常: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
+                Log("  内部异常: {ExceptionType} - {InnerMessage}", ex.InnerException.GetType().Name,
+                    ex.InnerException.Message);
             }
             return false;
         }
@@ -251,7 +255,7 @@ public class PluginContext : IDisposable
 
         try
         {
-            var result = _jsEngine.Evaluate($"typeof {functionName} === 'function'");
+            var result = _jsEngine.Evaluate("typeof " + functionName + " === 'function'");
             return result is bool b && b;
         }
         catch
@@ -276,7 +280,7 @@ public class PluginContext : IDisposable
         }
         catch (Exception ex)
         {
-            Log($"Evaluate 失败: {ex.Message}");
+            Log("Evaluate 失败: {ErrorMessage}", ex.Message);
             return null;
         }
     }
@@ -338,7 +342,7 @@ public class PluginContext : IDisposable
         }
         catch (Exception ex)
         {
-            Log($"垃圾回收失败: {ex.Message}");
+            Log("垃圾回收失败: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -400,11 +404,11 @@ public class PluginContext : IDisposable
 #region Logging
 
     /// <summary>
-    /// 记录日志
+    /// 记录日志（参数化模板）
     /// </summary>
-    private void Log(string message)
+    private void Log(string template, params object[] args)
     {
-        Services.LogService.Instance.Info($"Plugin:{PluginId}", message);
+        Services.LogService.Instance.Info($"Plugin:{PluginId}", template, args);
     }
 
 #endregion
@@ -468,13 +472,15 @@ public class PluginContext : IDisposable
             _pluginId = pluginId;
         }
 
-        public void log(object? msg) => Services.LogService.Instance.Info($"Plugin:{_pluginId}", $"[JS] {msg}");
-        public void warn(object? msg) => Services.LogService.Instance.Warn($"Plugin:{_pluginId}", $"[JS WARN] {msg}");
-        public void error(object? msg) => Services.LogService.Instance.Error($"Plugin:{_pluginId}",
-                                                                             $"[JS ERROR] {msg}");
+        public void log(object? msg) => Services.LogService.Instance.Info("Plugin:{PluginId}", "[JS] {Message}",
+                                                                          _pluginId, msg);
+        public void warn(object? msg) => Services.LogService.Instance.Warn("Plugin:{PluginId}", "[JS WARN] {Message}",
+                                                                           _pluginId, msg);
+        public void error(object? msg) => Services.LogService.Instance.Error("Plugin:{PluginId}",
+                                                                             "[JS ERROR] {Message}", _pluginId, msg);
         public void info(object? msg) => log(msg);
-        public void debug(object? msg) => Services.LogService.Instance.Debug($"Plugin:{_pluginId}",
-                                                                             $"[JS DEBUG] {msg}");
+        public void debug(object? msg) => Services.LogService.Instance.Debug("Plugin:{PluginId}",
+                                                                             "[JS DEBUG] {Message}", _pluginId, msg);
     }
 
 #endregion

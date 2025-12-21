@@ -117,7 +117,7 @@ public class HttpUrlValidator
     private void LogPermissionViolation(string url, string reason)
     {
         Services.LogService.Instance.Warn($"Plugin:{_pluginId}",
-                                          $"HTTP permission violation: {reason}. Attempted URL: {url}");
+                                          "HTTP permission violation: {Reason}. Attempted URL: {Url}", reason, url);
     }
 
 #endregion

@@ -66,7 +66,8 @@ public class WindowStateService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("WindowStateService", $"加载窗口状态失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Warn("WindowStateService", "加载窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                     ex.Message);
             _cachedState = null;
         }
 
@@ -93,7 +94,8 @@ public class WindowStateService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("WindowStateService", $"保存窗口状态失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Debug("WindowStateService", "保存窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                      ex.Message);
         }
     }
 

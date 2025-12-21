@@ -118,7 +118,8 @@ public class EventApi
             }
             Services.LogService.Instance.Debug(
                 $"Plugin:{_context.PluginId}",
-                $"EventApi: registered C# listener for '{eventName}' (subscription ID: {subscriptionId})");
+                "EventApi: registered C# listener for '{EventName}' (subscription ID: {SubscriptionId})", eventName,
+                subscriptionId);
         }
     }
 
@@ -155,7 +156,8 @@ public class EventApi
             }
             Services.LogService.Instance.Debug(
                 $"Plugin:{_context.PluginId}",
-                $"EventApi: registered JS listener for '{eventName}' (subscription ID: {subscriptionId})");
+                "EventApi: registered JS listener for '{EventName}' (subscription ID: {SubscriptionId})", eventName,
+                subscriptionId);
         }
         return subscriptionId;
     }
@@ -175,7 +177,7 @@ public class EventApi
             // 移除该事件的所有监听器
             GetEventManager().Off(eventName);
             Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}",
-                                               $"EventApi: removed all listeners for '{eventName}'");
+                                               "EventApi: removed all listeners for '{EventName}'", eventName);
         }
         else
         {
@@ -183,9 +185,9 @@ public class EventApi
             // 这里为了向后兼容，我们移除该事件的所有监听器
             // 因为无法通过回调引用找到对应的订阅 ID
             GetEventManager().Off(eventName);
-            Services.LogService.Instance.Debug(
-                $"Plugin:{_context.PluginId}",
-                $"EventApi: removed listeners for '{eventName}' (callback-based removal)");
+            Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}",
+                                               "EventApi: removed listeners for '{EventName}' (callback-based removal)",
+                                               eventName);
         }
     }
 
@@ -211,7 +213,8 @@ public class EventApi
                     _ownedSubscriptionIds.Remove(subscriptionId);
                 }
                 Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}",
-                                                   $"EventApi: removed listener with subscription ID {subscriptionId}");
+                                                   "EventApi: removed listener with subscription ID {SubscriptionId}",
+                                                   subscriptionId);
             }
             return;
         }
@@ -227,7 +230,8 @@ public class EventApi
                     _ownedSubscriptionIds.Remove(intId);
                 }
                 Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}",
-                                                   $"EventApi: removed listener with subscription ID {intId}");
+                                                   "EventApi: removed listener with subscription ID {SubscriptionId}",
+                                                   intId);
             }
             return;
         }
@@ -242,7 +246,7 @@ public class EventApi
         // 如果是 null 或其他类型，移除该事件的所有监听器
         GetEventManager().Off(eventName);
         Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}",
-                                           $"EventApi: removed all listeners for '{eventName}'");
+                                           "EventApi: removed all listeners for '{EventName}'", eventName);
     }
 
 #endregion

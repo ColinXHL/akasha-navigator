@@ -101,7 +101,8 @@ public class HttpApi
         catch (Exception ex)
         {
             var pluginId = _context?.PluginId ?? "unknown";
-            Services.LogService.Instance.Error($"Plugin:{pluginId}", $"HttpApi cleanup failed: {ex.Message}");
+            Services.LogService.Instance.Error($"Plugin:{pluginId}", "HttpApi cleanup failed: {ErrorMessage}",
+                                               ex.Message);
         }
     }
 
@@ -201,7 +202,8 @@ public class HttpApi
         catch (Exception ex)
         {
             var pluginId = _context?.PluginId ?? "unknown";
-            Services.LogService.Instance.Error($"Plugin:{pluginId}", $"HttpApi request failed: {ex.Message}");
+            Services.LogService.Instance.Error($"Plugin:{pluginId}", "HttpApi request failed: {ErrorMessage}",
+                                               ex.Message);
             return CreateErrorResponse($"Request failed: {ex.Message}");
         }
     }

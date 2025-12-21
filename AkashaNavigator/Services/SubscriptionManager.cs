@@ -106,11 +106,12 @@ public class SubscriptionManager
         {
             _config = SubscriptionConfig.LoadFromFile(SubscriptionsFilePath);
             _isLoaded = true;
-            LogService.Instance.Debug("SubscriptionManager", $"已加载订阅配置: {_config.Profiles.Count} 个 Profile");
+            LogService.Instance.Debug("SubscriptionManager", "已加载订阅配置: {ProfileCount} 个 Profile",
+                                      _config.Profiles.Count);
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubscriptionManager", $"加载订阅配置失败: {ex.Message}");
+            LogService.Instance.Error("SubscriptionManager", ex, "加载订阅配置失败");
             _config = new SubscriptionConfig();
             _isLoaded = true;
         }
@@ -135,7 +136,7 @@ public class SubscriptionManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubscriptionManager", $"保存订阅配置失败: {ex.Message}");
+            LogService.Instance.Error("SubscriptionManager", ex, "保存订阅配置失败");
         }
     }
 
@@ -196,7 +197,7 @@ public class SubscriptionManager
         // 检查是否已订阅
         if (_config.IsProfileSubscribed(profileId))
         {
-            LogService.Instance.Debug("SubscriptionManager", $"Profile '{profileId}' 已订阅");
+            LogService.Instance.Debug("SubscriptionManager", "Profile '{ProfileId}' 已订阅", profileId);
             return true;
         }
 
@@ -204,7 +205,8 @@ public class SubscriptionManager
         var profileInfo = ProfileRegistry.Instance.GetProfile(profileId);
         if (profileInfo == null)
         {
-            LogService.Instance.Warn("SubscriptionManager", $"订阅 Profile 失败: 未找到内置 Profile '{profileId}'");
+            LogService.Instance.Warn("SubscriptionManager", "订阅 Profile 失败: 未找到内置 Profile '{ProfileId}'",
+                                     profileId);
             return false;
         }
 
@@ -232,11 +234,13 @@ public class SubscriptionManager
                     {
                         _config.AddPlugin(pluginId, profileId);
                         LogService.Instance.Debug("SubscriptionManager",
-                                                  $"自动订阅推荐插件 '{pluginId}' 到 Profile '{profileId}'");
+                                                  "自动订阅推荐插件 '{PluginId}' 到 Profile '{ProfileId}'", pluginId,
+                                                  profileId);
                     }
                     else
                     {
-                        LogService.Instance.Warn("SubscriptionManager", $"推荐插件 '{pluginId}' 不存在于注册表，跳过");
+                        LogService.Instance.Warn("SubscriptionManager", "推荐插件 '{PluginId}' 不存在于注册表，跳过",
+                                                 pluginId);
                     }
                 }
             }
@@ -244,12 +248,13 @@ public class SubscriptionManager
             // 保存配置
             Save();
 
-            LogService.Instance.Info("SubscriptionManager", $"成功订阅 Profile '{profileId}'");
+            LogService.Instance.Info("SubscriptionManager", "成功订阅 Profile '{ProfileId}'", profileId);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubscriptionManager", $"订阅 Profile '{profileId}' 失败: {ex.Message}");
+            LogService.Instance.Error("SubscriptionManager", "订阅 Profile '{ProfileId}' 失败: {ErrorMessage}",
+                                      profileId, ex.Message);
             return false;
         }
     }
@@ -293,21 +298,23 @@ public class SubscriptionManager
             if (Directory.Exists(userProfileDir))
             {
                 Directory.Delete(userProfileDir, true);
-                LogService.Instance.Debug("SubscriptionManager", $"已删除用户 Profile 目录: {userProfileDir}");
+                LogService.Instance.Debug("SubscriptionManager", "已删除用户 Profile 目录: {UserProfileDir}",
+                                          userProfileDir);
             }
 
             // 保存配置
             Save();
 
             result.Success = true;
-            LogService.Instance.Info("SubscriptionManager", $"成功取消订阅 Profile '{profileId}'");
+            LogService.Instance.Info("SubscriptionManager", "成功取消订阅 Profile '{ProfileId}'", profileId);
             return result;
         }
         catch (Exception ex)
         {
             result.Success = false;
             result.ErrorMessage = ex.Message;
-            LogService.Instance.Error("SubscriptionManager", $"取消订阅 Profile '{profileId}' 失败: {ex.Message}");
+            LogService.Instance.Error("SubscriptionManager", "取消订阅 Profile '{ProfileId}' 失败: {ErrorMessage}",
+                                      profileId, ex.Message);
             return result;
         }
     }
@@ -364,21 +371,22 @@ public class SubscriptionManager
         // 检查 Profile 是否已订阅
         if (!_config.IsProfileSubscribed(profileId))
         {
-            LogService.Instance.Warn("SubscriptionManager", $"订阅插件失败: Profile '{profileId}' 未订阅");
+            LogService.Instance.Warn("SubscriptionManager", "订阅插件失败: Profile '{ProfileId}' 未订阅", profileId);
             return false;
         }
 
         // 检查插件是否存在于注册表
         if (!PluginRegistry.Instance.PluginExists(pluginId))
         {
-            LogService.Instance.Warn("SubscriptionManager", $"订阅插件失败: 插件 '{pluginId}' 不存在于注册表");
+            LogService.Instance.Warn("SubscriptionManager", "订阅插件失败: 插件 '{PluginId}' 不存在于注册表", pluginId);
             return false;
         }
 
         // 检查是否已订阅
         if (_config.IsPluginSubscribed(pluginId, profileId))
         {
-            LogService.Instance.Debug("SubscriptionManager", $"插件 '{pluginId}' 已订阅到 Profile '{profileId}'");
+            LogService.Instance.Debug("SubscriptionManager", "插件 '{PluginId}' 已订阅到 Profile '{ProfileId}'",
+                                      pluginId, profileId);
             return true;
         }
 
@@ -390,13 +398,15 @@ public class SubscriptionManager
             // 保存配置
             Save();
 
-            LogService.Instance.Info("SubscriptionManager", $"成功订阅插件 '{pluginId}' 到 Profile '{profileId}'");
+            LogService.Instance.Info("SubscriptionManager", "成功订阅插件 '{PluginId}' 到 Profile '{ProfileId}'",
+                                     pluginId, profileId);
             return true;
         }
         catch (Exception ex)
         {
             LogService.Instance.Error("SubscriptionManager",
-                                      $"订阅插件 '{pluginId}' 到 Profile '{profileId}' 失败: {ex.Message}");
+                                      "订阅插件 '{PluginId}' 到 Profile '{ProfileId}' 失败: {ErrorMessage}", pluginId,
+                                      profileId, ex.Message);
             return false;
         }
     }
@@ -420,7 +430,8 @@ public class SubscriptionManager
         // 检查是否已订阅
         if (!_config.IsPluginSubscribed(pluginId, profileId))
         {
-            LogService.Instance.Debug("SubscriptionManager", $"插件 '{pluginId}' 未订阅到 Profile '{profileId}'");
+            LogService.Instance.Debug("SubscriptionManager", "插件 '{PluginId}' 未订阅到 Profile '{ProfileId}'",
+                                      pluginId, profileId);
             return true; // 未订阅视为成功
         }
 
@@ -434,19 +445,22 @@ public class SubscriptionManager
             if (Directory.Exists(pluginConfigDir))
             {
                 Directory.Delete(pluginConfigDir, true);
-                LogService.Instance.Debug("SubscriptionManager", $"已删除插件配置目录: {pluginConfigDir}");
+                LogService.Instance.Debug("SubscriptionManager", "已删除插件配置目录: {PluginConfigDir}",
+                                          pluginConfigDir);
             }
 
             // 保存配置
             Save();
 
-            LogService.Instance.Info("SubscriptionManager", $"成功取消订阅插件 '{pluginId}' 从 Profile '{profileId}'");
+            LogService.Instance.Info("SubscriptionManager", "成功取消订阅插件 '{PluginId}' 从 Profile '{ProfileId}'",
+                                     pluginId, profileId);
             return true;
         }
         catch (Exception ex)
         {
             LogService.Instance.Error("SubscriptionManager",
-                                      $"取消订阅插件 '{pluginId}' 从 Profile '{profileId}' 失败: {ex.Message}");
+                                      "取消订阅插件 '{PluginId}' 从 Profile '{ProfileId}' 失败: {ErrorMessage}",
+                                      pluginId, profileId, ex.Message);
             return false;
         }
     }
@@ -476,7 +490,7 @@ public class SubscriptionManager
     {
         if (!Directory.Exists(templateDir))
         {
-            LogService.Instance.Warn("SubscriptionManager", $"模板目录不存在: {templateDir}");
+            LogService.Instance.Warn("SubscriptionManager", "模板目录不存在: {TemplateDir}", templateDir);
             return false;
         }
 
@@ -501,12 +515,13 @@ public class SubscriptionManager
                 CopyDirectory(dir, destDir);
             }
 
-            LogService.Instance.Debug("SubscriptionManager", $"已复制 Profile 模板: {templateDir} -> {targetDir}");
+            LogService.Instance.Debug("SubscriptionManager", "已复制 Profile 模板: {TemplateDir} -> {TargetDir}",
+                                      templateDir, targetDir);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubscriptionManager", $"复制 Profile 模板失败: {ex.Message}");
+            LogService.Instance.Error("SubscriptionManager", ex, "复制 Profile 模板失败");
             return false;
         }
     }

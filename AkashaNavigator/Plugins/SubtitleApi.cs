@@ -125,7 +125,7 @@ public class SubtitleApi
         // 验证事件名称
         if (normalizedName != EventChange && normalizedName != EventLoad && normalizedName != EventClear)
         {
-            Log($"未知的事件名称: {eventName}");
+            Log("未知的事件名称: {EventName}", eventName);
             return -1;
         }
 
@@ -135,7 +135,7 @@ public class SubtitleApi
         }
 
         var subscriptionId = _eventManager.On(normalizedName, callback);
-        Log($"注册事件监听 '{normalizedName}', ID: {subscriptionId}");
+        Log("注册事件监听 '{EventName}', ID: {SubscriptionId}", normalizedName, subscriptionId);
 
         // 如果是 load 事件且字幕已存在，立即触发回调
         if (normalizedName == EventLoad)
@@ -165,7 +165,7 @@ public class SubtitleApi
             var result = _eventManager.Off(subscriptionId);
             if (result)
             {
-                Log($"移除事件监听 '{normalizedName}', ID: {subscriptionId}");
+                Log("移除事件监听 '{EventName}', ID: {SubscriptionId}", normalizedName, subscriptionId);
                 CheckAndUnsubscribe();
             }
             return result;
@@ -173,7 +173,7 @@ public class SubtitleApi
         else
         {
             _eventManager.Off(normalizedName);
-            Log($"移除所有 '{normalizedName}' 事件监听");
+            Log("移除所有 '{EventName}' 事件监听", normalizedName);
             CheckAndUnsubscribe();
             return true;
         }
@@ -198,7 +198,7 @@ public class SubtitleApi
         }
         catch (Exception ex)
         {
-            Log($"获取当前字幕失败: {ex.Message}");
+            Log("获取当前字幕失败: {ErrorMessage}", ex.Message);
             return null;
         }
     }
@@ -217,7 +217,7 @@ public class SubtitleApi
         }
         catch (Exception ex)
         {
-            Log($"获取所有字幕失败: {ex.Message}");
+            Log("获取所有字幕失败: {ErrorMessage}", ex.Message);
             return _context.CreateJsArray() ?? Array.Empty<object>();
         }
     }
@@ -257,7 +257,7 @@ public class SubtitleApi
         }
         catch (Exception ex)
         {
-            Log($"订阅字幕服务事件失败: {ex.Message}");
+            Log("订阅字幕服务事件失败: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -278,7 +278,7 @@ public class SubtitleApi
         }
         catch (Exception ex)
         {
-            Log($"取消订阅字幕服务事件失败: {ex.Message}");
+            Log("取消订阅字幕服务事件失败: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -317,7 +317,7 @@ public class SubtitleApi
         }
         catch (Exception ex)
         {
-            Log($"触发已有字幕回调失败: {ex.Message}");
+            Log("触发已有字幕回调失败: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -431,11 +431,11 @@ public class SubtitleApi
     }
 
     /// <summary>
-    /// 记录日志
+    /// 记录日志（参数化模板）
     /// </summary>
-    private void Log(string message)
+    private void Log(string template, params object[] args)
     {
-        LogService.Instance.Debug($"SubtitleApi:{_context.PluginId}", message);
+        LogService.Instance.Debug($"Plugin:{_context.PluginId}", template, args);
     }
 
 #endregion

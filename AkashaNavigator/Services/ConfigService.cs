@@ -87,7 +87,7 @@ public class ConfigService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("ConfigService", $"加载配置失败，将使用默认配置: {ex.Message}");
+            LogService.Instance.Warn("ConfigService", "加载配置失败，将使用默认配置: {ErrorMessage}", ex.Message);
         }
 
         return new AppConfig();
@@ -104,7 +104,7 @@ public class ConfigService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ConfigService", $"保存配置失败: {ex.Message}");
+            LogService.Instance.Debug("ConfigService", "保存配置失败: {ErrorMessage}", ex.Message);
         }
     }
 

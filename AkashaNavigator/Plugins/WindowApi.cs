@@ -64,7 +64,7 @@ public class WindowApi
         // 清空 EventManager 引用
         _eventManager = null;
 
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", "WindowApi: cleaned up");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "WindowApi: cleaned up", _context.PluginId);
     }
 
 #endregion
@@ -81,16 +81,17 @@ public class WindowApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "WindowApi.SetOpacity: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "WindowApi.SetOpacity: PlayerWindow not available",
+                                              _context.PluginId);
             return;
         }
 
         // 钳制透明度到有效范围
         var clampedOpacity = Math.Clamp(opacity, AppConstants.MinOpacity, AppConstants.MaxOpacity);
 
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}",
-                                           $"WindowApi.SetOpacity({opacity}) -> clamped to {clampedOpacity}");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}",
+                                           "WindowApi.SetOpacity({Opacity}) -> clamped to {ClampedOpacity}",
+                                           _context.PluginId, opacity, clampedOpacity);
 
         // 在 UI 线程执行
         window.Dispatcher.Invoke(() =>
@@ -120,8 +121,8 @@ public class WindowApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "WindowApi.GetOpacity: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "WindowApi.GetOpacity: PlayerWindow not available",
+                                              _context.PluginId);
             return 1.0;
         }
 
@@ -151,12 +152,13 @@ public class WindowApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "WindowApi.SetClickThrough: PlayerWindow not available");
+            Services.LogService.Instance.Warn(
+                "Plugin:{PluginId}", "WindowApi.SetClickThrough: PlayerWindow not available", _context.PluginId);
             return;
         }
 
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"WindowApi.SetClickThrough({enabled})");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "WindowApi.SetClickThrough({Enabled})",
+                                           _context.PluginId, enabled);
 
         window.Dispatcher.Invoke(() =>
                                  {
@@ -184,8 +186,8 @@ public class WindowApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "WindowApi.IsClickThrough: PlayerWindow not available");
+            Services.LogService.Instance.Warn(
+                "Plugin:{PluginId}", "WindowApi.IsClickThrough: PlayerWindow not available", _context.PluginId);
             return false;
         }
 
@@ -206,12 +208,13 @@ public class WindowApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "WindowApi.SetTopmost: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "WindowApi.SetTopmost: PlayerWindow not available",
+                                              _context.PluginId);
             return;
         }
 
-        Services.LogService.Instance.Debug($"Plugin:{_context.PluginId}", $"WindowApi.SetTopmost({topmost})");
+        Services.LogService.Instance.Debug("Plugin:{PluginId}", "WindowApi.SetTopmost({Topmost})", _context.PluginId,
+                                           topmost);
 
         window.Dispatcher.Invoke(() =>
                                  { window.Topmost = topmost; });
@@ -227,8 +230,8 @@ public class WindowApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "WindowApi.IsTopmost: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "WindowApi.IsTopmost: PlayerWindow not available",
+                                              _context.PluginId);
             return true; // 默认返回 true，因为播放器通常是置顶的
         }
 
@@ -249,8 +252,8 @@ public class WindowApi
         var window = _getWindow();
         if (window == null)
         {
-            Services.LogService.Instance.Warn($"Plugin:{_context.PluginId}",
-                                              "WindowApi.GetBounds: PlayerWindow not available");
+            Services.LogService.Instance.Warn("Plugin:{PluginId}", "WindowApi.GetBounds: PlayerWindow not available",
+                                              _context.PluginId);
             return new { x = 0.0, y = 0.0, width = 800.0, height = 600.0 };
         }
 

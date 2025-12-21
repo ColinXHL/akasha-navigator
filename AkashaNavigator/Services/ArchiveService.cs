@@ -554,7 +554,8 @@ public class ArchiveService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("ArchiveService", $"加载归档数据失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Warn("ArchiveService", "加载归档数据失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                     ex.Message);
             _cache = new ArchiveData();
         }
         _cacheLoaded = true;
@@ -572,7 +573,8 @@ public class ArchiveService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ArchiveService", $"保存归档数据失败 [{filePath}]: {ex.Message}");
+            LogService.Instance.Debug("ArchiveService", "保存归档数据失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                      ex.Message);
         }
     }
 

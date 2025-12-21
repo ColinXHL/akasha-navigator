@@ -307,9 +307,13 @@ function onUnload(api) {
 ### 使用日志
 
 ```javascript
-api.log("普通日志");
-api.core.warn("警告日志");
-api.core.error("错误日志");
+log.info("普通日志");
+log.warn("警告日志");
+log.error("错误日志");
+log.debug("调试日志");
+
+// 支持参数化模板
+log.info("用户 {Name} 执行了 {Action}", "Alice", "登录");
 ```
 
 在应用的日志窗口（菜单 → 日志）中查看输出。

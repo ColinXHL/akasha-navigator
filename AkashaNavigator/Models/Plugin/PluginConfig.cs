@@ -122,7 +122,7 @@ public class PluginConfig
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error("PluginConfig", $"GetRaw({key}) failed: {ex.Message}");
+            Services.LogService.Instance.Error("PluginConfig", "GetRaw({Key}) failed: {ErrorMessage}", key, ex.Message);
             return null;
         }
     }
@@ -294,12 +294,14 @@ public class PluginConfig
     {
         if (defaults == null)
         {
-            Services.LogService.Instance.Debug("PluginConfig", $"ApplyDefaults: defaults is null for {PluginId}");
+            Services.LogService.Instance.Debug("PluginConfig", "ApplyDefaults: defaults is null for {PluginId}",
+                                               PluginId);
             return;
         }
 
         Services.LogService.Instance.Debug("PluginConfig",
-                                           $"ApplyDefaults: applying {defaults.Count} defaults for {PluginId}");
+                                           "ApplyDefaults: applying {DefaultsCount} defaults for {PluginId}",
+                                           defaults.Count, PluginId);
 
         foreach (var kvp in defaults)
         {
@@ -310,18 +312,18 @@ public class PluginConfig
                 if (node != null)
                 {
                     SetNodeByPath(kvp.Key, node);
-                    Services.LogService.Instance.Debug("PluginConfig",
-                                                       $"  Applied default: {kvp.Key} = {kvp.Value.GetRawText()}");
+                    Services.LogService.Instance.Debug("PluginConfig", "  Applied default: {Key} = {Value}", kvp.Key,
+                                                       kvp.Value.GetRawText());
                 }
             }
             else
             {
-                Services.LogService.Instance.Debug("PluginConfig", $"  Skipped (exists): {kvp.Key}");
+                Services.LogService.Instance.Debug("PluginConfig", "  Skipped (exists): {Key}", kvp.Key);
             }
         }
 
-        Services.LogService.Instance.Debug("PluginConfig",
-                                           $"ApplyDefaults complete. Settings: {_settings.ToJsonString()}");
+        Services.LogService.Instance.Debug("PluginConfig", "ApplyDefaults complete. Settings: {Settings}",
+                                           _settings.ToJsonString());
     }
 
 #endregion

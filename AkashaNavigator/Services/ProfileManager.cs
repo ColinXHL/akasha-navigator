@@ -252,7 +252,8 @@ public class ProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", $"保存 Profile 失败 [{profilePath}]: {ex.Message}");
+            LogService.Instance.Debug("ProfileManager", "保存 Profile 失败 [{ProfilePath}]: {ErrorMessage}",
+                                      profilePath, ex.Message);
         }
     }
 
@@ -403,12 +404,12 @@ public class ProfileManager
                 PluginAssociationManager.Instance.AddPluginsToProfile(pluginIds, profileId);
             }
 
-            LogService.Instance.Info("ProfileManager", $"成功创建 Profile '{profileId}'");
+            LogService.Instance.Info("ProfileManager", "成功创建 Profile '{ProfileId}'", profileId);
             return CreateProfileResult.Success(profileId);
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", $"创建 Profile 失败: {ex.Message}");
+            LogService.Instance.Error("ProfileManager", ex, "创建 Profile 失败");
             return CreateProfileResult.Failure($"创建失败: {ex.Message}");
         }
     }
@@ -433,7 +434,7 @@ public class ProfileManager
         var profile = GetProfileById(id);
         if (profile == null)
         {
-            LogService.Instance.Warn("ProfileManager", $"更新 Profile 失败: Profile '{id}' 不存在");
+            LogService.Instance.Warn("ProfileManager", "更新 Profile 失败: Profile '{ProfileId}' 不存在", id);
             return false;
         }
 
@@ -449,12 +450,12 @@ public class ProfileManager
             // 保存到文件
             SaveProfile(profile);
 
-            LogService.Instance.Info("ProfileManager", $"成功更新 Profile '{id}'");
+            LogService.Instance.Info("ProfileManager", "成功更新 Profile '{ProfileId}'", id);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", $"更新 Profile 失败: {ex.Message}");
+            LogService.Instance.Error("ProfileManager", ex, "更新 Profile 失败");
             return false;
         }
     }
@@ -510,7 +511,7 @@ public class ProfileManager
                 Directory.Delete(profileDir, recursive: true);
             }
 
-            LogService.Instance.Info("ProfileManager", $"成功删除 Profile '{id}'");
+            LogService.Instance.Info("ProfileManager", "成功删除 Profile '{ProfileId}'", id);
             return DeleteProfileResult.Success();
         }
         catch (UnauthorizedAccessException ex)
@@ -523,7 +524,7 @@ public class ProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", $"删除 Profile 失败: {ex.Message}");
+            LogService.Instance.Error("ProfileManager", ex, "删除 Profile 失败");
             return DeleteProfileResult.Failure($"删除失败: {ex.Message}");
         }
     }
@@ -644,7 +645,7 @@ public class ProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("ProfileManager", $"从订阅配置移除 Profile 失败: {ex.Message}");
+            LogService.Instance.Warn("ProfileManager", "从订阅配置移除 Profile 失败: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -672,7 +673,7 @@ public class ProfileManager
         {
             // 重新加载 Profiles 列表
             ReloadProfiles();
-            LogService.Instance.Info("ProfileManager", $"成功订阅 Profile '{profileId}'");
+            LogService.Instance.Info("ProfileManager", "成功订阅 Profile '{ProfileId}'", profileId);
         }
 
         return success;
@@ -709,7 +710,7 @@ public class ProfileManager
         {
             // 从列表中移除
             Profiles.RemoveAll(p => p.Id.Equals(profileId, StringComparison.OrdinalIgnoreCase));
-            LogService.Instance.Info("ProfileManager", $"成功取消订阅 Profile '{profileId}'");
+            LogService.Instance.Info("ProfileManager", "成功取消订阅 Profile '{ProfileId}'", profileId);
         }
 
         return result;
@@ -733,7 +734,7 @@ public class ProfileManager
         var profile = GetProfileById(profileId);
         if (profile == null)
         {
-            LogService.Instance.Warn("ProfileManager", $"导出失败：Profile '{profileId}' 不存在");
+            LogService.Instance.Warn("ProfileManager", "导出失败：Profile '{ProfileId}' 不存在", profileId);
             return null;
         }
 
@@ -753,9 +754,9 @@ public class ProfileManager
                                                  PluginConfigs = pluginConfigs,
                                                  ExportedAt = DateTime.Now };
 
-        LogService.Instance.Info(
-            "ProfileManager",
-            $"导出 Profile '{profileId}'：{referenceEntries.Count} 个插件引用，{pluginConfigs.Count} 个插件配置");
+        LogService.Instance.Info("ProfileManager",
+                                 "导出 Profile '{ProfileId}'：{ReferenceCount} 个插件引用，{ConfigCount} 个插件配置",
+                                 profileId, referenceEntries.Count, pluginConfigs.Count);
 
         return exportData;
     }
@@ -775,12 +776,13 @@ public class ProfileManager
         try
         {
             exportData.SaveToFile(filePath);
-            LogService.Instance.Info("ProfileManager", $"Profile '{profileId}' 已导出到 {filePath}");
+            LogService.Instance.Info("ProfileManager", "Profile '{ProfileId}' 已导出到 {FilePath}", profileId,
+                                     filePath);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", $"导出 Profile 到文件失败: {ex.Message}");
+            LogService.Instance.Error("ProfileManager", ex, "导出 Profile 到文件失败");
             return false;
         }
     }
@@ -873,15 +875,15 @@ public class ProfileManager
             // 重新加载 Profiles 列表
             ReloadProfiles();
 
-            LogService.Instance.Info(
-                "ProfileManager",
-                $"导入 Profile '{data.ProfileId}'：{data.PluginReferences.Count} 个插件引用，{missingPlugins.Count} 个缺失");
+            LogService.Instance.Info("ProfileManager",
+                                     "导入 Profile '{ProfileId}'：{ReferenceCount} 个插件引用，{MissingCount} 个缺失",
+                                     data.ProfileId, data.PluginReferences.Count, missingPlugins.Count);
 
             return ProfileImportResult.Success(data.ProfileId, missingPlugins);
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", $"导入 Profile 失败: {ex.Message}");
+            LogService.Instance.Error("ProfileManager", ex, "导入 Profile 失败");
             return ProfileImportResult.Failure($"导入失败: {ex.Message}");
         }
     }
@@ -993,7 +995,8 @@ public class ProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", $"加载插件配置失败 [{configPath}]: {ex.Message}");
+            LogService.Instance.Debug("ProfileManager", "加载插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
+                                      ex.Message);
             return null;
         }
     }
@@ -1023,7 +1026,8 @@ public class ProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", $"保存插件配置失败 [{configPath}]: {ex.Message}");
+            LogService.Instance.Debug("ProfileManager", "保存插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
+                                      ex.Message);
             return false;
         }
     }
@@ -1051,7 +1055,8 @@ public class ProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", $"删除插件配置失败 [{configPath}]: {ex.Message}");
+            LogService.Instance.Debug("ProfileManager", "删除插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
+                                      ex.Message);
             return false;
         }
     }
@@ -1105,7 +1110,7 @@ public class ProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", $"加载所有插件配置失败: {ex.Message}");
+            LogService.Instance.Debug("ProfileManager", "加载所有插件配置失败: {ErrorMessage}", ex.Message);
         }
 
         return result;
@@ -1143,7 +1148,7 @@ public class ProfileManager
 
             if (!File.Exists(profilePath))
             {
-                LogService.Instance.Warn("ProfileManager", $"已订阅的 Profile 文件不存在: {profilePath}");
+                LogService.Instance.Warn("ProfileManager", "已订阅的 Profile 文件不存在: {ProfilePath}", profilePath);
                 continue;
             }
 
@@ -1153,12 +1158,13 @@ public class ProfileManager
                 if (profile != null)
                 {
                     Profiles.Add(profile);
-                    LogService.Instance.Debug("ProfileManager", $"已加载订阅的 Profile: {profileId}");
+                    LogService.Instance.Debug("ProfileManager", "已加载订阅的 Profile: {ProfileId}", profileId);
                 }
             }
             catch (Exception ex)
             {
-                LogService.Instance.Warn("ProfileManager", $"加载 Profile 失败 [{profilePath}]: {ex.Message}");
+                LogService.Instance.Warn("ProfileManager", "加载 Profile 失败 [{ProfilePath}]: {ErrorMessage}",
+                                         profilePath, ex.Message);
             }
         }
 
@@ -1257,7 +1263,7 @@ public class ProfileManager
             }
             catch (Exception ex)
             {
-                LogService.Instance.Warn("ProfileManager", $"从模板复制默认 Profile 失败: {ex.Message}");
+                LogService.Instance.Warn("ProfileManager", "从模板复制默认 Profile 失败: {ErrorMessage}", ex.Message);
             }
         }
 

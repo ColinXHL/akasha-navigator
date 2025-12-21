@@ -262,7 +262,9 @@ public partial class OverlayWindow : Window
     {
         Services.LogService.Instance.Debug(
             "OverlayWindow",
-            $"ShowDirectionMarker: {direction}, duration={durationMs}, IsVisible={IsVisible}, Left={Left}, Top={Top}, Width={Width}, Height={Height}");
+            "ShowDirectionMarker: {Direction}, duration={DurationMs}, IsVisible={IsVisible}, Left={Left}, Top={Top}, " +
+                "Width={Width}, Height={Height}",
+            direction, durationMs, IsVisible, Left, Top, Width, Height);
 
         // 停止之前的定时器
         StopHideTimer();
@@ -275,11 +277,12 @@ public partial class OverlayWindow : Window
         {
             marker.Visibility = Visibility.Visible;
             _currentDirection = direction;
-            Services.LogService.Instance.Debug("OverlayWindow", $"Marker {direction} set to Visible");
+            Services.LogService.Instance.Debug("OverlayWindow", "Marker {Direction} set to Visible", direction);
         }
         else
         {
-            Services.LogService.Instance.Warn("OverlayWindow", $"Marker {direction} not found in _markers dictionary");
+            Services.LogService.Instance.Warn("OverlayWindow", "Marker {Direction} not found in _markers dictionary",
+                                              direction);
         }
 
         // 如果指定了时长，设置定时隐藏
@@ -432,7 +435,8 @@ public partial class OverlayWindow : Window
     {
         if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
         {
-            Services.LogService.Instance.Error("OverlayWindow", $"SetMarkerImage: Image file not found: {imagePath}");
+            Services.LogService.Instance.Error("OverlayWindow", "SetMarkerImage: Image file not found: {ImagePath}",
+                                               imagePath);
             return false;
         }
 
@@ -453,12 +457,13 @@ public partial class OverlayWindow : Window
                 marker.Source = _markerImageSource;
             }
 
-            Services.LogService.Instance.Info("OverlayWindow", $"SetMarkerImage: Loaded image from {imagePath}");
+            Services.LogService.Instance.Info("OverlayWindow", "SetMarkerImage: Loaded image from {ImagePath}",
+                                              imagePath);
             return true;
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error("OverlayWindow", $"SetMarkerImage failed: {ex.Message}");
+            Services.LogService.Instance.Error("OverlayWindow", ex, "SetMarkerImage failed");
             return false;
         }
     }
@@ -572,7 +577,7 @@ public partial class OverlayWindow : Window
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
         {
-            Services.LogService.Instance.Error("OverlayWindow", $"DrawImage: Image file not found: {path}");
+            Services.LogService.Instance.Error("OverlayWindow", "DrawImage: Image file not found: {Path}", path);
             return string.Empty;
         }
 
@@ -611,7 +616,7 @@ public partial class OverlayWindow : Window
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error("OverlayWindow", $"DrawImage failed: {ex.Message}");
+            Services.LogService.Instance.Error("OverlayWindow", ex, "DrawImage failed");
             return string.Empty;
         }
     }

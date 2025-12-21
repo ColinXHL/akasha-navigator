@@ -144,7 +144,8 @@ public partial class UninstallConfirmDialog : AnimatedWindow
         {
             var removedCount = PluginAssociationManager.Instance.RemovePluginFromAllProfiles(_pluginId);
             LogService.Instance.Info("UninstallConfirmDialog",
-                                     $"已从 {removedCount} 个 Profile 中移除插件 {_pluginId} 的引用");
+                                     "已从 {RemovedCount} 个 Profile 中移除插件 {PluginId} 的引用", removedCount,
+                                     _pluginId);
         }
 
         // 2. 执行卸载（强制模式，因为关联已清理）
@@ -152,13 +153,14 @@ public partial class UninstallConfirmDialog : AnimatedWindow
 
         if (uninstallResult.IsSuccess)
         {
-            LogService.Instance.Info("UninstallConfirmDialog", $"插件 {_pluginId} 卸载成功");
+            LogService.Instance.Info("UninstallConfirmDialog", "插件 {PluginId} 卸载成功", _pluginId);
             return true;
         }
         else
         {
             ErrorMessage = uninstallResult.ErrorMessage;
-            LogService.Instance.Error("UninstallConfirmDialog", $"插件 {_pluginId} 卸载失败: {ErrorMessage}");
+            LogService.Instance.Error("UninstallConfirmDialog", "插件 {PluginId} 卸载失败: {ErrorMessage}", _pluginId,
+                                      ErrorMessage ?? "未知错误");
             return false;
         }
     }

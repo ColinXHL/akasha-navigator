@@ -419,12 +419,12 @@ public class PluginAssociationManager
             else
             {
                 LogService.Instance.Debug("PluginAssociationManager",
-                                          $"全局配置不存在，将使用默认配置: {globalConfigPath}");
+                                          "全局配置不存在，将使用默认配置: {GlobalConfigPath}", globalConfigPath);
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginAssociationManager", $"复制全局配置失败: {ex.Message}");
+            LogService.Instance.Error("PluginAssociationManager", ex, "复制全局配置失败");
         }
     }
 

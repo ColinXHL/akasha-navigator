@@ -386,9 +386,9 @@ public class PluginApiTests : IDisposable
 
         // 不应该抛出异常
         api.Log("Test message");
-        api.Core.Log("Test message");
-        api.Core.Warn("Warning message");
-        api.Core.Error("Error message");
+        api.Core.Logger.Info("Test message");
+        api.Core.Logger.Warn("Warning message");
+        api.Core.Logger.Error("Error message");
     }
 
     /// <summary>

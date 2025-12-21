@@ -19,15 +19,15 @@ public class MarketplaceRegistryTests
     [Fact]
     public void ProfilesRegistry_ShouldBeValidFormat()
     {
-        // Arrange: 读取 profiles/registry.json
-        var registryPath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "profiles", "registry.json");
+        // Arrange: 读取 repo/profiles/registry.json
+        var registryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "repo",
+                                        "profiles", "registry.json");
 
         // 如果文件不存在，尝试其他路径
         if (!File.Exists(registryPath))
         {
-            registryPath =
-                Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "profiles", "registry.json");
+            registryPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "repo", "profiles",
+                                        "registry.json");
         }
 
         Assert.True(File.Exists(registryPath), $"Registry file not found at {registryPath}");
@@ -53,14 +53,14 @@ public class MarketplaceRegistryTests
     [Fact]
     public void GenshinProfile_ShouldContainRequiredFields()
     {
-        // Arrange: 读取 profiles/registry.json
-        var registryPath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "profiles", "registry.json");
+        // Arrange: 读取 repo/profiles/registry.json
+        var registryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "repo",
+                                        "profiles", "registry.json");
 
         if (!File.Exists(registryPath))
         {
-            registryPath =
-                Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "profiles", "registry.json");
+            registryPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "repo", "profiles",
+                                        "registry.json");
         }
 
         Assert.True(File.Exists(registryPath), $"Registry file not found at {registryPath}");
@@ -92,14 +92,14 @@ public class MarketplaceRegistryTests
     [Fact]
     public void MarketplaceProfileEntry_ShouldConvertToMarketplaceProfile()
     {
-        // Arrange: 读取 profiles/registry.json
-        var registryPath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "profiles", "registry.json");
+        // Arrange: 读取 repo/profiles/registry.json
+        var registryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "repo",
+                                        "profiles", "registry.json");
 
         if (!File.Exists(registryPath))
         {
-            registryPath =
-                Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "profiles", "registry.json");
+            registryPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "repo", "profiles",
+                                        "registry.json");
         }
 
         Assert.True(File.Exists(registryPath), $"Registry file not found at {registryPath}");
