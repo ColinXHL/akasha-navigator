@@ -166,7 +166,7 @@ function onLoad(api) {
     }
     
     // 字幕加载时，预处理并统计方向信息
-    api.subtitle.onLoaded(function(subtitleData) {
+    api.subtitle.on("load", function(subtitleData) {
         var directionCount = 0;
         
         subtitleData.body.forEach(function(entry) {
@@ -180,7 +180,7 @@ function onLoad(api) {
     });
     
     // 监听字幕变化，实时显示方向标记
-    api.subtitle.onChanged(function(subtitle) {
+    api.subtitle.on("change", function(subtitle) {
         if (subtitle) {
             var directions = extractDirections(subtitle.content);
             
@@ -195,7 +195,7 @@ function onLoad(api) {
     });
     
     // 字幕清除时的处理
-    api.subtitle.onCleared(function() {
+    api.subtitle.on("clear", function() {
         api.log("字幕已清除");
     });
 }
@@ -206,6 +206,8 @@ function onLoad(api) {
  */
 function onUnload(api) {
     api.log("原神方向标记插件已卸载");
-    api.subtitle.removeAllListeners();
+    api.subtitle.off("load");
+    api.subtitle.off("change");
+    api.subtitle.off("clear");
     api.overlay.hide();
 }
