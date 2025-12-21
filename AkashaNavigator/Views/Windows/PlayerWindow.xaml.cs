@@ -612,6 +612,9 @@ public partial class PlayerWindow : Window
         // 注册窗口消息钩子用于边缘吸附
         var hwndSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         hwndSource?.AddHook(WndProc);
+
+        // 设置窗口不激活样式，防止热键操作时抢夺游戏焦点
+        Win32Helper.SetNoActivateStyle(this, true);
     }
 
     /// <summary>

@@ -27,6 +27,11 @@ public static class Win32Helper
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
     [DllImport("user32.dll")]
+    [return:MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy,
+                                            uint uFlags);
+
+    [DllImport("user32.dll")]
     private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
 
     [DllImport("user32.dll")]
@@ -183,6 +188,13 @@ public static class Win32Helper
     public const int WS_EX_TRANSPARENT = 0x00000020;
     public const int WS_EX_LAYERED = 0x00080000;
     public const int WS_EX_TOOLWINDOW = 0x00000080;
+    public const int WS_EX_NOACTIVATE = 0x08000000;
+
+    // SetWindowPos 标志
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_NOZORDER = 0x0004;
 
     // SetLayeredWindowAttributes 标志
     private const uint LWA_ALPHA = 0x02;
@@ -580,6 +592,44 @@ public static class Win32Helper
         var hwnd = new WindowInteropHelper(window).Handle;
         int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
         SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
+    }
+
+    /// <summary>
+    /// 设置窗口不激活样式（点击或操作时不会获得焦点）
+    /// </summary>
+    /// <param name="window">目标窗口</param>
+    /// <param name="enable">是否启用不激活样式</param>
+    public static void SetNoActivateStyle(Window window, bool enable)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+            return;
+
+        int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        if (enable)
+        {
+            exStyle |= WS_EX_NOACTIVATE;
+        }
+        else
+        {
+            exStyle &= ~WS_EX_NOACTIVATE;
+        }
+        SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+    }
+
+    /// <summary>
+    /// 检查窗口是否设置了不激活样式
+    /// </summary>
+    /// <param name="window">目标窗口</param>
+    /// <returns>是否设置了不激活样式</returns>
+    public static bool HasNoActivateStyle(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero)
+            return false;
+
+        int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        return (exStyle & WS_EX_NOACTIVATE) != 0;
     }
 
 #endregion

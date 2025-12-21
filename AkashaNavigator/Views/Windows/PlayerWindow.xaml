@@ -11,6 +11,7 @@
         MinHeight="150"
         Topmost="True"
         ShowInTaskbar="True"
+        ShowActivated="False"
         SourceInitialized="Window_SourceInitialized">
     
     <!-- 主容器：2px 细边框 -->

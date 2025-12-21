@@ -31,6 +31,13 @@ public partial class OsdWindow : Window
     public OsdWindow()
     {
         InitializeComponent();
+
+        // 窗口句柄创建后立即设置不激活样式和鼠标穿透
+        SourceInitialized += (s, e) =>
+        {
+            Helpers.Win32Helper.SetNoActivateStyle(this, true);
+            Helpers.Win32Helper.SetClickThrough(this, true);
+        };
     }
 
 #endregion
