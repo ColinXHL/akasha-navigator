@@ -25,7 +25,20 @@ public partial class InstalledPluginsPage : UserControl
 
     private void InstalledPluginsPage_Loaded(object sender, RoutedEventArgs e)
     {
-        RefreshPluginList();
+        // 刷新列表并自动检查更新
+        CheckAndRefreshPluginList();
+    }
+
+    /// <summary>
+    /// 检查更新并刷新插件列表（公共方法）
+    /// </summary>
+    public void CheckAndRefreshPluginList()
+    {
+        // 检查所有插件的更新
+        var updates = PluginLibrary.Instance.CheckAllUpdates();
+
+        // 刷新列表（带更新信息）
+        RefreshPluginList(updates);
     }
 
     /// <summary>

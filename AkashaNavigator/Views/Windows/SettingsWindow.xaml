@@ -127,6 +127,10 @@
 
                     <!-- 高级设置 -->
                     <TextBlock Text="高级设置" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+                    <CheckBox x:Name="EnablePluginUpdateNotificationCheckBox" Content="启动时提示插件更新"
+                              Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,4"/>
+                    <TextBlock Text="开启后，启动时如有插件可更新会弹窗提示" 
+                               Foreground="#666" FontSize="11" Margin="0,0,0,12"/>
                     <CheckBox x:Name="EnableDebugLogCheckBox" Content="启用调试日志"
                               Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,4"/>
                     <TextBlock Text="开启后日志文件将包含详细的调试信息，用于排查问题" 

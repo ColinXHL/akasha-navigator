@@ -61,6 +61,7 @@ public partial class SettingsWindow : AnimatedWindow
         PromptArchiveOnExitCheckBox.IsChecked = _config.PromptArchiveOnExit;
 
         // 高级设置
+        EnablePluginUpdateNotificationCheckBox.IsChecked = _config.EnablePluginUpdateNotification;
         EnableDebugLogCheckBox.IsChecked = _config.EnableDebugLog;
 
         // 快捷键
@@ -101,6 +102,7 @@ public partial class SettingsWindow : AnimatedWindow
         _config.PromptArchiveOnExit = PromptArchiveOnExitCheckBox.IsChecked ?? false;
 
         // 高级设置
+        _config.EnablePluginUpdateNotification = EnablePluginUpdateNotificationCheckBox.IsChecked ?? true;
         _config.EnableDebugLog = EnableDebugLogCheckBox.IsChecked ?? false;
 
         // 快捷键
@@ -218,6 +220,7 @@ public partial class SettingsWindow : AnimatedWindow
         PromptArchiveOnExitCheckBox.IsChecked = false;
 
         // 重置高级设置
+        EnablePluginUpdateNotificationCheckBox.IsChecked = true;
         EnableDebugLogCheckBox.IsChecked = false;
 
         // 重置快捷键

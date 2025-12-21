@@ -217,6 +217,21 @@ public partial class App : System.Windows.Application
             var isBookmarked = DataService.Instance.IsBookmarked(url);
             _controlBarWindow.UpdateBookmarkState(isBookmarked);
         };
+
+        // WebView 首次加载完成后检查插件更新（非首次启动且启用了更新提示）
+        if (!_config.IsFirstLaunch && _config.EnablePluginUpdateNotification)
+        {
+            // 使用一次性事件处理器
+            EventHandler? handler = null;
+            handler = (s, e) =>
+            {
+                _playerWindow.NavigationStateChanged -= handler;
+                // 延迟一小段时间再显示，确保窗口完全加载
+                Dispatcher.BeginInvoke(new Action(CheckAndPromptPluginUpdates),
+                                       System.Windows.Threading.DispatcherPriority.Background);
+            };
+            _playerWindow.NavigationStateChanged += handler;
+        }
     }
 
     /// <summary>
@@ -355,6 +370,73 @@ public partial class App : System.Windows.Application
         {
             _logLevelSwitch.MinimumLevel = newLevel;
             Log.Information("日志级别已切换为 {Level}", newLevel);
+        }
+    }
+
+    /// <summary>
+    /// 检查并提示插件更新
+    /// </summary>
+    private void CheckAndPromptPluginUpdates()
+    {
+        try
+        {
+            var updates = PluginLibrary.Instance.CheckAllUpdates();
+            if (updates.Count == 0)
+                return;
+
+            var dialog = new PluginUpdatePromptDialog(updates);
+            var result = dialog.ShowDialog();
+
+            if (result == true)
+            {
+                switch (dialog.Result)
+                {
+                case PluginUpdatePromptResult.OpenPluginCenter:
+                    // 延迟打开插件中心（等待主窗口创建完成）
+                    Dispatcher.BeginInvoke(new Action(() =>
+                                                      {
+                                                          if (_playerWindow != null)
+                                                          {
+                                                              var pluginCenterWindow = new PluginCenterWindow();
+                                                              pluginCenterWindow.Owner = _playerWindow;
+                                                              // 导航到已安装插件页面
+                                                              pluginCenterWindow.NavigateToInstalledPlugins();
+                                                              pluginCenterWindow.ShowDialog();
+                                                          }
+                                                      }),
+                                           System.Windows.Threading.DispatcherPriority.Loaded);
+                    break;
+
+                case PluginUpdatePromptResult.UpdateAll:
+                    // 执行一键更新
+                    var successCount = 0;
+                    var failCount = 0;
+                    foreach (var update in updates)
+                    {
+                        var updateResult = PluginLibrary.Instance.UpdatePlugin(update.PluginId);
+                        if (updateResult.IsSuccess)
+                            successCount++;
+                        else
+                            failCount++;
+                    }
+
+                    // 显示更新结果
+                    if (failCount == 0)
+                    {
+                        NotificationService.Instance.Success($"成功更新 {successCount} 个插件！", "更新完成");
+                    }
+                    else
+                    {
+                        NotificationService.Instance.Warning($"更新完成：{successCount} 个成功，{failCount} 个失败。",
+                                                             "更新完成");
+                    }
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogService.Instance.Error("App", ex, "检查插件更新时发生异常");
         }
     }
 

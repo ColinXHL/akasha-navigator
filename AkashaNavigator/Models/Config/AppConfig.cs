@@ -85,6 +85,15 @@ public class AppConfig
 
 #endregion
 
+#region Plugin Update
+
+    /// <summary>
+    /// 是否在启动时提示插件更新（默认开启）
+    /// </summary>
+    public bool EnablePluginUpdateNotification { get; set; } = true;
+
+#endregion
+
 #region Window Behavior
 
     /// <summary>

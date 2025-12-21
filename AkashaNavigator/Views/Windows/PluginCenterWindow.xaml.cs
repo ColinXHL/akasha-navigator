@@ -61,7 +61,7 @@ public partial class PluginCenterWindow : AnimatedWindow
         if (radioButton == NavInstalledPlugins)
         {
             InstalledPluginsPage.Visibility = Visibility.Visible;
-            InstalledPluginsPage.RefreshPluginList();
+            InstalledPluginsPage.CheckAndRefreshPluginList();
         }
         else if (radioButton == NavAvailablePlugins)
         {
@@ -87,7 +87,7 @@ public partial class PluginCenterWindow : AnimatedWindow
     {
         if (NavInstalledPlugins.IsChecked == true)
         {
-            InstalledPluginsPage.RefreshPluginList();
+            InstalledPluginsPage.CheckAndRefreshPluginList();
         }
         else if (NavAvailablePlugins.IsChecked == true)
         {
