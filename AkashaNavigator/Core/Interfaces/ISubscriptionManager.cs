@@ -68,13 +68,15 @@ namespace AkashaNavigator.Core.Interfaces
         /// </summary>
         /// <param name="pluginId">插件ID</param>
         /// <param name="profileId">Profile ID</param>
-        void SubscribePlugin(string pluginId, string profileId);
+        /// <returns>是否成功</returns>
+        bool SubscribePlugin(string pluginId, string profileId);
 
         /// <summary>
         /// 取消订阅插件
         /// </summary>
         /// <param name="pluginId">插件ID</param>
         /// <param name="profileId">Profile ID</param>
-        void UnsubscribePlugin(string pluginId, string profileId);
+        /// <returns>是否成功</returns>
+        bool UnsubscribePlugin(string pluginId, string profileId);
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -9,34 +10,27 @@ namespace AkashaNavigator.Services
 /// 窗口状态服务
 /// 负责保存和加载窗口位置、大小、最后访问 URL 等
 /// </summary>
-public class WindowStateService
+public class WindowStateService : IWindowStateService
 {
 #region Singleton
 
-    private static WindowStateService? _instance;
-    private static readonly object _lock = new();
+    private static IWindowStateService? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（向后兼容）
     /// </summary>
-    public static WindowStateService Instance
+    public static IWindowStateService Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new WindowStateService();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("WindowStateService not initialized");
+        set => _instance = value;
     }
 
 #endregion
 
 #region Fields
 
+    private readonly ILogService _logService;
+    private readonly IProfileManager _profileManager;
     private WindowState? _cachedState;
 
 #endregion
@@ -45,6 +39,15 @@ public class WindowStateService
 
     private WindowStateService()
     {
+    }
+
+    /// <summary>
+    /// DI 容器使用的构造函数
+    /// </summary>
+    public WindowStateService(ILogService logService, IProfileManager profileManager)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
     }
 
 #endregion
@@ -66,7 +69,7 @@ public class WindowStateService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("WindowStateService", "加载窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Warn("WindowStateService", "加载窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
                                      ex.Message);
             _cachedState = null;
         }
@@ -94,7 +97,7 @@ public class WindowStateService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("WindowStateService", "保存窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Debug("WindowStateService", "保存窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
                                       ex.Message);
         }
     }
@@ -115,7 +118,7 @@ public class WindowStateService
 
     private string GetFilePath()
     {
-        return Path.Combine(ProfileManager.Instance.GetCurrentProfileDirectory(), AppConstants.WindowStateFileName);
+        return Path.Combine(_profileManager.GetCurrentProfileDirectory(), AppConstants.WindowStateFileName);
     }
 
     private WindowState CreateDefaultState()

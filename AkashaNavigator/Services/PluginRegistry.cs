@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -77,28 +78,19 @@ internal class PluginRegistryData
 /// 插件注册表服务
 /// 管理内置插件索引（只读）
 /// </summary>
-public class PluginRegistry
+public class PluginRegistry : IPluginRegistry
 {
 #region Singleton
 
-    private static PluginRegistry? _instance;
-    private static readonly object _lock = new();
+    private static IPluginRegistry? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（向后兼容）
     /// </summary>
-    public static PluginRegistry Instance
+    public static IPluginRegistry Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new PluginRegistry();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("PluginRegistry not initialized");
+        set => _instance = value;
     }
 
     /// <summary>
@@ -106,10 +98,7 @@ public class PluginRegistry
     /// </summary>
     internal static void ResetInstance()
     {
-        lock (_lock)
-        {
-            _instance = null;
-        }
+        _instance = null;
     }
 
 #endregion
@@ -136,12 +125,27 @@ public class PluginRegistry
     /// </summary>
     private bool _isLoaded = false;
 
+    /// <summary>
+    /// 日志服务
+    /// </summary>
+    private readonly ILogService _logService;
+
 #endregion
 
 #region Constructor
 
-    private PluginRegistry()
+    public PluginRegistry()
     {
+        _logService = _logService;
+        BuiltInPluginsDirectory = AppPaths.BuiltInPluginsDirectory;
+    }
+
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public PluginRegistry(ILogService logService)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         BuiltInPluginsDirectory = AppPaths.BuiltInPluginsDirectory;
     }
 
@@ -151,6 +155,7 @@ public class PluginRegistry
     /// <param name="builtInPluginsDirectory">内置插件目录路径</param>
     internal PluginRegistry(string builtInPluginsDirectory)
     {
+        _logService = _logService;
         BuiltInPluginsDirectory = builtInPluginsDirectory;
     }
 
@@ -237,7 +242,7 @@ public class PluginRegistry
 
         if (!File.Exists(RegistryFilePath))
         {
-            LogService.Instance.Warn("PluginRegistry", "索引文件不存在: {RegistryFilePath}", RegistryFilePath);
+            _logService.Warn("PluginRegistry", "索引文件不存在: {RegistryFilePath}", RegistryFilePath);
             return;
         }
 
@@ -247,12 +252,12 @@ public class PluginRegistry
             if (data?.Plugins != null)
             {
                 _plugins = data.Plugins;
-                LogService.Instance.Debug("PluginRegistry", "已加载 {PluginCount} 个内置插件", _plugins.Count);
+                _logService.Debug("PluginRegistry", "已加载 {PluginCount} 个内置插件", _plugins.Count);
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginRegistry", ex, "加载索引文件失败");
+            _logService.Error("PluginRegistry", ex, "加载索引文件失败");
         }
     }
 

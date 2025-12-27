@@ -16,25 +16,22 @@ public class NotificationService : INotificationService
 {
 #region Singleton
 
-    private static NotificationService? _instance;
-    private static readonly object _lock = new();
+    private static INotificationService? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（向后兼容）
     /// </summary>
-    public static NotificationService Instance
+    public static INotificationService Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new NotificationService();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("NotificationService not initialized");
+        set => _instance = value;
     }
+
+#endregion
+
+#region Fields
+
+    private readonly ILogService _logService;
 
 #endregion
 
@@ -42,6 +39,14 @@ public class NotificationService : INotificationService
 
     private NotificationService()
     {
+    }
+
+    /// <summary>
+    /// DI 容器使用的构造函数
+    /// </summary>
+    public NotificationService(ILogService logService)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
     }
 
 #endregion
@@ -63,7 +68,7 @@ public class NotificationService : INotificationService
             // 确保在 UI 线程上执行
             if (Application.Current?.Dispatcher == null)
             {
-                LogService.Instance.Warn("NotificationService", "无法显示通知：Application.Current 为空");
+                _logService.Warn("NotificationService", "无法显示通知：Application.Current 为空");
                 return;
             }
 
@@ -80,7 +85,7 @@ public class NotificationService : INotificationService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("NotificationService", ex, "显示通知失败");
+            _logService.Error("NotificationService", ex, "显示通知失败");
         }
     }
 
@@ -115,7 +120,7 @@ public class NotificationService : INotificationService
             // 确保在 UI 线程上执行
             if (Application.Current?.Dispatcher == null)
             {
-                LogService.Instance.Warn("NotificationService", "无法显示对话框：Application.Current 为空");
+                _logService.Warn("NotificationService", "无法显示对话框：Application.Current 为空");
                 tcs.SetResult(false);
                 return tcs.Task;
             }
@@ -133,7 +138,7 @@ public class NotificationService : INotificationService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("NotificationService", ex, "显示对话框失败");
+            _logService.Error("NotificationService", ex, "显示对话框失败");
             tcs.TrySetResult(false);
         }
 

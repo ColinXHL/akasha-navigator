@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using AkashaNavigator.Views.Windows;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -9,14 +10,14 @@ namespace AkashaNavigator.Services
 /// 覆盖层窗口管理服务
 /// 管理插件创建的覆盖层窗口实例
 /// </summary>
-public class OverlayManager
+public class OverlayManager : IOverlayManager
 {
 #region Singleton
 
     private static readonly Lazy<OverlayManager> _instance = new(() => new OverlayManager());
 
     /// <summary>
-    /// 单例实例
+    /// 向后兼容的单例属性（临时，用于步骤4过渡）
     /// </summary>
     public static OverlayManager Instance => _instance.Value;
 

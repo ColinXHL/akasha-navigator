@@ -5,6 +5,7 @@ using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -141,10 +142,25 @@ public class DataMigration
 
 #endregion
 
+#region Fields
+
+    private readonly ILogService _logService;
+
+#endregion
+
 #region Constructor
 
     private DataMigration()
     {
+        _logService = LogService.Instance;
+    }
+
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public DataMigration(ILogService logService)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
     }
 
 #endregion
@@ -271,7 +287,7 @@ public class DataMigration
         {
             // 1. 创建备份
             backup = CreateBackup();
-            LogService.Instance.Info("DataMigration", "已创建迁移备份: {BackupDirectory}", backup.BackupDirectory);
+            _logService.Info("DataMigration", "已创建迁移备份: {BackupDirectory}", backup.BackupDirectory);
 
             // 2. 获取需要迁移的插件
             var oldPlugins = GetOldStylePlugins();
@@ -308,7 +324,7 @@ public class DataMigration
                 // 检查是否已在全局库中
                 if (libraryIndex.Plugins.Any(p => string.Equals(p.Id, pluginId, StringComparison.OrdinalIgnoreCase)))
                 {
-                    LogService.Instance.Debug("DataMigration", "插件 {PluginId} 已在全局库中，跳过", pluginId);
+                    _logService.Debug("DataMigration", "插件 {PluginId} 已在全局库中，跳过", pluginId);
                     continue;
                 }
 
@@ -324,12 +340,12 @@ public class DataMigration
                                                    InstalledAt = DateTime.Now, Source = "migrated" });
 
                     migratedPluginCount++;
-                    LogService.Instance.Info("DataMigration", "已迁移插件: {PluginId}", pluginId);
+                    _logService.Info("DataMigration", "已迁移插件: {PluginId}", pluginId);
                 }
                 catch (Exception ex)
                 {
                     warnings.Add($"迁移插件 {pluginId} 失败: {ex.Message}");
-                    LogService.Instance.Warn("DataMigration", "迁移插件 {PluginId} 失败: {ErrorMessage}", pluginId,
+                    _logService.Warn("DataMigration", "迁移插件 {PluginId} 失败: {ErrorMessage}", pluginId,
                                              ex.Message);
                 }
             }
@@ -387,13 +403,13 @@ public class DataMigration
                     if (Directory.Exists(pluginsDir))
                     {
                         Directory.Delete(pluginsDir, true);
-                        LogService.Instance.Debug("DataMigration", "已删除旧插件目录: {PluginsDir}", pluginsDir);
+                        _logService.Debug("DataMigration", "已删除旧插件目录: {PluginsDir}", pluginsDir);
                     }
                 }
                 catch (Exception ex)
                 {
                     warnings.Add($"删除旧插件目录失败 [{profileId}]: {ex.Message}");
-                    LogService.Instance.Warn("DataMigration", "删除旧插件目录失败 [{PluginsDir}]: {ErrorMessage}",
+                    _logService.Warn("DataMigration", "删除旧插件目录失败 [{PluginsDir}]: {ErrorMessage}",
                                              pluginsDir, ex.Message);
                 }
             }
@@ -405,7 +421,7 @@ public class DataMigration
                 warnings.AddRange(validationErrors);
             }
 
-            LogService.Instance.Info("DataMigration",
+            _logService.Info("DataMigration",
                                      $"迁移完成: {migratedPluginCount} 个插件, {migratedProfileCount} 个 Profile");
 
             if (warnings.Count > 0)
@@ -417,7 +433,7 @@ public class DataMigration
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("DataMigration", ex, "迁移失败");
+            _logService.Error("DataMigration", ex, "迁移失败");
 
             // 尝试回滚
             if (backup != null)
@@ -425,11 +441,11 @@ public class DataMigration
                 try
                 {
                     Rollback(backup);
-                    LogService.Instance.Info("DataMigration", "已回滚迁移更改");
+                    _logService.Info("DataMigration", "已回滚迁移更改");
                 }
                 catch (Exception rollbackEx)
                 {
-                    LogService.Instance.Error("DataMigration", rollbackEx, "回滚失败");
+                    _logService.Error("DataMigration", rollbackEx, "回滚失败");
                 }
             }
 
@@ -548,7 +564,7 @@ public class DataMigration
         // 注意：这里只删除迁移过程中添加的，不删除之前就存在的
         // 由于我们无法精确知道哪些是新添加的，这里选择保守策略，不删除
 
-        LogService.Instance.Info("DataMigration", "迁移回滚完成");
+        _logService.Info("DataMigration", "迁移回滚完成");
     }
 
 #endregion

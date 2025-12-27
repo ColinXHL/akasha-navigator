@@ -89,20 +89,12 @@ public class ProfileManager : IProfileManager
     private static readonly object _lock = new();
 
     /// <summary>
-    /// 获取单例实例
+    /// 向后兼容的单例属性（临时，用于步骤4过渡）
     /// </summary>
     public static ProfileManager Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new ProfileManager();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("ProfileManager not initialized. Use DI container.");
+        internal set => _instance = value;
     }
 
     /// <summary>
@@ -115,6 +107,18 @@ public class ProfileManager : IProfileManager
             _instance = null;
         }
     }
+
+#endregion
+
+#region Fields
+
+    private readonly IConfigService _configService;
+    private readonly ILogService _logService;
+    private readonly IPluginHost _pluginHost;
+    private readonly IPluginAssociationManager _pluginAssociationManager;
+    private readonly ISubscriptionManager _subscriptionManager;
+    private readonly IPluginLibrary _pluginLibrary;
+    private readonly IProfileRegistry _profileRegistry;
 
 #endregion
 
@@ -158,8 +162,26 @@ public class ProfileManager : IProfileManager
 
 #region Constructor
 
-    private ProfileManager()
+    /// <summary>
+    /// 私有构造函数（单例模式 + DI）
+    /// </summary>
+    public ProfileManager(
+        IConfigService configService,
+        ILogService logService,
+        IPluginHost pluginHost,
+        IPluginAssociationManager pluginAssociationManager,
+        ISubscriptionManager subscriptionManager,
+        IPluginLibrary pluginLibrary,
+        IProfileRegistry profileRegistry)
     {
+        _configService = configService;
+        _logService = logService;
+        _pluginHost = pluginHost;
+        _pluginAssociationManager = pluginAssociationManager;
+        _subscriptionManager = subscriptionManager;
+        _pluginLibrary = pluginLibrary;
+        _profileRegistry = profileRegistry;
+
         // 数据目录：User/Data/
         DataDirectory = AppPaths.DataDirectory;
         ProfilesDirectory = AppPaths.ProfilesDirectory;
@@ -168,7 +190,7 @@ public class ProfileManager : IProfileManager
         LoadAllProfiles();
 
         // 从配置中恢复上次选择的 Profile，如果不存在则使用默认 Profile
-        var savedProfileId = ConfigService.Instance.Config.CurrentProfileId;
+        var savedProfileId = _configService.Config.CurrentProfileId;
         CurrentProfile =
             GetProfileById(savedProfileId) ?? GetProfileById(AppConstants.DefaultProfileId) ?? CreateDefaultProfile();
     }
@@ -187,20 +209,20 @@ public class ProfileManager : IProfileManager
             return false;
 
         // 卸载当前 Profile 的插件
-        PluginHost.Instance.UnloadAllPlugins();
+        _pluginHost.UnloadAllPlugins();
 
         CurrentProfile = profile;
 
         // 保存当前选择的 Profile ID 到配置
-        var config = ConfigService.Instance.Config;
+        var config = _configService.Config;
         config.CurrentProfileId = profileId;
-        ConfigService.Instance.Save();
+        _configService.Save();
 
         // 加载新 Profile 的插件
-        PluginHost.Instance.LoadPluginsForProfile(profileId);
+        _pluginHost.LoadPluginsForProfile(profileId);
 
         // 广播 profileChanged 事件到插件
-        PluginHost.Instance.BroadcastEvent(EventManager.ProfileChanged, new { profileId = profile.Id });
+        _pluginHost.BroadcastEvent(EventManager.ProfileChanged, new { profileId = profile.Id });
 
         ProfileChanged?.Invoke(this, profile);
         return true;
@@ -253,7 +275,7 @@ public class ProfileManager : IProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", "保存 Profile 失败 [{ProfilePath}]: {ErrorMessage}",
+            _logService.Debug("ProfileManager", "保存 Profile 失败 [{ProfilePath}]: {ErrorMessage}",
                                       profilePath, ex.Message);
         }
     }
@@ -407,15 +429,15 @@ public class ProfileManager : IProfileManager
             // 关联插件
             if (pluginIds != null && pluginIds.Count > 0)
             {
-                PluginAssociationManager.Instance.AddPluginsToProfile(pluginIds, profileId);
+                _pluginAssociationManager.AddPluginsToProfile(pluginIds, profileId);
             }
 
-            LogService.Instance.Info("ProfileManager", "成功创建 Profile '{ProfileId}'", profileId);
+            _logService.Info("ProfileManager", "成功创建 Profile '{ProfileId}'", profileId);
             return CreateProfileResult.Success(profileId);
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", ex, "创建 Profile 失败");
+            _logService.Error("ProfileManager", ex, "创建 Profile 失败");
             return CreateProfileResult.Failure($"创建失败: {ex.Message}");
         }
     }
@@ -432,7 +454,7 @@ public class ProfileManager : IProfileManager
         // 验证名称
         if (string.IsNullOrWhiteSpace(newName))
         {
-            LogService.Instance.Warn("ProfileManager", "更新 Profile 失败: 名称不能为空");
+            _logService.Warn("ProfileManager", "更新 Profile 失败: 名称不能为空");
             return false;
         }
 
@@ -440,7 +462,7 @@ public class ProfileManager : IProfileManager
         var profile = GetProfileById(id);
         if (profile == null)
         {
-            LogService.Instance.Warn("ProfileManager", "更新 Profile 失败: Profile '{ProfileId}' 不存在", id);
+            _logService.Warn("ProfileManager", "更新 Profile 失败: Profile '{ProfileId}' 不存在", id);
             return false;
         }
 
@@ -456,12 +478,12 @@ public class ProfileManager : IProfileManager
             // 保存到文件
             SaveProfile(profile);
 
-            LogService.Instance.Info("ProfileManager", "成功更新 Profile '{ProfileId}'", id);
+            _logService.Info("ProfileManager", "成功更新 Profile '{ProfileId}'", id);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", ex, "更新 Profile 失败");
+            _logService.Error("ProfileManager", ex, "更新 Profile 失败");
             return false;
         }
     }
@@ -502,7 +524,7 @@ public class ProfileManager : IProfileManager
             }
 
             // 删除插件关联
-            PluginAssociationManager.Instance.RemoveProfile(id);
+            _pluginAssociationManager.RemoveProfile(id);
 
             // 从订阅中移除
             RemoveProfileFromSubscription(id);
@@ -517,7 +539,7 @@ public class ProfileManager : IProfileManager
                 Directory.Delete(profileDir, recursive: true);
             }
 
-            LogService.Instance.Info("ProfileManager", "成功删除 Profile '{ProfileId}'", id);
+            _logService.Info("ProfileManager", "成功删除 Profile '{ProfileId}'", id);
             return DeleteProfileResult.Success();
         }
         catch (UnauthorizedAccessException ex)
@@ -530,7 +552,7 @@ public class ProfileManager : IProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", ex, "删除 Profile 失败");
+            _logService.Error("ProfileManager", ex, "删除 Profile 失败");
             return DeleteProfileResult.Failure($"删除失败: {ex.Message}");
         }
     }
@@ -627,7 +649,7 @@ public class ProfileManager : IProfileManager
         }
 
         // 重新加载 SubscriptionManager
-        SubscriptionManager.Instance.Load();
+        _subscriptionManager.Load();
     }
 
     /// <summary>
@@ -647,11 +669,11 @@ public class ProfileManager : IProfileManager
             config.SaveToFile(subscriptionsPath);
 
             // 重新加载 SubscriptionManager
-            SubscriptionManager.Instance.Load();
+            _subscriptionManager.Load();
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("ProfileManager", "从订阅配置移除 Profile 失败: {ErrorMessage}", ex.Message);
+            _logService.Warn("ProfileManager", "从订阅配置移除 Profile 失败: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -668,18 +690,18 @@ public class ProfileManager : IProfileManager
     {
         if (string.IsNullOrWhiteSpace(profileId))
         {
-            LogService.Instance.Warn("ProfileManager", "订阅 Profile 失败: profileId 为空");
+            _logService.Warn("ProfileManager", "订阅 Profile 失败: profileId 为空");
             return false;
         }
 
         // 调用 SubscriptionManager 执行订阅
-        var success = SubscriptionManager.Instance.SubscribeProfile(profileId);
+        var success = _subscriptionManager.SubscribeProfile(profileId);
 
         if (success)
         {
             // 重新加载 Profiles 列表
             ReloadProfiles();
-            LogService.Instance.Info("ProfileManager", "成功订阅 Profile '{ProfileId}'", profileId);
+            _logService.Info("ProfileManager", "成功订阅 Profile '{ProfileId}'", profileId);
         }
 
         return success;
@@ -710,13 +732,13 @@ public class ProfileManager : IProfileManager
         }
 
         // 调用 SubscriptionManager 执行取消订阅
-        var result = SubscriptionManager.Instance.UnsubscribeProfile(profileId);
+        var result = _subscriptionManager.UnsubscribeProfile(profileId);
 
         if (result.Success)
         {
             // 从列表中移除
             Profiles.RemoveAll(p => p.Id.Equals(profileId, StringComparison.OrdinalIgnoreCase));
-            LogService.Instance.Info("ProfileManager", "成功取消订阅 Profile '{ProfileId}'", profileId);
+            _logService.Info("ProfileManager", "成功取消订阅 Profile '{ProfileId}'", profileId);
         }
 
         return result;
@@ -740,12 +762,12 @@ public class ProfileManager : IProfileManager
         var profile = GetProfileById(profileId);
         if (profile == null)
         {
-            LogService.Instance.Warn("ProfileManager", "导出失败：Profile '{ProfileId}' 不存在", profileId);
+            _logService.Warn("ProfileManager", "导出失败：Profile '{ProfileId}' 不存在", profileId);
             return null;
         }
 
         // 获取插件引用清单
-        var pluginReferences = PluginAssociationManager.Instance.GetPluginsInProfile(profileId);
+        var pluginReferences = _pluginAssociationManager.GetPluginsInProfile(profileId);
         var referenceEntries = pluginReferences.Select(r => PluginReferenceEntry.FromReference(r)).ToList();
 
         // 获取所有插件配置
@@ -760,7 +782,7 @@ public class ProfileManager : IProfileManager
                                                  PluginConfigs = pluginConfigs,
                                                  ExportedAt = DateTime.Now };
 
-        LogService.Instance.Info("ProfileManager",
+        _logService.Info("ProfileManager",
                                  "导出 Profile '{ProfileId}'：{ReferenceCount} 个插件引用，{ConfigCount} 个插件配置",
                                  profileId, referenceEntries.Count, pluginConfigs.Count);
 
@@ -782,13 +804,13 @@ public class ProfileManager : IProfileManager
         try
         {
             exportData.SaveToFile(filePath);
-            LogService.Instance.Info("ProfileManager", "Profile '{ProfileId}' 已导出到 {FilePath}", profileId,
+            _logService.Info("ProfileManager", "Profile '{ProfileId}' 已导出到 {FilePath}", profileId,
                                      filePath);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", ex, "导出 Profile 到文件失败");
+            _logService.Error("ProfileManager", ex, "导出 Profile 到文件失败");
             return false;
         }
     }
@@ -824,7 +846,7 @@ public class ProfileManager : IProfileManager
         var missingPlugins = new List<string>();
         foreach (var reference in data.PluginReferences)
         {
-            if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+            if (!_pluginLibrary.IsInstalled(reference.PluginId))
             {
                 missingPlugins.Add(reference.PluginId);
             }
@@ -844,7 +866,7 @@ public class ProfileManager : IProfileManager
             // 创建插件关联
             foreach (var reference in data.PluginReferences)
             {
-                PluginAssociationManager.Instance.AddPluginToProfile(reference.PluginId, data.ProfileId,
+                _pluginAssociationManager.AddPluginToProfile(reference.PluginId, data.ProfileId,
                                                                      reference.Enabled);
             }
 
@@ -855,7 +877,7 @@ public class ProfileManager : IProfileManager
             }
 
             // 添加到订阅
-            if (!SubscriptionManager.Instance.IsProfileSubscribed(data.ProfileId))
+            if (!_subscriptionManager.IsProfileSubscribed(data.ProfileId))
             {
                 // 手动添加到订阅配置
                 var subscriptionsPath = AppPaths.SubscriptionsFilePath;
@@ -875,13 +897,13 @@ public class ProfileManager : IProfileManager
 
                 config.AddProfile(data.ProfileId);
                 config.SaveToFile(subscriptionsPath);
-                SubscriptionManager.Instance.Load();
+                _subscriptionManager.Load();
             }
 
             // 重新加载 Profiles 列表
             ReloadProfiles();
 
-            LogService.Instance.Info("ProfileManager",
+            _logService.Info("ProfileManager",
                                      "导入 Profile '{ProfileId}'：{ReferenceCount} 个插件引用，{MissingCount} 个缺失",
                                      data.ProfileId, data.PluginReferences.Count, missingPlugins.Count);
 
@@ -889,7 +911,7 @@ public class ProfileManager : IProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileManager", ex, "导入 Profile 失败");
+            _logService.Error("ProfileManager", ex, "导入 Profile 失败");
             return ProfileImportResult.Failure($"导入失败: {ex.Message}");
         }
     }
@@ -933,7 +955,7 @@ public class ProfileManager : IProfileManager
             // 仍然检测缺失插件
             foreach (var reference in data.PluginReferences)
             {
-                if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+                if (!_pluginLibrary.IsInstalled(reference.PluginId))
                 {
                     result.MissingPlugins.Add(reference.PluginId);
                 }
@@ -945,7 +967,7 @@ public class ProfileManager : IProfileManager
         var missingPlugins = new List<string>();
         foreach (var reference in data.PluginReferences)
         {
-            if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+            if (!_pluginLibrary.IsInstalled(reference.PluginId))
             {
                 missingPlugins.Add(reference.PluginId);
             }
@@ -965,7 +987,7 @@ public class ProfileManager : IProfileManager
     /// <returns>插件引用列表</returns>
     public List<PluginReference> GetPluginReferences(string profileId)
     {
-        return PluginAssociationManager.Instance.GetPluginsInProfile(profileId);
+        return _pluginAssociationManager.GetPluginsInProfile(profileId);
     }
 
     /// <summary>
@@ -977,7 +999,7 @@ public class ProfileManager : IProfileManager
     /// <returns>是否成功设置</returns>
     public bool SetPluginEnabled(string profileId, string pluginId, bool enabled)
     {
-        return PluginAssociationManager.Instance.SetPluginEnabled(profileId, pluginId, enabled);
+        return _pluginAssociationManager.SetPluginEnabled(profileId, pluginId, enabled);
     }
 
     /// <summary>
@@ -1001,7 +1023,7 @@ public class ProfileManager : IProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", "加载插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
+            _logService.Debug("ProfileManager", "加载插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
                                       ex.Message);
             return null;
         }
@@ -1032,7 +1054,7 @@ public class ProfileManager : IProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", "保存插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
+            _logService.Debug("ProfileManager", "保存插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
                                       ex.Message);
             return false;
         }
@@ -1061,7 +1083,7 @@ public class ProfileManager : IProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", "删除插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
+            _logService.Debug("ProfileManager", "删除插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
                                       ex.Message);
             return false;
         }
@@ -1116,7 +1138,7 @@ public class ProfileManager : IProfileManager
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ProfileManager", "加载所有插件配置失败: {ErrorMessage}", ex.Message);
+            _logService.Debug("ProfileManager", "加载所有插件配置失败: {ErrorMessage}", ex.Message);
         }
 
         return result;
@@ -1133,17 +1155,17 @@ public class ProfileManager : IProfileManager
     private void LoadAllProfiles()
     {
         // 确保 SubscriptionManager 已加载
-        SubscriptionManager.Instance.Load();
+        _subscriptionManager.Load();
 
         // 获取已订阅的 Profile 列表
-        var subscribedProfiles = SubscriptionManager.Instance.GetSubscribedProfiles();
+        var subscribedProfiles = _subscriptionManager.GetSubscribedProfiles();
 
         // 如果没有订阅任何 Profile，确保默认 Profile 存在
         if (subscribedProfiles.Count == 0)
         {
             // 自动订阅默认 Profile
             EnsureDefaultProfileSubscribed();
-            subscribedProfiles = SubscriptionManager.Instance.GetSubscribedProfiles();
+            subscribedProfiles = _subscriptionManager.GetSubscribedProfiles();
         }
 
         // 只加载已订阅的 Profile
@@ -1154,7 +1176,7 @@ public class ProfileManager : IProfileManager
 
             if (!File.Exists(profilePath))
             {
-                LogService.Instance.Warn("ProfileManager", "已订阅的 Profile 文件不存在: {ProfilePath}", profilePath);
+                _logService.Warn("ProfileManager", "已订阅的 Profile 文件不存在: {ProfilePath}", profilePath);
                 continue;
             }
 
@@ -1164,12 +1186,12 @@ public class ProfileManager : IProfileManager
                 if (profile != null)
                 {
                     Profiles.Add(profile);
-                    LogService.Instance.Debug("ProfileManager", "已加载订阅的 Profile: {ProfileId}", profileId);
+                    _logService.Debug("ProfileManager", "已加载订阅的 Profile: {ProfileId}", profileId);
                 }
             }
             catch (Exception ex)
             {
-                LogService.Instance.Warn("ProfileManager", "加载 Profile 失败 [{ProfilePath}]: {ErrorMessage}",
+                _logService.Warn("ProfileManager", "加载 Profile 失败 [{ProfilePath}]: {ErrorMessage}",
                                          profilePath, ex.Message);
             }
         }
@@ -1187,14 +1209,14 @@ public class ProfileManager : IProfileManager
     /// </summary>
     private void EnsureDefaultProfileSubscribed()
     {
-        if (!SubscriptionManager.Instance.IsProfileSubscribed(AppConstants.DefaultProfileId))
+        if (!_subscriptionManager.IsProfileSubscribed(AppConstants.DefaultProfileId))
         {
             // 检查内置模板是否存在
-            if (ProfileRegistry.Instance.ProfileExists(AppConstants.DefaultProfileId))
+            if (_profileRegistry.ProfileExists(AppConstants.DefaultProfileId))
             {
                 // 从内置模板订阅
-                SubscriptionManager.Instance.SubscribeProfile(AppConstants.DefaultProfileId);
-                LogService.Instance.Info("ProfileManager", "已自动订阅默认 Profile（从内置模板）");
+                _subscriptionManager.SubscribeProfile(AppConstants.DefaultProfileId);
+                _logService.Info("ProfileManager", "已自动订阅默认 Profile（从内置模板）");
             }
             else
             {
@@ -1202,7 +1224,7 @@ public class ProfileManager : IProfileManager
                 CreateDefaultProfile();
                 // 手动添加到订阅配置（因为没有内置模板）
                 AddDefaultProfileToSubscription();
-                LogService.Instance.Info("ProfileManager", "已创建并订阅默认 Profile");
+                _logService.Info("ProfileManager", "已创建并订阅默认 Profile");
             }
         }
     }
@@ -1236,7 +1258,7 @@ public class ProfileManager : IProfileManager
         }
 
         // 重新加载 SubscriptionManager
-        SubscriptionManager.Instance.Load();
+        _subscriptionManager.Load();
     }
 
     /// <summary>
@@ -1249,7 +1271,7 @@ public class ProfileManager : IProfileManager
         var profilePath = Path.Combine(profileDir, AppConstants.ProfileFileName);
 
         // 检查内置模板是否存在
-        var templateDir = ProfileRegistry.Instance.GetProfileTemplateDirectory(AppConstants.DefaultProfileId);
+        var templateDir = _profileRegistry.GetProfileTemplateDirectory(AppConstants.DefaultProfileId);
         var templatePath = Path.Combine(templateDir, AppConstants.ProfileFileName);
 
         if (File.Exists(templatePath))
@@ -1263,13 +1285,13 @@ public class ProfileManager : IProfileManager
                 var profile = JsonHelper.LoadFromFile<GameProfile>(profilePath);
                 if (profile != null)
                 {
-                    LogService.Instance.Info("ProfileManager", "已从内置模板创建默认 Profile");
+                    _logService.Info("ProfileManager", "已从内置模板创建默认 Profile");
                     return profile;
                 }
             }
             catch (Exception ex)
             {
-                LogService.Instance.Warn("ProfileManager", "从模板复制默认 Profile 失败: {ErrorMessage}", ex.Message);
+                _logService.Warn("ProfileManager", "从模板复制默认 Profile 失败: {ErrorMessage}", ex.Message);
             }
         }
 
@@ -1282,7 +1304,7 @@ public class ProfileManager : IProfileManager
 
         // 保存到文件
         SaveProfile(newProfile);
-        LogService.Instance.Info("ProfileManager", "已创建新的默认 Profile");
+        _logService.Info("ProfileManager", "已创建新的默认 Profile");
         return newProfile;
     }
 

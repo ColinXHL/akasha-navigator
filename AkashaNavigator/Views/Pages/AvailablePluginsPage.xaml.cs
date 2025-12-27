@@ -2,9 +2,11 @@ using System.IO;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.Views.Windows;
 
@@ -15,8 +17,16 @@ namespace AkashaNavigator.Views.Pages
 /// </summary>
 public partial class AvailablePluginsPage : UserControl
 {
-    public AvailablePluginsPage()
+    private readonly PluginLibrary _pluginLibrary;
+    private readonly INotificationService _notificationService;
+
+    /// <summary>
+    /// DI容器注入的构造函数
+    /// </summary>
+    public AvailablePluginsPage(PluginLibrary pluginLibrary, INotificationService notificationService)
     {
+        _pluginLibrary = pluginLibrary;
+        _notificationService = notificationService;
         InitializeComponent();
         Loaded += AvailablePluginsPage_Loaded;
     }
@@ -54,7 +64,7 @@ public partial class AvailablePluginsPage : UserControl
     private List<AvailablePluginViewModel> GetAllBuiltinPlugins()
     {
         var result = new List<AvailablePluginViewModel>();
-        var installedIds = PluginLibrary.Instance.GetInstalledPlugins().Select(p => p.Id).ToHashSet();
+        var installedIds = _pluginLibrary.GetInstalledPlugins().Select(p => p.Id).ToHashSet();
 
         // 扫描内置插件目录
         var builtinPluginsDir = AppPaths.BuiltInPluginsDirectory;
@@ -106,10 +116,10 @@ public partial class AvailablePluginsPage : UserControl
     {
         if (sender is Button btn && btn.Tag is AvailablePluginViewModel viewModel)
         {
-            var result = PluginLibrary.Instance.InstallPlugin(viewModel.Id, viewModel.SourceDirectory);
+            var result = _pluginLibrary.InstallPlugin(viewModel.Id, viewModel.SourceDirectory);
             if (result.IsSuccess)
             {
-                NotificationService.Instance.Success($"插件 \"{viewModel.Name}\" 安装成功！");
+                _notificationService.Success($"插件 \"{viewModel.Name}\" 安装成功！");
 
                 // 更新视图模型状态
                 viewModel.IsInstalled = true;
@@ -122,7 +132,7 @@ public partial class AvailablePluginsPage : UserControl
             }
             else
             {
-                NotificationService.Instance.Error($"安装失败: {result.ErrorMessage}");
+                _notificationService.Error($"安装失败: {result.ErrorMessage}");
             }
         }
     }
@@ -135,7 +145,8 @@ public partial class AvailablePluginsPage : UserControl
         if (sender is Button btn && btn.Tag is AvailablePluginViewModel viewModel)
         {
             // 显示卸载确认对话框（包含引用信息）
-            var dialog = new UninstallConfirmDialog(viewModel.Id, viewModel.Name);
+            var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+            var dialog = dialogFactory.CreateUninstallConfirmDialog(viewModel.Id, viewModel.Name);
             dialog.Owner = Window.GetWindow(this);
 
             if (dialog.ShowDialog() == true && dialog.UninstallSucceeded)

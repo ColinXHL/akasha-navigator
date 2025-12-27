@@ -7,6 +7,7 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -47,21 +48,25 @@ public partial class ProfileCreateDialog : AnimatedWindow
 #region Fields
 
     private readonly List<PluginSelectorItem> _pluginItems;
+    private readonly IPluginLibrary _pluginLibrary;
+    private readonly IProfileManager _profileManager;
     private string _selectedIcon = "📦";
 
 #endregion
 
 #region Constructor
 
-    public ProfileCreateDialog()
+    public ProfileCreateDialog(IPluginLibrary pluginLibrary, IProfileManager profileManager)
     {
+        _pluginLibrary = pluginLibrary;
+        _profileManager = profileManager;
         InitializeComponent();
 
         // 初始化图标选择器
         InitializeIconSelector();
 
         // 加载已安装插件列表
-        var installedPlugins = PluginLibrary.Instance.GetInstalledPlugins();
+        var installedPlugins = _pluginLibrary.GetInstalledPlugins();
         _pluginItems = installedPlugins
                            .Select(p => new PluginSelectorItem { Id = p.Id, Name = p.Name, Version = p.Version,
                                                                  Description = p.Description, IsSelected = false })
@@ -181,17 +186,17 @@ public partial class ProfileCreateDialog : AnimatedWindow
         SelectedPluginIds = _pluginItems.Where(i => i.IsSelected).Select(i => i.Id).ToList();
 
         // 生成 Profile ID
-        var generatedId = ProfileManager.Instance.GenerateProfileId(ProfileName);
+        var generatedId = _profileManager.GenerateProfileId(ProfileName);
 
         // 检查 ID 是否已存在
-        if (ProfileManager.Instance.ProfileIdExists(generatedId))
+        if (_profileManager.ProfileIdExists(generatedId))
         {
             ShowError("已存在同名 Profile");
             return;
         }
 
         // 创建 Profile
-        var result = ProfileManager.Instance.CreateProfile(generatedId, ProfileName, ProfileIcon, SelectedPluginIds);
+        var result = _profileManager.CreateProfile(generatedId, ProfileName, ProfileIcon, SelectedPluginIds);
 
         if (result.IsSuccess)
         {

@@ -7,6 +7,7 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -15,10 +16,19 @@ namespace AkashaNavigator.Views.Dialogs
 /// </summary>
 public partial class SubscriptionSourceDialog : Window
 {
+    private readonly ProfileMarketplaceService _profileMarketplaceService;
+    private readonly INotificationService _notificationService;
     private bool _hasChanges = false;
 
-    public SubscriptionSourceDialog()
+    /// <summary>
+    /// DI容器注入的构造函数
+    /// </summary>
+    public SubscriptionSourceDialog(
+        ProfileMarketplaceService profileMarketplaceService,
+        INotificationService notificationService)
     {
+        _profileMarketplaceService = profileMarketplaceService;
+        _notificationService = notificationService;
         InitializeComponent();
         Loaded += SubscriptionSourceDialog_Loaded;
         UrlInput.TextChanged += UrlInput_TextChanged;
@@ -40,7 +50,7 @@ public partial class SubscriptionSourceDialog : Window
     /// </summary>
     private void RefreshSourceList()
     {
-        var sources = ProfileMarketplaceService.Instance.GetSubscriptionSources();
+        var sources = _profileMarketplaceService.GetSubscriptionSources();
         var viewModels = sources.Select(s => new SubscriptionSourceViewModel(s)).ToList();
 
         SourceList.ItemsSource = viewModels;
@@ -74,7 +84,7 @@ public partial class SubscriptionSourceDialog : Window
         var url = UrlInput.Text?.Trim();
         if (string.IsNullOrEmpty(url))
         {
-            NotificationService.Instance.Info("请输入订阅源 URL", "提示");
+            _notificationService.Info("请输入订阅源 URL", "提示");
             return;
         }
 
@@ -85,7 +95,7 @@ public partial class SubscriptionSourceDialog : Window
 
         try
         {
-            var result = await ProfileMarketplaceService.Instance.AddSubscriptionSourceAsync(url);
+            var result = await _profileMarketplaceService.AddSubscriptionSourceAsync(url);
 
             if (result.IsSuccess)
             {
@@ -103,11 +113,11 @@ public partial class SubscriptionSourceDialog : Window
                     message += $"\n包含 {result.ProfileCount} 个 Profile";
                 }
 
-                NotificationService.Instance.Success(message, "添加成功");
+                _notificationService.Success(message, "添加成功");
             }
             else
             {
-                NotificationService.Instance.Error($"添加失败: {result.ErrorMessage}", "添加失败");
+                _notificationService.Error($"添加失败: {result.ErrorMessage}", "添加失败");
             }
         }
         finally
@@ -127,11 +137,11 @@ public partial class SubscriptionSourceDialog : Window
         if (sender is Button btn && btn.Tag is string url)
         {
             var confirmed =
-                await NotificationService.Instance.ConfirmAsync($"确定要删除此订阅源吗？\n\n{url}", "确认删除");
+                await _notificationService.ConfirmAsync($"确定要删除此订阅源吗？\n\n{url}", "确认删除");
 
             if (confirmed)
             {
-                ProfileMarketplaceService.Instance.RemoveSubscriptionSource(url);
+                _profileMarketplaceService.RemoveSubscriptionSource(url);
                 RefreshSourceList();
                 _hasChanges = true;
             }

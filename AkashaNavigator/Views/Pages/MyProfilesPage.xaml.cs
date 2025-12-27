@@ -9,6 +9,7 @@ using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.Views.Windows;
 using Microsoft.Win32;
@@ -20,10 +21,27 @@ namespace AkashaNavigator.Views.Pages
 /// </summary>
 public partial class MyProfilesPage : UserControl
 {
+    private readonly IProfileManager _profileManager;
+    private readonly IPluginAssociationManager _pluginAssociationManager;
+    private readonly PluginLibrary _pluginLibrary; // 使用具体类，因为需要 InstallPlugin 方法
+    private readonly IPluginHost _pluginHost;
+    private readonly INotificationService _notificationService;
     private string? _currentProfileId;
 
-    public MyProfilesPage()
+    // DI构造函数（推荐使用）
+    public MyProfilesPage(
+        IProfileManager profileManager,
+        IPluginAssociationManager pluginAssociationManager,
+        PluginLibrary pluginLibrary,
+        IPluginHost pluginHost,
+        INotificationService notificationService)
     {
+        _profileManager = profileManager;
+        _pluginAssociationManager = pluginAssociationManager;
+        _pluginLibrary = pluginLibrary;
+        _pluginHost = pluginHost;
+        _notificationService = notificationService;
+
         InitializeComponent();
         Loaded += MyProfilesPage_Loaded;
     }
@@ -38,8 +56,8 @@ public partial class MyProfilesPage : UserControl
     /// </summary>
     public void RefreshProfileList()
     {
-        var profiles = ProfileManager.Instance.Profiles;
-        var currentProfile = ProfileManager.Instance.CurrentProfile;
+        var profiles = _profileManager.Profiles;
+        var currentProfile = _profileManager.CurrentProfile;
 
         // 创建 ViewModel 列表
         var viewModels = profiles
@@ -79,16 +97,16 @@ public partial class MyProfilesPage : UserControl
         }
 
         // 获取 Profile 的插件引用
-        var references = PluginAssociationManager.Instance.GetPluginsInProfile(_currentProfileId);
+        var references = _pluginAssociationManager.GetPluginsInProfile(_currentProfileId);
 
         // 获取当前关联的插件 ID 集合
         var currentPluginIds = references.Select(r => r.PluginId).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // 获取原始插件列表中被移除的插件（用于市场 Profile）
-        var missingOriginalPlugins = PluginAssociationManager.Instance.GetMissingOriginalPlugins(_currentProfileId);
+        var missingOriginalPlugins = _pluginAssociationManager.GetMissingOriginalPlugins(_currentProfileId);
 
         // 获取缺失插件（已关联但未安装的 + 原始列表中被移除的）
-        var missingPlugins = PluginAssociationManager.Instance.GetMissingPlugins(_currentProfileId);
+        var missingPlugins = _pluginAssociationManager.GetMissingPlugins(_currentProfileId);
         var totalMissingCount = missingPlugins.Count + missingOriginalPlugins.Count;
 
         // 显示缺失警告
@@ -128,7 +146,7 @@ public partial class MyProfilesPage : UserControl
         };
 
         // 尝试获取插件信息
-        var manifest = PluginLibrary.Instance.GetPluginManifest(pluginId);
+        var manifest = _pluginLibrary.GetPluginManifest(pluginId);
         if (manifest != null)
         {
             vm.Name = manifest.Name ?? pluginId;
@@ -165,7 +183,7 @@ public partial class MyProfilesPage : UserControl
         // 获取插件信息
         if (reference.Status == PluginInstallStatus.Installed || reference.Status == PluginInstallStatus.Disabled)
         {
-            var manifest = PluginLibrary.Instance.GetPluginManifest(reference.PluginId);
+            var manifest = _pluginLibrary.GetPluginManifest(reference.PluginId);
             if (manifest != null)
             {
                 vm.Name = manifest.Name ?? reference.PluginId;
@@ -225,14 +243,14 @@ public partial class MyProfilesPage : UserControl
 
         // 「设为当前」按钮：当选中的 Profile 不是当前 Profile 时显示
         var isCurrent =
-            _currentProfileId.Equals(ProfileManager.Instance.CurrentProfile.Id, StringComparison.OrdinalIgnoreCase);
+            _currentProfileId.Equals(_profileManager.CurrentProfile.Id, StringComparison.OrdinalIgnoreCase);
         BtnSetCurrent.Visibility = isCurrent ? Visibility.Collapsed : Visibility.Visible;
 
         // 编辑按钮始终可用
         BtnEditProfile.IsEnabled = true;
 
         // 删除按钮对默认 Profile 禁用
-        var isDefault = ProfileManager.Instance.IsDefaultProfile(_currentProfileId);
+        var isDefault = _profileManager.IsDefaultProfile(_currentProfileId);
         BtnDeleteProfile.IsEnabled = !isDefault;
     }
 
@@ -243,33 +261,33 @@ public partial class MyProfilesPage : UserControl
     {
         if (string.IsNullOrEmpty(_currentProfileId))
         {
-            NotificationService.Instance.Warning("请先选择一个 Profile");
+            _notificationService.Warning("请先选择一个 Profile");
             return;
         }
 
         // 检查是否已经是当前 Profile
-        if (_currentProfileId.Equals(ProfileManager.Instance.CurrentProfile.Id, StringComparison.OrdinalIgnoreCase))
+        if (_currentProfileId.Equals(_profileManager.CurrentProfile.Id, StringComparison.OrdinalIgnoreCase))
         {
-            NotificationService.Instance.Info("该 Profile 已经是当前使用的 Profile");
+            _notificationService.Info("该 Profile 已经是当前使用的 Profile");
             return;
         }
 
-        var profile = ProfileManager.Instance.GetProfileById(_currentProfileId);
+        var profile = _profileManager.GetProfileById(_currentProfileId);
         var profileName = profile?.Name ?? _currentProfileId;
 
         // 切换 Profile
-        var success = ProfileManager.Instance.SwitchProfile(_currentProfileId);
+        var success = _profileManager.SwitchProfile(_currentProfileId);
 
         if (success)
         {
             // 刷新 UI 以更新「当前使用」标识
             RefreshProfileList();
 
-            NotificationService.Instance.Success($"已切换到 Profile \"{profileName}\"");
+            _notificationService.Success($"已切换到 Profile \"{profileName}\"");
         }
         else
         {
-            NotificationService.Instance.Error($"切换到 Profile \"{profileName}\" 失败");
+            _notificationService.Error($"切换到 Profile \"{profileName}\" 失败");
         }
     }
 
@@ -281,7 +299,7 @@ public partial class MyProfilesPage : UserControl
         if (sender is CheckBox checkBox && checkBox.Tag is string pluginId && !string.IsNullOrEmpty(_currentProfileId))
         {
             var enabled = checkBox.IsChecked ?? false;
-            ProfileManager.Instance.SetPluginEnabled(_currentProfileId, pluginId, enabled);
+            _profileManager.SetPluginEnabled(_currentProfileId, pluginId, enabled);
 
             // 刷新列表以更新状态显示
             RefreshPluginList();
@@ -295,13 +313,13 @@ public partial class MyProfilesPage : UserControl
     {
         if (string.IsNullOrEmpty(_currentProfileId))
         {
-            NotificationService.Instance.Warning("请先选择一个 Profile");
+            _notificationService.Warning("请先选择一个 Profile");
             return;
         }
 
         // 获取已安装但未添加到当前 Profile 的插件
-        var installedPlugins = PluginLibrary.Instance.GetInstalledPlugins();
-        var currentPlugins = PluginAssociationManager.Instance.GetPluginsInProfile(_currentProfileId)
+        var installedPlugins = _pluginLibrary.GetInstalledPlugins();
+        var currentPlugins = _pluginAssociationManager.GetPluginsInProfile(_currentProfileId)
                                  .Select(r => r.PluginId)
                                  .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -309,12 +327,12 @@ public partial class MyProfilesPage : UserControl
 
         if (availablePlugins.Count == 0)
         {
-            NotificationService.Instance.Info("没有可添加的插件，请先在「已安装插件」页面安装插件");
+            _notificationService.Info("没有可添加的插件，请先在「已安装插件」页面安装插件");
             return;
         }
 
         // 显示插件选择对话框
-        var dialog = new PluginSelectorDialog(availablePlugins, _currentProfileId);
+        var dialog = new PluginSelectorDialog(_pluginAssociationManager, availablePlugins, _currentProfileId);
         dialog.Owner = Window.GetWindow(this);
         if (dialog.ShowDialog() == true)
         {
@@ -329,15 +347,15 @@ public partial class MyProfilesPage : UserControl
     {
         if (sender is Button btn && btn.Tag is string pluginId)
         {
-            var result = PluginLibrary.Instance.InstallPlugin(pluginId);
+            var result = _pluginLibrary.InstallPlugin(pluginId);
             if (result.IsSuccess)
             {
                 RefreshPluginList();
-                NotificationService.Instance.Success($"插件 \"{pluginId}\" 安装成功");
+                _notificationService.Success($"插件 \"{pluginId}\" 安装成功");
             }
             else
             {
-                NotificationService.Instance.Error($"安装失败: {result.ErrorMessage}");
+                _notificationService.Error($"安装失败: {result.ErrorMessage}");
             }
         }
     }
@@ -351,10 +369,10 @@ public partial class MyProfilesPage : UserControl
             return;
 
         // 获取已关联但未安装的插件
-        var missingPlugins = PluginAssociationManager.Instance.GetMissingPlugins(_currentProfileId);
+        var missingPlugins = _pluginAssociationManager.GetMissingPlugins(_currentProfileId);
 
         // 获取原始列表中被移除的插件
-        var missingOriginalPlugins = PluginAssociationManager.Instance.GetMissingOriginalPlugins(_currentProfileId);
+        var missingOriginalPlugins = _pluginAssociationManager.GetMissingOriginalPlugins(_currentProfileId);
 
         // 合并所有缺失的插件
         var allMissingPlugins = new HashSet<string>(missingPlugins, StringComparer.OrdinalIgnoreCase);
@@ -365,7 +383,7 @@ public partial class MyProfilesPage : UserControl
 
         if (allMissingPlugins.Count == 0)
         {
-            NotificationService.Instance.Info("没有缺失的插件");
+            _notificationService.Info("没有缺失的插件");
             return;
         }
 
@@ -377,13 +395,13 @@ public partial class MyProfilesPage : UserControl
             // 如果是从原始列表移除的，先添加关联
             if (missingOriginalPlugins.Contains(pluginId))
             {
-                PluginAssociationManager.Instance.AddPluginToProfile(pluginId, _currentProfileId);
+                _pluginAssociationManager.AddPluginToProfile(pluginId, _currentProfileId);
             }
 
             // 如果插件未安装，尝试安装
-            if (!PluginLibrary.Instance.IsInstalled(pluginId))
+            if (!_pluginLibrary.IsInstalled(pluginId))
             {
-                var result = PluginLibrary.Instance.InstallPlugin(pluginId);
+                var result = _pluginLibrary.InstallPlugin(pluginId);
                 if (result.IsSuccess)
                 {
                     successCount++;
@@ -404,25 +422,25 @@ public partial class MyProfilesPage : UserControl
 
         // 检查补全的 Profile 是否是当前正在使用的 Profile
         var isCurrentProfile =
-            _currentProfileId.Equals(ProfileManager.Instance.CurrentProfile.Id, StringComparison.OrdinalIgnoreCase);
+            _currentProfileId.Equals(_profileManager.CurrentProfile.Id, StringComparison.OrdinalIgnoreCase);
 
         if (isCurrentProfile && successCount > 0)
         {
             // 重新加载当前 Profile 的插件，使新安装的插件生效
-            PluginHost.Instance.LoadPluginsForProfile(_currentProfileId);
+            _pluginHost.LoadPluginsForProfile(_currentProfileId);
         }
 
         if (failCount > 0)
         {
-            NotificationService.Instance.Warning($"安装完成: 成功 {successCount} 个，失败 {failCount} 个");
+            _notificationService.Warning($"安装完成: 成功 {successCount} 个，失败 {failCount} 个");
         }
         else if (isCurrentProfile)
         {
-            NotificationService.Instance.Success($"成功安装 {successCount} 个插件，已自动加载");
+            _notificationService.Success($"成功安装 {successCount} 个插件，已自动加载");
         }
         else
         {
-            NotificationService.Instance.Success($"成功安装 {successCount} 个插件");
+            _notificationService.Success($"成功安装 {successCount} 个插件");
         }
     }
 
@@ -434,12 +452,12 @@ public partial class MyProfilesPage : UserControl
         if (sender is Button btn && btn.Tag is string pluginId && !string.IsNullOrEmpty(_currentProfileId))
         {
             // 获取插件名称
-            var manifest = PluginLibrary.Instance.GetPluginManifest(pluginId);
+            var manifest = _pluginLibrary.GetPluginManifest(pluginId);
             var pluginName = manifest?.Name ?? pluginId;
 
             // 检查是否是市场 Profile（有原始插件列表）
-            var hasOriginal = PluginAssociationManager.Instance.HasOriginalPlugins(_currentProfileId);
-            var originalPlugins = PluginAssociationManager.Instance.GetOriginalPlugins(_currentProfileId);
+            var hasOriginal = _pluginAssociationManager.HasOriginalPlugins(_currentProfileId);
+            var originalPlugins = _pluginAssociationManager.GetOriginalPlugins(_currentProfileId);
             var isInOriginal = originalPlugins.Contains(pluginId, StringComparer.OrdinalIgnoreCase);
 
             string message;
@@ -454,13 +472,13 @@ public partial class MyProfilesPage : UserControl
                     $"确定要从此 Profile 中移除插件 \"{pluginName}\" 吗？\n\n注意：这只会移除引用，不会卸载插件本体。";
             }
 
-            var confirmed = await NotificationService.Instance.ConfirmAsync(message, "确认移除");
+            var confirmed = await _notificationService.ConfirmAsync(message, "确认移除");
 
             if (confirmed)
             {
-                PluginAssociationManager.Instance.RemovePluginFromProfile(pluginId, _currentProfileId);
+                _pluginAssociationManager.RemovePluginFromProfile(pluginId, _currentProfileId);
                 RefreshPluginList();
-                NotificationService.Instance.Success($"已从 Profile 中移除插件 \"{pluginName}\"");
+                _notificationService.Success($"已从 Profile 中移除插件 \"{pluginName}\"");
             }
         }
     }
@@ -473,18 +491,18 @@ public partial class MyProfilesPage : UserControl
         if (sender is Button btn && btn.Tag is string pluginId && !string.IsNullOrEmpty(_currentProfileId))
         {
             // 获取插件信息
-            var pluginInfo = PluginLibrary.Instance.GetInstalledPluginInfo(pluginId);
+            var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
             if (pluginInfo == null)
             {
-                NotificationService.Instance.Error($"找不到插件 {pluginId}");
+                _notificationService.Error($"找不到插件 {pluginId}");
                 return;
             }
 
             // 获取插件源码目录
-            var pluginDirectory = PluginLibrary.Instance.GetPluginDirectory(pluginId);
+            var pluginDirectory = _pluginLibrary.GetPluginDirectory(pluginId);
 
             // 获取当前 Profile 的配置目录
-            var configDirectory = PluginHost.Instance.GetPluginConfigDirectory(_currentProfileId, pluginId);
+            var configDirectory = _pluginHost.GetPluginConfigDirectory(_currentProfileId, pluginId);
 
             // 打开插件设置窗口（传入 profileId）
             PluginSettingsWindow.ShowSettings(pluginId, pluginInfo.Name, pluginDirectory, configDirectory,
@@ -500,20 +518,20 @@ public partial class MyProfilesPage : UserControl
         if (sender is Button btn && btn.Tag is string pluginId && !string.IsNullOrEmpty(_currentProfileId))
         {
             // 获取插件名称
-            var manifest = PluginLibrary.Instance.GetPluginManifest(pluginId);
+            var manifest = _pluginLibrary.GetPluginManifest(pluginId);
             var pluginName = manifest?.Name ?? pluginId;
 
             // 添加插件到 Profile
-            var added = PluginAssociationManager.Instance.AddPluginToProfile(pluginId, _currentProfileId);
+            var added = _pluginAssociationManager.AddPluginToProfile(pluginId, _currentProfileId);
 
             if (added)
             {
                 RefreshPluginList();
-                NotificationService.Instance.Success($"已将插件 \"{pluginName}\" 添加到 Profile");
+                _notificationService.Success($"已将插件 \"{pluginName}\" 添加到 Profile");
             }
             else
             {
-                NotificationService.Instance.Warning($"插件 \"{pluginName}\" 已在 Profile 中");
+                _notificationService.Warning($"插件 \"{pluginName}\" 已在 Profile 中");
             }
         }
     }
@@ -523,7 +541,7 @@ public partial class MyProfilesPage : UserControl
     /// </summary>
     private void BtnNewProfile_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ProfileCreateDialog();
+        var dialog = new ProfileCreateDialog(_pluginLibrary, _profileManager);
         dialog.Owner = Window.GetWindow(this);
 
         if (dialog.ShowDialog() == true && dialog.IsConfirmed && !string.IsNullOrEmpty(dialog.ProfileId))
@@ -543,18 +561,18 @@ public partial class MyProfilesPage : UserControl
     {
         if (string.IsNullOrEmpty(_currentProfileId))
         {
-            NotificationService.Instance.Warning("请先选择一个 Profile");
+            _notificationService.Warning("请先选择一个 Profile");
             return;
         }
 
-        var profile = ProfileManager.Instance.GetProfileById(_currentProfileId);
+        var profile = _profileManager.GetProfileById(_currentProfileId);
         if (profile == null)
         {
-            NotificationService.Instance.Error("Profile 不存在");
+            _notificationService.Error("Profile 不存在");
             return;
         }
 
-        var dialog = new ProfileEditDialog(profile);
+        var dialog = new ProfileEditDialog(_profileManager, profile);
         dialog.Owner = Window.GetWindow(this);
 
         if (dialog.ShowDialog() == true && dialog.IsConfirmed)
@@ -571,22 +589,22 @@ public partial class MyProfilesPage : UserControl
     {
         if (string.IsNullOrEmpty(_currentProfileId))
         {
-            NotificationService.Instance.Warning("请先选择一个 Profile");
+            _notificationService.Warning("请先选择一个 Profile");
             return;
         }
 
         // 检查是否是默认 Profile
-        if (ProfileManager.Instance.IsDefaultProfile(_currentProfileId))
+        if (_profileManager.IsDefaultProfile(_currentProfileId))
         {
-            NotificationService.Instance.Warning("默认 Profile 不能删除");
+            _notificationService.Warning("默认 Profile 不能删除");
             return;
         }
 
-        var profile = ProfileManager.Instance.GetProfileById(_currentProfileId);
+        var profile = _profileManager.GetProfileById(_currentProfileId);
         var profileName = profile?.Name ?? _currentProfileId;
 
         // 显示确认对话框
-        var confirmed = await NotificationService.Instance.ConfirmAsync(
+        var confirmed = await _notificationService.ConfirmAsync(
             $"确定要删除 Profile \"{profileName}\" 吗？\n\n此操作将删除该 Profile 及其所有插件关联，但不会卸载插件本体。",
             "确认删除");
 
@@ -594,17 +612,17 @@ public partial class MyProfilesPage : UserControl
             return;
 
         // 执行删除
-        var deleteResult = ProfileManager.Instance.DeleteProfile(_currentProfileId);
+        var deleteResult = _profileManager.DeleteProfile(_currentProfileId);
 
         if (deleteResult.IsSuccess)
         {
             // 刷新 Profile 列表（会自动切换到默认 Profile）
             RefreshProfileList();
-            NotificationService.Instance.Success($"Profile \"{profileName}\" 已删除");
+            _notificationService.Success($"Profile \"{profileName}\" 已删除");
         }
         else
         {
-            NotificationService.Instance.Error($"删除失败: {deleteResult.ErrorMessage}");
+            _notificationService.Error($"删除失败: {deleteResult.ErrorMessage}");
         }
     }
 
@@ -630,14 +648,14 @@ public partial class MyProfilesPage : UserControl
     {
         if (string.IsNullOrEmpty(_currentProfileId))
         {
-            NotificationService.Instance.Warning("请先选择一个 Profile");
+            _notificationService.Warning("请先选择一个 Profile");
             return;
         }
 
-        var profile = ProfileManager.Instance.GetProfileById(_currentProfileId);
+        var profile = _profileManager.GetProfileById(_currentProfileId);
         if (profile == null)
         {
-            NotificationService.Instance.Error("Profile 不存在");
+            _notificationService.Error("Profile 不存在");
             return;
         }
 
@@ -647,14 +665,14 @@ public partial class MyProfilesPage : UserControl
 
         if (dialog.ShowDialog() == true)
         {
-            var success = ProfileManager.Instance.ExportProfileToFile(_currentProfileId, dialog.FileName);
+            var success = _profileManager.ExportProfileToFile(_currentProfileId, dialog.FileName);
             if (success)
             {
-                NotificationService.Instance.Success($"Profile 已导出到: {dialog.FileName}");
+                _notificationService.Success($"Profile 已导出到: {dialog.FileName}");
             }
             else
             {
-                NotificationService.Instance.Error("导出失败，请查看日志获取详细信息");
+                _notificationService.Error("导出失败，请查看日志获取详细信息");
             }
         }
     }
@@ -674,12 +692,12 @@ public partial class MyProfilesPage : UserControl
         var data = ProfileExportData.LoadFromFile(dialog.FileName);
         if (data == null)
         {
-            NotificationService.Instance.Error("无法解析导入文件，请确保文件格式正确");
+            _notificationService.Error("无法解析导入文件，请确保文件格式正确");
             return;
         }
 
         // 预览导入
-        var preview = ProfileManager.Instance.PreviewImport(data);
+        var preview = _profileManager.PreviewImport(data);
 
         // 构建确认消息
         var message = $"即将导入 Profile: {data.ProfileName}\n包含 {data.PluginReferences.Count} 个插件引用";
@@ -692,25 +710,25 @@ public partial class MyProfilesPage : UserControl
         bool overwrite = false;
         if (preview.ProfileExists)
         {
-            var overwriteConfirmed = await NotificationService.Instance.ConfirmAsync(
+            var overwriteConfirmed = await _notificationService.ConfirmAsync(
                 $"Profile \"{data.ProfileId}\" 已存在。\n\n是否覆盖现有 Profile？", "Profile 已存在");
 
             if (!overwriteConfirmed)
             {
-                NotificationService.Instance.Info("导入已取消");
+                _notificationService.Info("导入已取消");
                 return;
             }
             overwrite = true;
         }
         else
         {
-            var confirmed = await NotificationService.Instance.ConfirmAsync(message, "确认导入");
+            var confirmed = await _notificationService.ConfirmAsync(message, "确认导入");
             if (!confirmed)
                 return;
         }
 
         // 执行导入
-        var importResult = ProfileManager.Instance.ImportProfile(data, overwrite);
+        var importResult = _profileManager.ImportProfile(data, overwrite);
 
         if (importResult.IsSuccess)
         {
@@ -725,11 +743,11 @@ public partial class MyProfilesPage : UserControl
                 successMessage += $" ({importResult.MissingPlugins.Count} 个插件缺失，可一键安装)";
             }
 
-            NotificationService.Instance.Success(successMessage);
+            _notificationService.Success(successMessage);
         }
         else
         {
-            NotificationService.Instance.Error($"导入失败: {importResult.ErrorMessage}");
+            _notificationService.Error($"导入失败: {importResult.ErrorMessage}");
         }
     }
 }

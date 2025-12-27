@@ -4,6 +4,7 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -31,10 +32,20 @@ public partial class PluginUpdatePromptDialog : AnimatedWindow
 
 #endregion
 
+#region Fields
+
+    private readonly IConfigService _configService;
+
+#endregion
+
 #region Constructor
 
-    public PluginUpdatePromptDialog(List<UpdateCheckResult> updates)
+    /// <summary>
+    /// DI容器注入的构造函数
+    /// </summary>
+    public PluginUpdatePromptDialog(IConfigService configService, List<UpdateCheckResult> updates)
     {
+        _configService = configService;
         InitializeComponent();
         UpdatesAvailable = updates;
 
@@ -87,9 +98,9 @@ public partial class PluginUpdatePromptDialog : AnimatedWindow
     {
         if (DontShowAgain)
         {
-            var config = ConfigService.Instance.Config;
+            var config = _configService.Config;
             config.EnablePluginUpdateNotification = false;
-            ConfigService.Instance.Save();
+            _configService.Save();
         }
     }
 

@@ -93,6 +93,8 @@ public partial class ControlBarWindow : Window
 
 #region Fields
 
+    private readonly PlayerWindow _playerWindow;
+
     /// <summary>
     /// 是否正在拖动
     /// </summary>
@@ -137,8 +139,10 @@ public partial class ControlBarWindow : Window
 
 #region Constructor
 
-    public ControlBarWindow()
+    public ControlBarWindow(PlayerWindow playerWindow)
     {
+        _playerWindow = playerWindow ?? throw new ArgumentNullException(nameof(playerWindow));
+
         InitializeComponent();
         InitializeWindowPosition();
         InitializeAutoShowHide();

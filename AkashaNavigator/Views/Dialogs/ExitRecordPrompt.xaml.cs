@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -61,15 +62,20 @@ public partial class ExitRecordPrompt : AnimatedWindow
 
 #endregion
 
+#region Fields
+
+    private readonly IPioneerNoteService _pioneerNoteService;
+
+#endregion
+
 #region Constructor
 
     /// <summary>
-    /// 创建退出记录提示窗口
+    /// DI容器注入的构造函数
     /// </summary>
-    /// <param name="url">当前页面 URL</param>
-    /// <param name="title">当前页面标题</param>
-    public ExitRecordPrompt(string url, string title)
+    public ExitRecordPrompt(IPioneerNoteService pioneerNoteService, string url, string title)
     {
+        _pioneerNoteService = pioneerNoteService;
         InitializeComponent();
 
         PageUrl = url ?? string.Empty;
@@ -88,15 +94,17 @@ public partial class ExitRecordPrompt : AnimatedWindow
     /// 检查是否需要显示退出记录提示
     /// </summary>
     /// <param name="url">当前页面 URL</param>
+    /// <param name="pioneerNoteService">开荒笔记服务（可选，用于测试）</param>
     /// <returns>如果 URL 未记录且非空，返回 true</returns>
-    public static bool ShouldShowPrompt(string url)
+    public static bool ShouldShowPrompt(string url, IPioneerNoteService? pioneerNoteService = null)
     {
         // 如果 URL 为空，不显示提示
         if (string.IsNullOrWhiteSpace(url))
             return false;
 
+        var service = pioneerNoteService ?? PioneerNoteService.Instance;
         // 检查 URL 是否已记录
-        return !PioneerNoteService.Instance.IsUrlRecorded(url);
+        return !service.IsUrlRecorded(url);
     }
 
 #endregion

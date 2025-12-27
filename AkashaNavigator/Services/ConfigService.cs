@@ -13,24 +13,15 @@ public class ConfigService : IConfigService
 {
 #region Singleton
 
-    private static ConfigService? _instance;
-    private static readonly object _lock = new();
+    private static IConfigService? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 向后兼容的单例属性（临时保留，步骤7将移除）
     /// </summary>
-    public static ConfigService Instance
+    public static IConfigService Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new ConfigService();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("ConfigService not initialized. Use DI container.");
+        set => _instance = value;
     }
 
 #endregion
@@ -58,10 +49,31 @@ public class ConfigService : IConfigService
 
 #endregion
 
+#region Fields
+
+    private readonly ILogService _logService;
+
+#endregion
+
 #region Constructor
 
+    // 构造函数改为internal，允许DI容器创建实例
     private ConfigService()
     {
+        _logService = _logService;
+        // 配置文件路径：User/Data/config.json
+        ConfigFilePath = AppPaths.ConfigFilePath;
+
+        // 加载配置
+        Config = Load();
+    }
+
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public ConfigService(ILogService logService)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         // 配置文件路径：User/Data/config.json
         ConfigFilePath = AppPaths.ConfigFilePath;
 
@@ -88,7 +100,7 @@ public class ConfigService : IConfigService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("ConfigService", "加载配置失败，将使用默认配置: {ErrorMessage}", ex.Message);
+            _logService.Warn("ConfigService", "加载配置失败，将使用默认配置: {ErrorMessage}", ex.Message);
         }
 
         return new AppConfig();
@@ -105,7 +117,7 @@ public class ConfigService : IConfigService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("ConfigService", "保存配置失败: {ErrorMessage}", ex.Message);
+            _logService.Debug("ConfigService", "保存配置失败: {ErrorMessage}", ex.Message);
         }
     }
 

@@ -4,9 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
 
 namespace AkashaNavigator.Views.Pages
@@ -16,11 +18,23 @@ namespace AkashaNavigator.Views.Pages
 /// </summary>
 public partial class ProfileMarketPage : UserControl
 {
+    private readonly ProfileMarketplaceService _profileMarketplaceService;
+    private readonly PluginLibrary _pluginLibrary;
+    private readonly INotificationService _notificationService;
     private bool _isLoading = false;
     private List<MarketplaceProfileViewModel> _allProfiles = new();
 
-    public ProfileMarketPage()
+    /// <summary>
+    /// DI容器注入的构造函数
+    /// </summary>
+    public ProfileMarketPage(
+        ProfileMarketplaceService profileMarketplaceService,
+        PluginLibrary pluginLibrary,
+        INotificationService notificationService)
     {
+        _profileMarketplaceService = profileMarketplaceService;
+        _pluginLibrary = pluginLibrary;
+        _notificationService = notificationService;
         InitializeComponent();
         Loaded += ProfileMarketPage_Loaded;
     }
@@ -54,7 +68,7 @@ public partial class ProfileMarketPage : UserControl
         try
         {
             // 获取 Profile 列表（包含内置 Profile 和订阅源 Profile）
-            var profiles = await ProfileMarketplaceService.Instance.FetchAvailableProfilesAsync();
+            var profiles = await _profileMarketplaceService.FetchAvailableProfilesAsync();
 
             // 如果没有任何 Profile（内置和订阅源都没有）
             if (profiles.Count == 0)
@@ -66,7 +80,7 @@ public partial class ProfileMarketPage : UserControl
             }
 
             // 转换为视图模型
-            _allProfiles = profiles.Select(p => new MarketplaceProfileViewModel(p)).ToList();
+            _allProfiles = profiles.Select(p => new MarketplaceProfileViewModel(p, _profileMarketplaceService)).ToList();
 
             // 应用过滤
             FilterProfiles();
@@ -131,7 +145,8 @@ public partial class ProfileMarketPage : UserControl
     /// </summary>
     private void BtnManageSources_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SubscriptionSourceDialog();
+        var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+        var dialog = dialogFactory.CreateSubscriptionSourceDialog();
         dialog.Owner = Window.GetWindow(this);
         if (dialog.ShowDialog() == true)
         {
@@ -147,7 +162,7 @@ public partial class ProfileMarketPage : UserControl
     {
         if (sender is Button btn && btn.Tag is MarketplaceProfileViewModel vm)
         {
-            var dialog = new MarketplaceProfileDetailDialog(vm.Profile);
+            var dialog = new MarketplaceProfileDetailDialog(_pluginLibrary, vm.Profile);
             dialog.Owner = Window.GetWindow(this);
             if (dialog.ShowDialog() == true && dialog.ShouldInstall)
             {
@@ -187,7 +202,7 @@ public partial class ProfileMarketPage : UserControl
         var profileName = vm.Name;
 
         // 获取唯一插件列表
-        var uniquePluginIds = ProfileMarketplaceService.Instance.GetUniquePlugins(profileId);
+        var uniquePluginIds = _profileMarketplaceService.GetUniquePlugins(profileId);
 
         List<string>? pluginsToUninstall = null;
 
@@ -197,7 +212,7 @@ public partial class ProfileMarketPage : UserControl
             var pluginItems = uniquePluginIds
                                   .Select(pluginId =>
                                           {
-                                              var pluginInfo = PluginLibrary.Instance.GetInstalledPluginInfo(pluginId);
+                                              var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
                                               return new PluginUninstallItem {
                                                   PluginId = pluginId, Name = pluginInfo?.Name ?? pluginId,
                                                   Description = pluginInfo?.Description ?? string.Empty,
@@ -220,7 +235,7 @@ public partial class ProfileMarketPage : UserControl
         else
         {
             // 没有唯一插件，使用 NotificationService 显示确认对话框
-            var confirmed = await NotificationService.Instance.ConfirmAsync(
+            var confirmed = await _notificationService.ConfirmAsync(
                 $"确定要卸载 Profile \"{profileName}\" 吗？\n\n此操作将删除该 Profile 的配置文件。", "确认卸载");
 
             if (!confirmed)
@@ -242,12 +257,12 @@ public partial class ProfileMarketPage : UserControl
         var profileName = vm.Name;
 
         // 调用服务执行卸载
-        var result = ProfileMarketplaceService.Instance.UninstallProfile(profileId, pluginsToUninstall);
+        var result = _profileMarketplaceService.UninstallProfile(profileId, pluginsToUninstall);
 
         if (result.IsSuccess)
         {
             // 强制刷新 ViewModel 的 IsInstalled 属性（从服务重新检查状态）
-            vm.IsInstalled = ProfileMarketplaceService.Instance.ProfileExists(profileId);
+            vm.IsInstalled = _profileMarketplaceService.ProfileExists(profileId);
 
             // 刷新列表以更新 UI 状态
             FilterProfiles();
@@ -270,11 +285,11 @@ public partial class ProfileMarketPage : UserControl
                 }
             }
 
-            NotificationService.Instance.Success(message, "卸载成功");
+            _notificationService.Success(message, "卸载成功");
         }
         else
         {
-            NotificationService.Instance.Error($"卸载失败: {result.ErrorMessage}", "卸载失败");
+            _notificationService.Error($"卸载失败: {result.ErrorMessage}", "卸载失败");
         }
 
         await Task.CompletedTask;
@@ -286,13 +301,13 @@ public partial class ProfileMarketPage : UserControl
     private async Task InstallProfileAsync(MarketplaceProfile profile)
     {
         // 检测缺失插件
-        var missingPlugins = ProfileMarketplaceService.Instance.GetMissingPlugins(profile);
+        var missingPlugins = _profileMarketplaceService.GetMissingPlugins(profile);
 
         // 检查是否已存在
         bool overwrite = false;
-        if (ProfileMarketplaceService.Instance.ProfileExists(profile.Id))
+        if (_profileMarketplaceService.ProfileExists(profile.Id))
         {
-            var confirmed = await NotificationService.Instance.ConfirmAsync(
+            var confirmed = await _notificationService.ConfirmAsync(
                 $"Profile \"{profile.Name}\" 已存在。\n\n是否覆盖现有 Profile？", "Profile 已存在");
 
             if (!confirmed)
@@ -312,13 +327,13 @@ public partial class ProfileMarketPage : UserControl
             }
             message += "\n\n安装后可以在「我的 Profile」页面一键安装缺失插件。\n\n是否继续？";
 
-            var confirmed = await NotificationService.Instance.ConfirmAsync(message, "确认安装");
+            var confirmed = await _notificationService.ConfirmAsync(message, "确认安装");
             if (!confirmed)
                 return;
         }
 
         // 执行安装
-        var installResult = await ProfileMarketplaceService.Instance.InstallProfileAsync(profile, overwrite);
+        var installResult = await _profileMarketplaceService.InstallProfileAsync(profile, overwrite);
 
         if (installResult.IsSuccess)
         {
@@ -326,7 +341,7 @@ public partial class ProfileMarketPage : UserControl
             var vm = _allProfiles.FirstOrDefault(p => p.Id == profile.Id);
             if (vm != null)
             {
-                vm.IsInstalled = ProfileMarketplaceService.Instance.ProfileExists(profile.Id);
+                vm.IsInstalled = _profileMarketplaceService.ProfileExists(profile.Id);
             }
 
             // 刷新列表显示
@@ -339,11 +354,11 @@ public partial class ProfileMarketPage : UserControl
                     $"\n\n有 {installResult.MissingPlugins.Count} 个插件缺失，可以在「我的 Profile」页面点击「一键安装缺失插件」进行安装。";
             }
 
-            NotificationService.Instance.Success(successMessage, "安装成功");
+            _notificationService.Success(successMessage, "安装成功");
         }
         else
         {
-            NotificationService.Instance.Error($"安装失败: {installResult.ErrorMessage}", "安装失败");
+            _notificationService.Error($"安装失败: {installResult.ErrorMessage}", "安装失败");
         }
     }
 }
@@ -353,16 +368,22 @@ public partial class ProfileMarketPage : UserControl
 /// </summary>
 public class MarketplaceProfileViewModel : System.ComponentModel.INotifyPropertyChanged
 {
+    private readonly ProfileMarketplaceService _profileMarketplaceService;
+
     public MarketplaceProfile Profile { get; }
     private bool _isInstalled;
 
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
-    public MarketplaceProfileViewModel(MarketplaceProfile profile)
+    /// <summary>
+    /// DI容器注入的构造函数
+    /// </summary>
+    public MarketplaceProfileViewModel(MarketplaceProfile profile, ProfileMarketplaceService profileMarketplaceService)
     {
         Profile = profile;
+        _profileMarketplaceService = profileMarketplaceService;
         // 初始化时检查安装状态
-        _isInstalled = ProfileMarketplaceService.Instance.ProfileExists(profile.Id);
+        _isInstalled = _profileMarketplaceService.ProfileExists(profile.Id);
     }
 
     public string Id => Profile.Id;

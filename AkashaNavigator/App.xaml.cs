@@ -1,11 +1,14 @@
 using System;
 using System.IO;
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Plugins.Core;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Views.Dialogs;
+using AkashaNavigator.Core;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -19,6 +22,7 @@ public partial class App : System.Windows.Application
 {
 #region Fields
 
+    private Bootstrapper? _bootstrapper;
     private PlayerWindow? _playerWindow;
     private ControlBarWindow? _controlBarWindow;
     private HotkeyService? _hotkeyService;
@@ -29,6 +33,22 @@ public partial class App : System.Windows.Application
     /// 日志级别开关，用于运行时动态切换日志级别
     /// </summary>
     private static readonly LoggingLevelSwitch _logLevelSwitch = new(LogEventLevel.Information);
+
+    // ✅ 新增：注入的服务字段
+    private IConfigService? _configService;
+    private INotificationService? _notificationService;
+    private DataMigration? _dataMigration;
+    private IPluginHost? _pluginHost;
+    private PluginLibrary? _pluginLibrary;
+
+#endregion
+
+#region Properties
+
+    /// <summary>
+    /// 全局服务提供者，用于在需要时获取DI容器中的服务
+    /// </summary>
+    public static IServiceProvider Services { get; private set; } = null!;
 
 #endregion
 
@@ -42,15 +62,28 @@ public partial class App : System.Windows.Application
         // 配置 Serilog 日志系统
         ConfigureSerilog();
 
-        // 执行数据迁移（如果需要）
+        // 步骤1：使用 Bootstrapper 初始化 DI 容器和服务（必须在数据迁移之前）
+        _bootstrapper = new Bootstrapper();
+        var serviceProvider = _bootstrapper.GetServiceProvider();
+
+        // ✅ 保存ServiceProvider供全局访问
+        Services = serviceProvider;
+
+        // 步骤2：显式请求 LogService 以触发其初始化（必须在 ExecuteDataMigration 之前）
+        var logService = serviceProvider.GetRequiredService<ILogService>();
+
+        // 步骤3：执行数据迁移（现在 LogService.Instance 已经可用了）
         ExecuteDataMigration();
 
-        // 初始化服务（单例）
-        _ = ProfileManager.Instance;
-        _ = DataService.Instance;
+        // 从 DI 容器获取配置服务
+        _configService = serviceProvider.GetRequiredService<IConfigService>();
+        _config = _configService.Config;
 
-        // 加载配置
-        _config = ConfigService.Instance.Config;
+        // ✅ 注入其他需要的服务
+        _notificationService = serviceProvider.GetRequiredService<INotificationService>();
+        _dataMigration = serviceProvider.GetRequiredService<DataMigration>();
+        _pluginHost = serviceProvider.GetRequiredService<IPluginHost>();
+        _pluginLibrary = serviceProvider.GetRequiredService<PluginLibrary>();
 
         // 根据配置更新日志级别
         UpdateLogLevel();
@@ -63,205 +96,27 @@ public partial class App : System.Windows.Application
 
             // 标记为非首次启动并保存
             _config.IsFirstLaunch = false;
-            ConfigService.Instance.Save();
+            _configService.Save();
         }
 
         // 订阅配置变更事件
-        ConfigService.Instance.ConfigChanged += (s, config) =>
+        _configService.ConfigChanged += (s, config) =>
         {
             _config = config;
             ApplySettings();
         };
 
-        // 创建主窗口（播放器）
-        _playerWindow = new PlayerWindow();
+        // 使用 Bootstrapper 创建窗口并启动应用（包括窗口绑定和插件加载）
+        _bootstrapper.Run();
 
-        // 设置 PluginApi 的全局窗口获取器（在创建 PlayerWindow 后立即设置）
-        PluginApi.SetGlobalWindowGetter(() => _playerWindow);
-
-        // 加载当前 Profile 的插件
-        var currentProfileId = ProfileManager.Instance.CurrentProfile.Id;
-        PluginHost.Instance.LoadPluginsForProfile(currentProfileId);
-
-        // 创建控制栏窗口
-        _controlBarWindow = new ControlBarWindow();
-
-        // 设置窗口间事件关联
-        SetupWindowBindings();
-
-        // 显示窗口
-        _playerWindow.Show();
-
-        // 控制栏窗口启动自动显示/隐藏监听（默认隐藏，鼠标移到顶部触发显示）
-        _controlBarWindow.StartAutoShowHide();
+        // 获取窗口引用（用于快捷键服务和插件更新检查）
+        _playerWindow = serviceProvider.GetRequiredService<PlayerWindow>();
 
         // 启动全局快捷键服务
         StartHotkeyService();
-    }
 
-    /// <summary>
-    /// 设置两窗口之间的事件绑定
-    /// </summary>
-    private void SetupWindowBindings()
-    {
-        if (_playerWindow == null || _controlBarWindow == null)
-            return;
-
-        SetupNavigationBindings();
-        SetupPlayerBindings();
-        SetupMenuBindings();
-        SetupBookmarkBindings();
+        // 设置插件更新检查
         SetupPluginUpdateCheck();
-    }
-
-    /// <summary>
-    /// 设置导航相关事件绑定
-    /// 包含导航请求、后退、前进、刷新事件
-    /// </summary>
-    private void SetupNavigationBindings()
-    {
-        if (_playerWindow == null || _controlBarWindow == null)
-            return;
-
-        // 控制栏导航请求 → 播放器窗口加载
-        _controlBarWindow.NavigateRequested += (s, url) =>
-        { _playerWindow.Navigate(url); };
-
-        // 控制栏后退请求
-        _controlBarWindow.BackRequested += (s, e) =>
-        { _playerWindow.GoBack(); };
-
-        // 控制栏前进请求
-        _controlBarWindow.ForwardRequested += (s, e) =>
-        { _playerWindow.GoForward(); };
-
-        // 控制栏刷新请求
-        _controlBarWindow.RefreshRequested += (s, e) =>
-        { _playerWindow.Refresh(); };
-    }
-
-    /// <summary>
-    /// 设置播放器窗口相关事件绑定
-    /// 包含窗口关闭、URL 变化、导航状态变化事件
-    /// </summary>
-    private void SetupPlayerBindings()
-    {
-        if (_playerWindow == null || _controlBarWindow == null)
-            return;
-
-        // 播放器窗口关闭时，关闭控制栏并退出应用
-        _playerWindow.Closed += (s, e) =>
-        {
-            _controlBarWindow.Close();
-            Shutdown();
-        };
-
-        // 播放器 URL 变化时，同步到控制栏
-        _playerWindow.UrlChanged += (s, url) =>
-        { _controlBarWindow.CurrentUrl = url; };
-
-        // 播放器导航状态变化时，更新控制栏按钮
-        _playerWindow.NavigationStateChanged += (s, e) =>
-        {
-            _controlBarWindow.UpdateBackButtonState(_playerWindow.CanGoBack);
-            _controlBarWindow.UpdateForwardButtonState(_playerWindow.CanGoForward);
-        };
-
-        // 播放器 URL 变化时，检查收藏状态
-        _playerWindow.UrlChanged += (s, url) =>
-        {
-            var isBookmarked = DataService.Instance.IsBookmarked(url);
-            _controlBarWindow.UpdateBookmarkState(isBookmarked);
-        };
-    }
-
-    /// <summary>
-    /// 设置菜单相关事件绑定
-    /// 包含历史记录、收藏夹、插件中心、设置、归档菜单事件
-    /// </summary>
-    private void SetupMenuBindings()
-    {
-        if (_playerWindow == null || _controlBarWindow == null)
-            return;
-
-        // 历史记录菜单事件
-        _controlBarWindow.HistoryRequested += (s, e) =>
-        {
-            var historyWindow = new HistoryWindow();
-            historyWindow.HistoryItemSelected += (sender, url) =>
-            { _playerWindow.Navigate(url); };
-            historyWindow.ShowDialog();
-        };
-
-        // 收藏夹菜单事件
-        _controlBarWindow.BookmarksRequested += (s, e) =>
-        {
-            var bookmarkPopup = new BookmarkPopup();
-            bookmarkPopup.BookmarkItemSelected += (sender, url) =>
-            { _playerWindow.Navigate(url); };
-            bookmarkPopup.ShowDialog();
-        };
-
-        // 插件中心菜单事件
-        _controlBarWindow.PluginCenterRequested += (s, e) =>
-        {
-            var pluginCenterWindow = new PluginCenterWindow();
-            // 设置 Owner 为 PlayerWindow，确保插件中心显示在 PlayerWindow 之上
-            pluginCenterWindow.Owner = _playerWindow;
-            pluginCenterWindow.ShowDialog();
-        };
-
-        // 设置菜单事件
-        _controlBarWindow.SettingsRequested += (s, e) =>
-        {
-            var settingsWindow = new SettingsWindow();
-            // 设置 Owner 为 PlayerWindow，确保设置窗口显示在 PlayerWindow 之上
-            settingsWindow.Owner = _playerWindow;
-            settingsWindow.ShowDialog();
-        };
-
-        // 记录笔记按钮点击事件
-        _controlBarWindow.RecordNoteRequested += (s, e) =>
-        {
-            var url = _controlBarWindow.CurrentUrl;
-            var title = _playerWindow.CurrentTitle;
-            var recordDialog = new RecordNoteDialog(url, title);
-            recordDialog.Owner = _playerWindow;
-            recordDialog.ShowDialog();
-            if (recordDialog.Result)
-            {
-                ShowOsd("已记录", "💾");
-            }
-        };
-
-        // 开荒笔记菜单事件
-        _controlBarWindow.PioneerNotesRequested += (s, e) =>
-        {
-            var noteWindow = new PioneerNoteWindow();
-            noteWindow.NoteItemSelected += (sender, url) =>
-            { _playerWindow.Navigate(url); };
-            noteWindow.Owner = _playerWindow;
-            noteWindow.ShowDialog();
-        };
-    }
-
-    /// <summary>
-    /// 设置收藏按钮相关事件绑定
-    /// </summary>
-    private void SetupBookmarkBindings()
-    {
-        if (_playerWindow == null || _controlBarWindow == null)
-            return;
-
-        // 收藏按钮点击事件
-        _controlBarWindow.BookmarkRequested += (s, e) =>
-        {
-            var url = _controlBarWindow.CurrentUrl;
-            var title = _playerWindow.CurrentTitle;
-            var isBookmarked = DataService.Instance.ToggleBookmark(url, title);
-            _controlBarWindow.UpdateBookmarkState(isBookmarked);
-            ShowOsd(isBookmarked ? "已添加收藏" : "已取消收藏", "⭐");
-        };
     }
 
     /// <summary>
@@ -434,11 +289,15 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            var updates = PluginLibrary.Instance.CheckAllUpdates();
+            if (_pluginLibrary == null || _notificationService == null)
+                return;
+
+            var updates = _pluginLibrary.CheckAllUpdates();
             if (updates.Count == 0)
                 return;
 
-            var dialog = new PluginUpdatePromptDialog(updates);
+            var dialogFactory = Services.GetRequiredService<IDialogFactory>();
+            var dialog = dialogFactory.CreatePluginUpdatePromptDialog(updates);
             var result = dialog.ShowDialog();
 
             if (result == true)
@@ -467,7 +326,7 @@ public partial class App : System.Windows.Application
                     var failCount = 0;
                     foreach (var update in updates)
                     {
-                        var updateResult = PluginLibrary.Instance.UpdatePlugin(update.PluginId);
+                        var updateResult = _pluginLibrary.UpdatePlugin(update.PluginId);
                         if (updateResult.IsSuccess)
                             successCount++;
                         else
@@ -477,11 +336,11 @@ public partial class App : System.Windows.Application
                     // 显示更新结果
                     if (failCount == 0)
                     {
-                        NotificationService.Instance.Success($"成功更新 {successCount} 个插件！", "更新完成");
+                        _notificationService.Success($"成功更新 {successCount} 个插件！", "更新完成");
                     }
                     else
                     {
-                        NotificationService.Instance.Warning($"更新完成：{successCount} 个成功，{failCount} 个失败。",
+                        _notificationService.Warning($"更新完成：{successCount} 个成功，{failCount} 个失败。",
                                                              "更新完成");
                     }
                     break;
@@ -490,7 +349,8 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("App", ex, "检查插件更新时发生异常");
+            var logService = _bootstrapper?.GetServiceProvider().GetRequiredService<ILogService>();
+            logService?.Error("App", ex, "检查插件更新时发生异常");
         }
     }
 
@@ -501,35 +361,40 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            if (!DataMigration.Instance.NeedsMigration())
+            var logService = _bootstrapper?.GetServiceProvider().GetRequiredService<ILogService>();
+
+            if (_dataMigration == null || logService == null)
+                return;
+
+            if (!_dataMigration.NeedsMigration())
             {
                 return;
             }
 
-            LogService.Instance.Info("App", "检测到需要数据迁移，开始执行...");
+            logService.Info("App", "检测到需要数据迁移，开始执行...");
 
-            var result = DataMigration.Instance.Migrate();
+            var result = _dataMigration.Migrate();
 
             switch (result.Status)
             {
             case MigrationResultStatus.Success:
-                LogService.Instance.Info(
+                logService.Info(
                     "App", "数据迁移成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
                     result.MigratedPluginCount, result.MigratedProfileCount);
                 break;
 
             case MigrationResultStatus.PartialSuccess:
-                LogService.Instance.Warn(
+                logService.Warn(
                     "App", "数据迁移部分成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
                     result.MigratedPluginCount, result.MigratedProfileCount);
                 foreach (var warning in result.Warnings)
                 {
-                    LogService.Instance.Warn("App", "迁移警告: {Warning}", warning);
+                    logService.Warn("App", "迁移警告: {Warning}", warning);
                 }
                 break;
 
             case MigrationResultStatus.Failed:
-                LogService.Instance.Error("App", "数据迁移失败: {ErrorMessage}", result.ErrorMessage);
+                logService.Error("App", "数据迁移失败: {ErrorMessage}", result.ErrorMessage);
                 MessageBox.Show($"数据迁移失败：{result.ErrorMessage}\n\n应用将继续运行，但部分插件可能无法正常工作。",
                                 "迁移警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                 break;
@@ -541,7 +406,8 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("App", ex, "数据迁移过程中发生异常");
+            var logService = _bootstrapper?.GetServiceProvider().GetRequiredService<ILogService>();
+            logService?.Error("App", ex, "数据迁移过程中发生异常");
             // 不阻止应用启动，只记录错误
         }
     }
@@ -558,7 +424,7 @@ public partial class App : System.Windows.Application
         _controlBarWindow?.StopAutoShowHide();
 
         // 卸载所有插件
-        PluginHost.Instance.UnloadAllPlugins();
+        _pluginHost?.UnloadAllPlugins();
 
         // 关闭并刷新 Serilog 日志
         Log.CloseAndFlush();

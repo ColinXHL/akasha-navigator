@@ -1,7 +1,10 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Views.Pages;
 
 namespace AkashaNavigator.Views.Windows
 {
@@ -10,9 +13,49 @@ namespace AkashaNavigator.Views.Windows
 /// </summary>
 public partial class PluginCenterWindow : AnimatedWindow
 {
+    private MyProfilesPage? _myProfilesPage;
+    private ProfileMarketPage? _profileMarketPage;
+    private InstalledPluginsPage? _installedPluginsPage;
+    private AvailablePluginsPage? _availablePluginsPage;
+
     public PluginCenterWindow()
     {
         InitializeComponent();
+
+        // 通过 DI 创建 Pages 并添加到 ContentArea
+        LoadPages();
+    }
+
+    /// <summary>
+    /// 加载所有 Pages
+    /// </summary>
+    private void LoadPages()
+    {
+        var serviceProvider = App.Services;
+
+        _myProfilesPage = serviceProvider.GetRequiredService<MyProfilesPage>();
+        _profileMarketPage = serviceProvider.GetRequiredService<ProfileMarketPage>();
+        _installedPluginsPage = serviceProvider.GetRequiredService<InstalledPluginsPage>();
+        _availablePluginsPage = serviceProvider.GetRequiredService<AvailablePluginsPage>();
+
+        ContentArea.Children.Add(_myProfilesPage);
+        ContentArea.Children.Add(_profileMarketPage);
+        ContentArea.Children.Add(_installedPluginsPage);
+        ContentArea.Children.Add(_availablePluginsPage);
+
+        // 默认显示我的 Profile 页面
+        ShowMyProfiles();
+    }
+
+    /// <summary>
+    /// 显示我的 Profile 页面
+    /// </summary>
+    private void ShowMyProfiles()
+    {
+        _myProfilesPage!.Visibility = Visibility.Visible;
+        _profileMarketPage!.Visibility = Visibility.Collapsed;
+        _installedPluginsPage!.Visibility = Visibility.Collapsed;
+        _availablePluginsPage!.Visibility = Visibility.Collapsed;
     }
 
     /// <summary>
@@ -48,35 +91,35 @@ public partial class PluginCenterWindow : AnimatedWindow
             return;
 
         // 防止在 InitializeComponent 期间触发（控件尚未初始化）
-        if (InstalledPluginsPage == null)
+        if (_installedPluginsPage == null)
             return;
 
         // 隐藏所有页面
-        InstalledPluginsPage.Visibility = Visibility.Collapsed;
-        AvailablePluginsPage.Visibility = Visibility.Collapsed;
-        MyProfilesPage.Visibility = Visibility.Collapsed;
-        ProfileMarketPage.Visibility = Visibility.Collapsed;
+        _installedPluginsPage.Visibility = Visibility.Collapsed;
+        _availablePluginsPage.Visibility = Visibility.Collapsed;
+        _myProfilesPage.Visibility = Visibility.Collapsed;
+        _profileMarketPage.Visibility = Visibility.Collapsed;
 
         // 根据选中的导航按钮显示对应页面
         if (radioButton == NavInstalledPlugins)
         {
-            InstalledPluginsPage.Visibility = Visibility.Visible;
-            InstalledPluginsPage.CheckAndRefreshPluginList();
+            _installedPluginsPage.Visibility = Visibility.Visible;
+            _installedPluginsPage.CheckAndRefreshPluginList();
         }
         else if (radioButton == NavAvailablePlugins)
         {
-            AvailablePluginsPage.Visibility = Visibility.Visible;
-            AvailablePluginsPage.RefreshPluginList();
+            _availablePluginsPage.Visibility = Visibility.Visible;
+            _availablePluginsPage.RefreshPluginList();
         }
         else if (radioButton == NavMyProfiles)
         {
-            MyProfilesPage.Visibility = Visibility.Visible;
-            MyProfilesPage.RefreshProfileList();
+            _myProfilesPage.Visibility = Visibility.Visible;
+            _myProfilesPage.RefreshProfileList();
         }
         else if (radioButton == NavProfileMarket)
         {
-            ProfileMarketPage.Visibility = Visibility.Visible;
-            _ = ProfileMarketPage.LoadProfilesAsync();
+            _profileMarketPage.Visibility = Visibility.Visible;
+            _ = _profileMarketPage.LoadProfilesAsync();
         }
     }
 
@@ -87,11 +130,11 @@ public partial class PluginCenterWindow : AnimatedWindow
     {
         if (NavInstalledPlugins.IsChecked == true)
         {
-            InstalledPluginsPage.CheckAndRefreshPluginList();
+            _installedPluginsPage?.CheckAndRefreshPluginList();
         }
         else if (NavAvailablePlugins.IsChecked == true)
         {
-            AvailablePluginsPage.RefreshPluginList();
+            _availablePluginsPage?.RefreshPluginList();
         }
     }
 

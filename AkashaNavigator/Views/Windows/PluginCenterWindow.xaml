@@ -73,17 +73,7 @@
                 <!-- 右侧内容区 -->
                 <Border Grid.Column="1" Background="#1E1E1E" CornerRadius="0,0,8,0">
                     <Grid x:Name="ContentArea" Margin="24">
-                        <!-- 我的 Profile 页面 -->
-                        <pages:MyProfilesPage x:Name="MyProfilesPage" Visibility="Visible"/>
-                        
-                        <!-- Profile 市场页面 -->
-                        <pages:ProfileMarketPage x:Name="ProfileMarketPage" Visibility="Collapsed"/>
-                        
-                        <!-- 已安装插件页面 -->
-                        <pages:InstalledPluginsPage x:Name="InstalledPluginsPage" Visibility="Collapsed"/>
-                        
-                        <!-- 可用插件页面 -->
-                        <pages:AvailablePluginsPage x:Name="AvailablePluginsPage" Visibility="Collapsed"/>
+                        <!-- Pages 将在代码后台中通过 DI 动态添加 -->
                     </Grid>
                 </Border>
             </Grid>

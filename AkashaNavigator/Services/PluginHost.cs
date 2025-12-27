@@ -23,21 +23,21 @@ public class PluginHost : IPluginHost, IDisposable
     private static readonly object _lock = new();
 
     /// <summary>
-    /// 获取单例实例
+    /// 向后兼容的单例属性（临时，用于步骤4过渡）
     /// </summary>
     public static PluginHost Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new PluginHost();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("PluginHost not initialized. Use DI container.");
+        internal set => _instance = value;
     }
+
+#endregion
+
+#region Fields
+
+    private readonly ILogService _logService;
+    private readonly IPluginAssociationManager _pluginAssociationManager;
+    private readonly IPluginLibrary _pluginLibrary;
 
 #endregion
 
@@ -81,20 +81,29 @@ public class PluginHost : IPluginHost, IDisposable
 
 #region Constructor
 
-    private PluginHost()
+    /// <summary>
+    /// 私有构造函数（单例模式 + DI）
+    /// </summary>
+    public PluginHost(ILogService logService, IPluginAssociationManager pluginAssociationManager, IPluginLibrary pluginLibrary)
     {
+        _logService = logService;
+        _pluginAssociationManager = pluginAssociationManager;
+        _pluginLibrary = pluginLibrary;
+
         // 订阅插件启用状态变化事件
-        PluginAssociationManager.Instance.PluginEnabledChanged += OnPluginEnabledChanged;
+        _pluginAssociationManager.PluginEnabledChanged += OnPluginEnabledChanged;
 
         // 订阅插件库变化事件（用于插件更新后自动重新加载）
-        PluginLibrary.Instance.PluginChanged += OnPluginLibraryChanged;
+        _pluginLibrary.PluginChanged += OnPluginLibraryChanged;
     }
 
     /// <summary>
     /// 用于测试的内部构造函数
     /// </summary>
-    internal PluginHost(bool forTesting)
+    internal PluginHost(bool forTesting, ILogService logService, IPluginAssociationManager pluginAssociationManager)
     {
+        _logService = logService;
+        _pluginAssociationManager = pluginAssociationManager;
         // 测试用构造函数，不订阅事件
     }
 
@@ -121,7 +130,7 @@ public class PluginHost : IPluginHost, IDisposable
         _currentProfileId = profileId;
 
         // 1. 从 PluginAssociationManager 获取 Profile 的插件引用
-        var pluginReferences = PluginAssociationManager.Instance.GetPluginsInProfile(profileId);
+        var pluginReferences = _pluginAssociationManager.GetPluginsInProfile(profileId);
         if (pluginReferences.Count == 0)
         {
             Log("Profile '{ProfileId}' 没有关联任何插件", profileId);
@@ -139,14 +148,14 @@ public class PluginHost : IPluginHost, IDisposable
             }
 
             // 3. 检查插件是否已安装（从 PluginLibrary）
-            if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+            if (!_pluginLibrary.IsInstalled(reference.PluginId))
             {
                 Log("插件 {PluginId} 未安装，跳过加载", reference.PluginId);
                 continue;
             }
 
             // 4. 从 PluginLibrary 获取插件目录
-            var pluginDir = PluginLibrary.Instance.GetPluginDirectory(reference.PluginId);
+            var pluginDir = _pluginLibrary.GetPluginDirectory(reference.PluginId);
 
             // 5. 获取 Profile 特定的配置目录
             var configDir = GetPluginConfigDirectory(profileId, reference.PluginId);
@@ -321,14 +330,14 @@ public class PluginHost : IPluginHost, IDisposable
         }
 
         // 检查插件是否已安装
-        if (!PluginLibrary.Instance.IsInstalled(pluginId))
+        if (!_pluginLibrary.IsInstalled(pluginId))
         {
             Log("插件 {PluginId} 未安装，无法启用", pluginId);
             return;
         }
 
         // 从 PluginLibrary 获取插件目录
-        var pluginDir = PluginLibrary.Instance.GetPluginDirectory(pluginId);
+        var pluginDir = _pluginLibrary.GetPluginDirectory(pluginId);
 
         // 获取 Profile 特定的配置目录
         var configDir = GetPluginConfigDirectory(profileId, pluginId);
@@ -380,14 +389,14 @@ public class PluginHost : IPluginHost, IDisposable
         _pluginApis.Remove(pluginId);
 
         // 2. 检查插件是否仍然安装
-        if (!PluginLibrary.Instance.IsInstalled(pluginId))
+        if (!_pluginLibrary.IsInstalled(pluginId))
         {
             Log("插件 {PluginId} 已不存在于插件库中，无法重新加载", pluginId);
             return;
         }
 
         // 3. 从 PluginLibrary 获取新的插件目录
-        var pluginDir = PluginLibrary.Instance.GetPluginDirectory(pluginId);
+        var pluginDir = _pluginLibrary.GetPluginDirectory(pluginId);
 
         // 4. 使用原有的配置目录重新加载插件（保留配置）
         if (string.IsNullOrWhiteSpace(configDir))
@@ -644,7 +653,7 @@ public class PluginHost : IPluginHost, IDisposable
     /// <returns>配置目录路径</returns>
     public string GetPluginConfigDirectory(string profileId, string pluginId)
     {
-        return Path.Combine(AppPaths.ProfilesDirectory, profileId, AppConstants.PluginsDirectoryName, pluginId);
+        return AppPaths.GetPluginConfigDirectory(profileId, pluginId);
     }
 
     /// <summary>
@@ -661,7 +670,7 @@ public class PluginHost : IPluginHost, IDisposable
     /// </summary>
     private void Log(string messageTemplate, params object?[] args)
     {
-        LogService.Instance.Info("PluginHost", messageTemplate, args);
+        _logService.Info("PluginHost", messageTemplate, args);
     }
 
     /// <summary>
@@ -722,8 +731,8 @@ public class PluginHost : IPluginHost, IDisposable
         if (disposing)
         {
             // 取消订阅事件
-            PluginAssociationManager.Instance.PluginEnabledChanged -= OnPluginEnabledChanged;
-            PluginLibrary.Instance.PluginChanged -= OnPluginLibraryChanged;
+            _pluginAssociationManager.PluginEnabledChanged -= OnPluginEnabledChanged;
+            _pluginLibrary.PluginChanged -= OnPluginLibraryChanged;
 
             UnloadAllPlugins();
         }

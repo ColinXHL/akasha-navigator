@@ -9,6 +9,7 @@ using System.Windows.Media;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.PioneerNote;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Windows;
 
 namespace AkashaNavigator.Views.Dialogs
@@ -35,8 +36,10 @@ public partial class RecordNoteDialog : AnimatedWindow
 
 #region Fields
 
+    private readonly IPioneerNoteService _pioneerNoteService;
     private readonly string _url;
     private readonly string _defaultTitle;
+    private readonly Func<PioneerNoteWindow> _pioneerNoteWindowFactory;
     private string? _selectedFolderId;
     private ObservableCollection<FolderTreeItem> _folderTreeItems = new();
 
@@ -47,14 +50,18 @@ public partial class RecordNoteDialog : AnimatedWindow
     /// <summary>
     /// 创建记录笔记对话框
     /// </summary>
-    /// <param name="url">要记录的 URL</param>
-    /// <param name="title">默认标题（通常是页面标题）</param>
-    public RecordNoteDialog(string url, string title)
+    public RecordNoteDialog(
+        IPioneerNoteService pioneerNoteService,
+        string url,
+        string title,
+        Func<PioneerNoteWindow>? pioneerNoteWindowFactory = null)
     {
-        InitializeComponent();
-
+        _pioneerNoteService = pioneerNoteService;
         _url = url ?? string.Empty;
         _defaultTitle = title ?? string.Empty;
+        _pioneerNoteWindowFactory = pioneerNoteWindowFactory ?? (new Func<PioneerNoteWindow>(() => new PioneerNoteWindow(pioneerNoteService)));
+
+        InitializeComponent();
 
         // 初始化 UI
         TxtTitle.Text = _defaultTitle;
@@ -84,7 +91,7 @@ public partial class RecordNoteDialog : AnimatedWindow
                                             Children = new ObservableCollection<FolderTreeItem>() };
 
         // 获取所有顶级目录
-        var folders = PioneerNoteService.Instance.GetFoldersByParent(null);
+        var folders = _pioneerNoteService.GetFoldersByParent(null);
 
         // 递归构建目录树，作为根目录的子项
         foreach (var folder in folders)
@@ -112,7 +119,7 @@ public partial class RecordNoteDialog : AnimatedWindow
                                         Children = new ObservableCollection<FolderTreeItem>() };
 
         // 获取子目录
-        var childFolders = PioneerNoteService.Instance.GetFoldersByParent(folder.Id);
+        var childFolders = _pioneerNoteService.GetFoldersByParent(folder.Id);
         foreach (var childFolder in childFolders)
         {
             var childItem = BuildFolderTreeItem(childFolder);
@@ -360,7 +367,7 @@ public partial class RecordNoteDialog : AnimatedWindow
             {
                 try
                 {
-                    PioneerNoteService.Instance.UpdateFolder(selectedItem.Id!, editDialog.InputText);
+                    _pioneerNoteService.UpdateFolder(selectedItem.Id!, editDialog.InputText);
                     RefreshFolderTree();
                 }
                 catch (Exception ex)
@@ -395,7 +402,7 @@ public partial class RecordNoteDialog : AnimatedWindow
             {
                 try
                 {
-                    PioneerNoteService.Instance.DeleteFolder(selectedItem.Id!, cascade: true);
+                    _pioneerNoteService.DeleteFolder(selectedItem.Id!, cascade: true);
                     RefreshFolderTree();
                     _selectedFolderId = null; // 重置选中
                 }
@@ -461,7 +468,7 @@ public partial class RecordNoteDialog : AnimatedWindow
             // 创建笔记，使用输入框中的 URL
             var title = TxtTitle.Text.Trim();
             var url = TxtUrl.Text.Trim();
-            CreatedNote = PioneerNoteService.Instance.RecordNote(url, title, _selectedFolderId);
+            CreatedNote = _pioneerNoteService.RecordNote(url, title, _selectedFolderId);
             Result = true;
             CloseWithAnimation();
         }
@@ -494,8 +501,8 @@ public partial class RecordNoteDialog : AnimatedWindow
     /// </summary>
     private void BtnPioneerNotes_Click(object sender, RoutedEventArgs e)
     {
-        // 打开开荒笔记窗口
-        var noteWindow = new PioneerNoteWindow();
+        // 打开开荒笔记窗口（使用工厂方法创建）
+        var noteWindow = _pioneerNoteWindowFactory();
         noteWindow.Owner = this.Owner ?? this; // 使用对话框的 Owner 或自己作为 Owner
         noteWindow.ShowDialog();
 
@@ -540,7 +547,7 @@ public partial class RecordNoteDialog : AnimatedWindow
         try
         {
             // 在当前选中的目录下创建新目录
-            var newFolder = PioneerNoteService.Instance.CreateFolder(folderName, _selectedFolderId);
+            var newFolder = _pioneerNoteService.CreateFolder(folderName, _selectedFolderId);
 
             // 刷新目录树
             RefreshFolderTree();

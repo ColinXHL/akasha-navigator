@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Threading;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -8,29 +9,19 @@ namespace AkashaNavigator.Services
     /// 鼠标光标检测服务
     /// 用于检测游戏内鼠标是否显示（如打开地图/菜单时）
     /// </summary>
-    public class CursorDetectionService : IDisposable
+    public class CursorDetectionService : ICursorDetectionService, IDisposable
     {
         #region Singleton
 
-        private static CursorDetectionService? _instance;
-        private static readonly object _lock = new();
+        private static ICursorDetectionService? _instance;
 
         /// <summary>
-        /// 获取单例实例
+        /// 获取单例实例（向后兼容）
         /// </summary>
-        public static CursorDetectionService Instance
+        public static ICursorDetectionService Instance
         {
-            get
-            {
-                if (_instance == null)
-                {
-                    lock (_lock)
-                    {
-                        _instance ??= new CursorDetectionService();
-                    }
-                }
-                return _instance;
-            }
+            get => _instance ?? throw new InvalidOperationException("CursorDetectionService not initialized");
+            set => _instance = value;
         }
 
         #endregion
@@ -80,7 +71,10 @@ namespace AkashaNavigator.Services
 
         #region Constructor
 
-        private CursorDetectionService()
+        /// <summary>
+        /// DI容器使用的构造函数
+        /// </summary>
+        public CursorDetectionService()
         {
         }
 

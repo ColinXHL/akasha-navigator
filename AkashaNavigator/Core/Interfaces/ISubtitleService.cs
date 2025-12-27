@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using AkashaNavigator.Models.Data;
+using Microsoft.Web.WebView2.Core;
 
 namespace AkashaNavigator.Core.Interfaces
 {
@@ -60,5 +62,28 @@ namespace AkashaNavigator.Core.Interfaces
         /// </summary>
         /// <param name="timeInSeconds">当前播放时间（秒）</param>
         void UpdateCurrentTime(double timeInSeconds);
+
+        /// <summary>
+        /// 附加到 WebView2
+        /// </summary>
+        /// <param name="webView">WebView2 核心对象</param>
+        void AttachToWebView(CoreWebView2 webView);
+
+        /// <summary>
+        /// 从 WebView2 分离
+        /// </summary>
+        /// <param name="webView">WebView2 核心对象</param>
+        void DetachFromWebView(CoreWebView2 webView);
+
+        /// <summary>
+        /// 处理从 WebView2 收到的字幕数据消息
+        /// </summary>
+        /// <param name="jsonMessage">JSON 格式的消息</param>
+        void HandleSubtitleMessage(string jsonMessage);
+
+        /// <summary>
+        /// 主动请求获取 B站字幕数据（通过 API）
+        /// </summary>
+        Task RequestSubtitleAsync();
     }
 }

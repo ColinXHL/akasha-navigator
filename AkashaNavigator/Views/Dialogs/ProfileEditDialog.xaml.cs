@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -33,6 +34,7 @@ public partial class ProfileEditDialog : AnimatedWindow
 #region Fields
 
     private readonly GameProfile _profile;
+    private readonly IProfileManager _profileManager;
     private readonly string _originalName;
     private readonly string _originalIcon;
     private string _selectedIcon;
@@ -45,8 +47,9 @@ public partial class ProfileEditDialog : AnimatedWindow
     /// 创建 Profile 编辑对话框
     /// </summary>
     /// <param name="profile">要编辑的 Profile</param>
-    public ProfileEditDialog(GameProfile profile)
+    public ProfileEditDialog(IProfileManager profileManager, GameProfile profile)
     {
+        _profileManager = profileManager;
         InitializeComponent();
 
         _profile = profile;
@@ -74,7 +77,7 @@ public partial class ProfileEditDialog : AnimatedWindow
     /// </summary>
     private void InitializeIconSelector()
     {
-        var icons = ProfileManager.ProfileIcons;
+        var icons = _profileManager.ProfileIcons;
 
         foreach (var icon in icons)
         {
@@ -137,7 +140,7 @@ public partial class ProfileEditDialog : AnimatedWindow
         NewIcon = _selectedIcon;
 
         // 更新 Profile
-        var success = ProfileManager.Instance.UpdateProfile(_profile.Id, NewName, NewIcon);
+        var success = _profileManager.UpdateProfile(_profile.Id, NewName, NewIcon);
 
         if (success)
         {

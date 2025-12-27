@@ -5,6 +5,7 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Data;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
 
 namespace AkashaNavigator.Views.Windows
@@ -25,8 +26,11 @@ public partial class HistoryWindow : AnimatedWindow
 
 #region Constructor
 
-    public HistoryWindow()
+    private readonly IDataService _dataService;
+
+    public HistoryWindow(IDataService dataService)
     {
+        _dataService = dataService;
         InitializeComponent();
         LoadHistory();
     }
@@ -41,8 +45,8 @@ public partial class HistoryWindow : AnimatedWindow
     private void LoadHistory()
     {
         var searchText = SearchBox.Text.Trim();
-        var history = string.IsNullOrEmpty(searchText) ? DataService.Instance.GetHistory()
-                                                       : DataService.Instance.SearchHistory(searchText);
+        var history = string.IsNullOrEmpty(searchText) ? _dataService.GetHistory()
+                                                       : _dataService.SearchHistory(searchText);
 
         HistoryList.ItemsSource = history;
 
@@ -69,7 +73,7 @@ public partial class HistoryWindow : AnimatedWindow
     {
         if (sender is Button btn && btn.Tag is int id)
         {
-            DataService.Instance.DeleteHistory(id);
+            _dataService.DeleteHistory(id);
             LoadHistory();
         }
     }
@@ -85,7 +89,7 @@ public partial class HistoryWindow : AnimatedWindow
 
         if (dialog.Result == true)
         {
-            DataService.Instance.ClearHistory();
+            _dataService.ClearHistory();
             LoadHistory();
         }
     }

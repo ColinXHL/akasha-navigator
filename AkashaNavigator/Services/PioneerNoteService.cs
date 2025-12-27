@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.PioneerNote;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -12,28 +13,19 @@ namespace AkashaNavigator.Services
 /// 负责笔记数据的 CRUD 操作
 /// 参考 DataService 的实现模式
 /// </summary>
-public class PioneerNoteService
+public class PioneerNoteService : IPioneerNoteService
 {
 #region Singleton
 
-    private static PioneerNoteService? _instance;
-    private static readonly object _lock = new();
+    private static IPioneerNoteService? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（向后兼容）
     /// </summary>
-    public static PioneerNoteService Instance
+    public static IPioneerNoteService Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new PioneerNoteService();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("PioneerNoteService not initialized");
+        set => _instance = value;
     }
 
     /// <summary>
@@ -41,16 +33,15 @@ public class PioneerNoteService
     /// </summary>
     internal static void ResetInstance()
     {
-        lock (_lock)
-        {
-            _instance = null;
-        }
+        _instance = null;
     }
 
 #endregion
 
 #region Fields
 
+    private readonly ILogService _logService;
+    private readonly IProfileManager _profileManager;
     private PioneerNoteData _cache = new();
     private bool _cacheLoaded;
 
@@ -61,7 +52,23 @@ public class PioneerNoteService
     private PioneerNoteService()
     {
         // 监听 Profile 切换，清除缓存（与 DataService 保持一致）
-        ProfileManager.Instance.ProfileChanged += (s, e) =>
+        _profileManager.ProfileChanged += (s, e) =>
+        {
+            _cacheLoaded = false;
+            _cache = new PioneerNoteData();
+        };
+    }
+
+    /// <summary>
+    /// DI 容器使用的构造函数
+    /// </summary>
+    public PioneerNoteService(ILogService logService, IProfileManager profileManager)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+
+        // 监听 Profile 切换，清除缓存（与 DataService 保持一致）
+        _profileManager.ProfileChanged += (s, e) =>
         {
             _cacheLoaded = false;
             _cache = new PioneerNoteData();
@@ -529,6 +536,55 @@ public class PioneerNoteService
 
 #endregion
 
+#region Interface Compatibility Methods (for UI code compatibility)
+
+    /// <summary>
+    /// 获取所有笔记项（按排序规则）- 别名方法
+    /// </summary>
+    public List<NoteItem> GetAllNotes() => GetSortedItems(_cache.SortOrder);
+
+    /// <summary>
+    /// 获取指定目录下的笔记项 - 别名方法
+    /// </summary>
+    public List<NoteItem> GetNotesInFolder(string? folderId) => GetItemsByFolder(folderId);
+
+    /// <summary>
+    /// 重命名文件夹 - 别名方法
+    /// </summary>
+    public void RenameFolder(string folderId, string newName) => UpdateFolder(folderId, newName);
+
+    /// <summary>
+    /// 删除文件夹（接口兼容版本）
+    /// </summary>
+    public void DeleteFolder(string folderId) => DeleteFolder(folderId, cascade: true);
+
+    /// <summary>
+    /// 获取所有文件夹 - 别名方法
+    /// </summary>
+    public List<NoteFolder> GetAllFolders()
+    {
+        EnsureLoaded();
+        return new List<NoteFolder>(_cache.Folders);
+    }
+
+    /// <summary>
+    /// 移动笔记项到指定文件夹 - 别名方法
+    /// </summary>
+    public void MoveNoteToFolder(string noteId, string? targetFolderId) => MoveNote(noteId, targetFolderId);
+
+    /// <summary>
+    /// 清空所有数据
+    /// </summary>
+    public void ClearAll()
+    {
+        EnsureLoaded();
+        _cache.Items.Clear();
+        _cache.Folders.Clear();
+        Save();
+    }
+
+#endregion
+
 #region Private Methods
 
     /// <summary>
@@ -536,7 +592,7 @@ public class PioneerNoteService
     /// </summary>
     private string GetNoteFilePath()
     {
-        return Path.Combine(ProfileManager.Instance.GetCurrentProfileDirectory(), AppConstants.PioneerNotesFileName);
+        return Path.Combine(_profileManager.GetCurrentProfileDirectory(), AppConstants.PioneerNotesFileName);
     }
 
     /// <summary>
@@ -554,7 +610,7 @@ public class PioneerNoteService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("PioneerNoteService", "加载笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Warn("PioneerNoteService", "加载笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
                                      ex.Message);
             _cache = new PioneerNoteData();
         }
@@ -573,7 +629,7 @@ public class PioneerNoteService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("PioneerNoteService", "保存笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Debug("PioneerNoteService", "保存笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
                                       ex.Message);
         }
     }

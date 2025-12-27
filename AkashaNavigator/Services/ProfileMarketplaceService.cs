@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Profile;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -196,6 +197,7 @@ public class ProfileMarketplaceService
             }
             return _instance;
         }
+        internal set => _instance = value;
     }
 
     /// <summary>
@@ -218,6 +220,10 @@ public class ProfileMarketplaceService
     private readonly HttpClient _httpClient;
     private List<MarketplaceProfile> _cachedProfiles = new();
     private readonly object _cacheLock = new();
+    private readonly ILogService _logService;
+    private readonly IProfileManager _profileManager;
+    private readonly IPluginAssociationManager _pluginAssociationManager;
+    private readonly IPluginLibrary _pluginLibrary;
 
 #endregion
 
@@ -239,6 +245,24 @@ public class ProfileMarketplaceService
 
     private ProfileMarketplaceService()
     {
+        _logService = LogService.Instance;
+        _profileManager = ProfileManager.Instance;
+        _pluginAssociationManager = PluginAssociationManager.Instance;
+        _pluginLibrary = PluginLibrary.Instance;
+        _configFilePath = Path.Combine(AppPaths.DataDirectory, "marketplace-sources.json");
+        _sourceConfig = LoadConfig();
+        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
+    }
+
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public ProfileMarketplaceService(ILogService logService, IProfileManager profileManager, IPluginAssociationManager pluginAssociationManager, IPluginLibrary pluginLibrary)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+        _pluginAssociationManager = pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
+        _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _configFilePath = Path.Combine(AppPaths.DataDirectory, "marketplace-sources.json");
         _sourceConfig = LoadConfig();
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
@@ -247,8 +271,9 @@ public class ProfileMarketplaceService
     /// <summary>
     /// 用于测试的构造函数
     /// </summary>
-    internal ProfileMarketplaceService(string configFilePath, HttpClient? httpClient = null)
+    internal ProfileMarketplaceService(string configFilePath, HttpClient? httpClient = null, ILogService? logService = null)
     {
+        _logService = logService ?? LogService.Instance;
         _configFilePath = configFilePath;
         _sourceConfig = LoadConfig();
         _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
@@ -473,7 +498,7 @@ public class ProfileMarketplaceService
             }
             catch (Exception ex)
             {
-                LogService.Instance.Warn("ProfileMarketplaceService", "获取订阅源 '{SourceUrl}' 失败: {ErrorMessage}",
+                _logService.Warn("ProfileMarketplaceService", "获取订阅源 '{SourceUrl}' 失败: {ErrorMessage}",
                                          source.Url, ex.Message);
             }
         }
@@ -503,7 +528,7 @@ public class ProfileMarketplaceService
 
         if (!File.Exists(registryPath))
         {
-            LogService.Instance.Debug("ProfileMarketplaceService", "内置 Profile 市场注册表不存在: {RegistryPath}",
+            _logService.Debug("ProfileMarketplaceService", "内置 Profile 市场注册表不存在: {RegistryPath}",
                                       registryPath);
             return profiles;
         }
@@ -523,13 +548,13 @@ public class ProfileMarketplaceService
                     profiles.Add(profile);
                 }
 
-                LogService.Instance.Info("ProfileMarketplaceService", "加载了 {ProfileCount} 个内置 Profile",
+                _logService.Info("ProfileMarketplaceService", "加载了 {ProfileCount} 个内置 Profile",
                                          profiles.Count);
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("ProfileMarketplaceService", "加载内置 Profile 市场失败: {ErrorMessage}",
+            _logService.Warn("ProfileMarketplaceService", "加载内置 Profile 市场失败: {ErrorMessage}",
                                      ex.Message);
         }
 
@@ -551,7 +576,7 @@ public class ProfileMarketplaceService
 
         if (!File.Exists(profilePath))
         {
-            LogService.Instance.Debug("ProfileMarketplaceService", "内置 Profile 配置不存在: {ProfilePath}",
+            _logService.Debug("ProfileMarketplaceService", "内置 Profile 配置不存在: {ProfilePath}",
                                       profilePath);
             return null;
         }
@@ -593,7 +618,7 @@ public class ProfileMarketplaceService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("ProfileMarketplaceService", "加载内置 Profile 配置失败: {ErrorMessage}",
+            _logService.Warn("ProfileMarketplaceService", "加载内置 Profile 配置失败: {ErrorMessage}",
                                      ex.Message);
             return null;
         }
@@ -694,14 +719,14 @@ public class ProfileMarketplaceService
             return new List<string>();
 
         // 获取目标 Profile 的所有插件
-        var targetPlugins = PluginAssociationManager.Instance.GetPluginsInProfile(profileId);
+        var targetPlugins = _pluginAssociationManager.GetPluginsInProfile(profileId);
         if (targetPlugins.Count == 0)
             return new List<string>();
 
         var uniquePlugins = new List<string>();
 
         // 获取所有已安装 Profile 的 ID
-        var allProfileIds = PluginAssociationManager.Instance.GetAllProfileIds();
+        var allProfileIds = _pluginAssociationManager.GetAllProfileIds();
 
         foreach (var pluginRef in targetPlugins)
         {
@@ -716,7 +741,7 @@ public class ProfileMarketplaceService
                     continue;
 
                 // 检查其他 Profile 是否包含该插件
-                if (PluginAssociationManager.Instance.ProfileContainsPlugin(otherProfileId, pluginId))
+                if (_pluginAssociationManager.ProfileContainsPlugin(otherProfileId, pluginId))
                 {
                     isUnique = false;
                     break;
@@ -756,7 +781,7 @@ public class ProfileMarketplaceService
         }
 
         // 删除 Profile
-        var deleteResult = ProfileManager.Instance.DeleteProfile(profileId);
+        var deleteResult = _profileManager.DeleteProfile(profileId);
         if (!deleteResult.IsSuccess)
         {
             return ProfileUninstallResult.Failure(deleteResult.ErrorMessage ?? "删除 Profile 失败");
@@ -777,10 +802,10 @@ public class ProfileMarketplaceService
             try
             {
                 // 先从所有 Profile 中移除该插件的关联
-                PluginAssociationManager.Instance.RemovePluginFromAllProfiles(pluginId);
+                _pluginAssociationManager.RemovePluginFromAllProfiles(pluginId);
 
                 // 卸载插件
-                var uninstallResult = PluginLibrary.Instance.UninstallPlugin(pluginId, force: true);
+                var uninstallResult = _pluginLibrary.UninstallPlugin(pluginId, force: true);
                 if (uninstallResult.IsSuccess)
                 {
                     uninstalledPlugins.Add(pluginId);
@@ -788,14 +813,14 @@ public class ProfileMarketplaceService
                 else
                 {
                     failedPlugins.Add(pluginId);
-                    LogService.Instance.Warn("ProfileMarketplaceService", "卸载插件 '{PluginId}' 失败: {ErrorMessage}",
+                    _logService.Warn("ProfileMarketplaceService", "卸载插件 '{PluginId}' 失败: {ErrorMessage}",
                                              pluginId, uninstallResult.ErrorMessage);
                 }
             }
             catch (Exception ex)
             {
                 failedPlugins.Add(pluginId);
-                LogService.Instance.Error("ProfileMarketplaceService",
+                _logService.Error("ProfileMarketplaceService",
                                           "卸载插件 '{PluginId}' 时发生异常: {ErrorMessage}", pluginId, ex.Message);
             }
         }
@@ -829,7 +854,7 @@ public class ProfileMarketplaceService
 
         foreach (var pluginId in profile.PluginIds)
         {
-            if (!PluginLibrary.Instance.IsInstalled(pluginId))
+            if (!_pluginLibrary.IsInstalled(pluginId))
             {
                 missingPlugins.Add(pluginId);
             }
@@ -848,7 +873,7 @@ public class ProfileMarketplaceService
         if (string.IsNullOrWhiteSpace(profileId))
             return false;
 
-        return ProfileManager.Instance.GetProfileById(profileId) != null;
+        return _profileManager.GetProfileById(profileId) != null;
     }
 
     /// <summary>
@@ -893,7 +918,7 @@ public class ProfileMarketplaceService
             }
             catch (Exception ex)
             {
-                LogService.Instance.Warn("ProfileMarketplaceService", "下载 Profile 配置失败: {ErrorMessage}",
+                _logService.Warn("ProfileMarketplaceService", "下载 Profile 配置失败: {ErrorMessage}",
                                          ex.Message);
             }
         }
@@ -913,12 +938,12 @@ public class ProfileMarketplaceService
         }
 
         // 使用 ProfileManager 导入
-        var importResult = ProfileManager.Instance.ImportProfile(exportData, overwrite);
+        var importResult = _profileManager.ImportProfile(exportData, overwrite);
 
         if (importResult.IsSuccess)
         {
             // 保存原始插件列表（用于后续显示缺失状态）
-            PluginAssociationManager.Instance.SetOriginalPlugins(profile.Id, profile.PluginIds);
+            _pluginAssociationManager.SetOriginalPlugins(profile.Id, profile.PluginIds);
 
             return ProfileInstallResult.Success(profile.Id, missingPlugins);
         }

@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -15,14 +16,16 @@ namespace AkashaNavigator.Views.Dialogs
 public partial class MarketplaceProfileDetailDialog : Window
 {
     private readonly MarketplaceProfile _profile;
+    private readonly IPluginLibrary _pluginLibrary;
 
     /// <summary>
     /// 是否应该安装
     /// </summary>
     public bool ShouldInstall { get; private set; }
 
-    public MarketplaceProfileDetailDialog(MarketplaceProfile profile)
+    public MarketplaceProfileDetailDialog(IPluginLibrary pluginLibrary, MarketplaceProfile profile)
     {
+        _pluginLibrary = pluginLibrary;
         InitializeComponent();
         _profile = profile;
         LoadProfileDetails();
@@ -75,7 +78,7 @@ public partial class MarketplaceProfileDetailDialog : Window
         PluginCountText.Text = $"{_profile.PluginCount} 个";
 
         // 插件列表
-        var pluginViewModels = _profile.PluginIds.Select(id => new PluginStatusViewModel(id)).ToList();
+        var pluginViewModels = _profile.PluginIds.Select(id => new PluginStatusViewModel(_pluginLibrary, id)).ToList();
         PluginList.ItemsSource = pluginViewModels;
     }
 
@@ -105,13 +108,16 @@ public partial class MarketplaceProfileDetailDialog : Window
 /// </summary>
 public class PluginStatusViewModel
 {
+    private readonly IPluginLibrary _pluginLibrary;
+
     public string PluginId { get; }
     public bool IsInstalled { get; }
 
-    public PluginStatusViewModel(string pluginId)
+    public PluginStatusViewModel(IPluginLibrary pluginLibrary, string pluginId)
     {
+        _pluginLibrary = pluginLibrary;
         PluginId = pluginId;
-        IsInstalled = PluginLibrary.Instance.IsInstalled(pluginId);
+        IsInstalled = _pluginLibrary.IsInstalled(pluginId);
     }
 
     public string StatusText => IsInstalled ? "已安装" : "缺失";

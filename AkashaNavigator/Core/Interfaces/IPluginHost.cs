@@ -103,5 +103,12 @@ namespace AkashaNavigator.Core.Interfaces
         /// </summary>
         /// <param name="pluginId">插件 ID</param>
         void ReloadPlugin(string pluginId);
+
+        /// <summary>
+        /// 获取插件配置目录
+        /// </summary>
+        /// <param name="profileId">Profile ID</param>
+        /// <param name="pluginId">插件 ID</param>
+        string GetPluginConfigDirectory(string profileId, string pluginId);
     }
 }

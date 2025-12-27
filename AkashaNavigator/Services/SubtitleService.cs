@@ -34,25 +34,22 @@ public class SubtitleService : ISubtitleService
 
 #region Singleton
 
-    private static SubtitleService? _instance;
-    private static readonly object _singletonLock = new();
+    private static ISubtitleService? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（向后兼容）
     /// </summary>
-    public static SubtitleService Instance
+    public static ISubtitleService Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_singletonLock)
-                {
-                    _instance ??= new SubtitleService();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("SubtitleService not initialized");
+        set => _instance = value;
     }
+
+#endregion
+
+#region Fields
+
+    private readonly ILogService _logService;
 
 #endregion
 
@@ -96,10 +93,12 @@ public class SubtitleService : ISubtitleService
     }
 
     /// <summary>
-    /// 仅用于测试的内部构造函数
+    /// DI 容器使用的构造函数
     /// </summary>
-    internal SubtitleService(bool forTesting)
+    public SubtitleService(ILogService logService)
     {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        Instance = this; // 设置单例实例供插件系统使用
     }
 
 #endregion
@@ -150,12 +149,12 @@ public class SubtitleService : ISubtitleService
         }
         catch (JsonException ex)
         {
-            LogService.Instance.Warn("SubtitleService", "解析字幕 JSON 失败: {ErrorMessage}", ex.Message);
+            _logService.Warn("SubtitleService", "解析字幕 JSON 失败: {ErrorMessage}", ex.Message);
             return null;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", ex, "解析字幕时发生异常");
+            _logService.Error("SubtitleService", ex, "解析字幕时发生异常");
             return null;
         }
     }
@@ -267,7 +266,7 @@ public class SubtitleService : ISubtitleService
         }
 
         SubtitleCleared?.Invoke(this, EventArgs.Empty);
-        LogService.Instance.Debug("SubtitleService", "字幕数据已清除");
+        _logService.Debug("SubtitleService", "字幕数据已清除");
     }
 
     /// <summary>
@@ -302,12 +301,12 @@ public class SubtitleService : ISubtitleService
                 _currentSubtitle = newSubtitle;
                 if (newSubtitle != null)
                 {
-                    LogService.Instance.Debug("SubtitleService", "字幕变化: [{From:F1}s-{To:F1}s] {Content}",
+                    _logService.Debug("SubtitleService", "字幕变化: [{From:F1}s-{To:F1}s] {Content}",
                                               newSubtitle.From, newSubtitle.To, newSubtitle.Content);
                 }
                 else
                 {
-                    LogService.Instance.Debug("SubtitleService", "字幕变化: 无字幕");
+                    _logService.Debug("SubtitleService", "字幕变化: 无字幕");
                 }
             }
             else
@@ -331,7 +330,7 @@ public class SubtitleService : ISubtitleService
             _cachedSubtitleArray = null; // 使缓存失效
         }
 
-        LogService.Instance.Info("SubtitleService", "字幕数据已加载，共 {SubtitleCount} 条字幕，语言: {Language}",
+        _logService.Info("SubtitleService", "字幕数据已加载，共 {SubtitleCount} 条字幕，语言: {Language}",
                                  data.Body.Count, data.Language);
 
         // 输出前几条字幕作为预览
@@ -341,12 +340,12 @@ public class SubtitleService : ISubtitleService
             for (int i = 0; i < previewCount; i++)
             {
                 var entry = data.Body[i];
-                LogService.Instance.Debug("SubtitleService", "  字幕预览[{Index}]: [{From:F1}s-{To:F1}s] {Content}", i,
+                _logService.Debug("SubtitleService", "  字幕预览[{Index}]: [{From:F1}s-{To:F1}s] {Content}", i,
                                           entry.From, entry.To, entry.Content);
             }
             if (data.Body.Count > 3)
             {
-                LogService.Instance.Debug("SubtitleService", "  ... 还有 {RemainingCount} 条字幕", data.Body.Count - 3);
+                _logService.Debug("SubtitleService", "  ... 还有 {RemainingCount} 条字幕", data.Body.Count - 3);
             }
         }
 
@@ -377,7 +376,7 @@ public class SubtitleService : ISubtitleService
         // 添加被动拦截：监听 player/v2 API 请求的响应
         webView.WebResourceResponseReceived += OnWebResourceResponseReceived;
 
-        LogService.Instance.Debug("SubtitleService", "已附加到 WebView2");
+        _logService.Debug("SubtitleService", "已附加到 WebView2");
     }
 
     /// <summary>
@@ -398,7 +397,7 @@ public class SubtitleService : ISubtitleService
             if (!uri.Contains("cid="))
                 return;
 
-            LogService.Instance.Info("SubtitleService", "★ 拦截到 player/v2 API: {ApiUrl}...",
+            _logService.Info("SubtitleService", "★ 拦截到 player/v2 API: {ApiUrl}...",
                                      uri.Substring(0, Math.Min(100, uri.Length)));
 
             var response = e.Response;
@@ -428,7 +427,7 @@ public class SubtitleService : ISubtitleService
 
             // 获取 cid
             var cid = dataEl.TryGetProperty("cid", out var cidEl) ? cidEl.GetInt64().ToString() : "";
-            LogService.Instance.Debug("SubtitleService", "拦截到 cid: {Cid}", cid);
+            _logService.Debug("SubtitleService", "拦截到 cid: {Cid}", cid);
 
             // 获取字幕列表
             if (!dataEl.TryGetProperty("subtitle", out var subtitleEl))
@@ -442,7 +441,7 @@ public class SubtitleService : ISubtitleService
             if (subtitles.Count == 0)
                 return;
 
-            LogService.Instance.Info("SubtitleService", "被动拦截到 {SubtitleCount} 个字幕", subtitles.Count);
+            _logService.Info("SubtitleService", "被动拦截到 {SubtitleCount} 个字幕", subtitles.Count);
 
             // 优先选择中文字幕（ai-zh 优先，稳定性更好）
             JsonElement? selectedSubtitle = null;
@@ -484,7 +483,7 @@ public class SubtitleService : ISubtitleService
 
             var language = selectedSubtitle.Value.TryGetProperty("lan", out var langEl) ? langEl.GetString() ?? "" : "";
 
-            LogService.Instance.Info("SubtitleService", "被动拦截字幕 URL: {SubtitleUrl}...",
+            _logService.Info("SubtitleService", "被动拦截字幕 URL: {SubtitleUrl}...",
                                      subtitleUrl.Substring(0, Math.Min(80, subtitleUrl.Length)));
 
             // 请求字幕内容
@@ -492,7 +491,7 @@ public class SubtitleService : ISubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("SubtitleService", "拦截 player/v2 响应时出错: {ErrorMessage}", ex.Message);
+            _logService.Debug("SubtitleService", "拦截 player/v2 响应时出错: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -507,7 +506,7 @@ public class SubtitleService : ISubtitleService
 
             if (string.IsNullOrEmpty(response))
             {
-                LogService.Instance.Warn("SubtitleService", "字幕响应为空");
+                _logService.Warn("SubtitleService", "字幕响应为空");
                 return;
             }
 
@@ -524,7 +523,7 @@ public class SubtitleService : ISubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", ex, "请求字幕内容失败");
+            _logService.Error("SubtitleService", ex, "请求字幕内容失败");
         }
     }
 
@@ -536,7 +535,7 @@ public class SubtitleService : ISubtitleService
     {
         if (_attachedWebView == null)
         {
-            LogService.Instance.Warn("SubtitleService", "WebView2 未附加，无法请求字幕");
+            _logService.Warn("SubtitleService", "WebView2 未附加，无法请求字幕");
             return;
         }
 
@@ -544,18 +543,18 @@ public class SubtitleService : ISubtitleService
         var currentUrl = _attachedWebView.Source;
         if (string.IsNullOrEmpty(currentUrl) || !currentUrl.Contains("bilibili.com"))
         {
-            LogService.Instance.Debug("SubtitleService", "非 B站页面，跳过字幕请求");
+            _logService.Debug("SubtitleService", "非 B站页面，跳过字幕请求");
             return;
         }
 
         // 如果已经有字幕数据（被动拦截获取的），跳过主动请求
         if (GetSubtitleData() != null && GetSubtitleData()!.Body.Count > 0)
         {
-            LogService.Instance.Debug("SubtitleService", "已有字幕数据（被动拦截），跳过主动请求");
+            _logService.Debug("SubtitleService", "已有字幕数据（被动拦截），跳过主动请求");
             return;
         }
 
-        LogService.Instance.Debug("SubtitleService", "开始主动请求 B站字幕数据...");
+        _logService.Debug("SubtitleService", "开始主动请求 B站字幕数据...");
 
         // 注入 JS 获取字幕
         var script = @"
@@ -664,7 +663,7 @@ public class SubtitleService : ISubtitleService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", ex, "执行字幕获取脚本失败");
+            _logService.Error("SubtitleService", ex, "执行字幕获取脚本失败");
         }
     }
 
@@ -698,7 +697,7 @@ public class SubtitleService : ISubtitleService
             case "subtitle_error":
                 if (root.TryGetProperty("error", out var errorElement))
                 {
-                    LogService.Instance.Warn("SubtitleService", "字幕获取失败: {ErrorMessage}",
+                    _logService.Warn("SubtitleService", "字幕获取失败: {ErrorMessage}",
                                              errorElement.GetString());
                 }
                 break;
@@ -706,14 +705,14 @@ public class SubtitleService : ISubtitleService
             case "subtitle_info":
                 if (root.TryGetProperty("message", out var msgElement))
                 {
-                    LogService.Instance.Info("SubtitleService", msgElement.GetString() ?? "");
+                    _logService.Info("SubtitleService", msgElement.GetString() ?? "");
                 }
                 break;
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", ex, "处理字幕消息失败");
+            _logService.Error("SubtitleService", ex, "处理字幕消息失败");
         }
     }
 
@@ -726,22 +725,22 @@ public class SubtitleService : ISubtitleService
 
             if (string.IsNullOrEmpty(url))
             {
-                LogService.Instance.Debug("SubtitleService", "字幕 URL 为空，跳过请求");
+                _logService.Debug("SubtitleService", "字幕 URL 为空，跳过请求");
                 return;
             }
 
-            LogService.Instance.Debug("SubtitleService", "开始请求字幕内容: {SubtitleUrl}...",
+            _logService.Debug("SubtitleService", "开始请求字幕内容: {SubtitleUrl}...",
                                       url.Substring(0, Math.Min(80, url.Length)));
 
             var response = await _httpClient.GetStringAsync(url);
 
             if (string.IsNullOrEmpty(response))
             {
-                LogService.Instance.Warn("SubtitleService", "字幕响应为空");
+                _logService.Warn("SubtitleService", "字幕响应为空");
                 return;
             }
 
-            LogService.Instance.Debug("SubtitleService", "字幕响应长度: {ResponseLength}", response.Length);
+            _logService.Debug("SubtitleService", "字幕响应长度: {ResponseLength}", response.Length);
 
             // 解析字幕 JSON
             var subtitleData = ParseSubtitleJson(response, url);
@@ -754,13 +753,13 @@ public class SubtitleService : ISubtitleService
                 }
                 else
                 {
-                    LogService.Instance.Warn("SubtitleService", "解析后没有有效的字幕条目");
+                    _logService.Warn("SubtitleService", "解析后没有有效的字幕条目");
                 }
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", ex, "请求字幕内容失败");
+            _logService.Error("SubtitleService", ex, "请求字幕内容失败");
         }
     }
 
@@ -773,7 +772,7 @@ public class SubtitleService : ISubtitleService
 
             if (!root.TryGetProperty("data", out var dataElement))
             {
-                LogService.Instance.Warn("SubtitleService", "字幕消息中没有 data 字段");
+                _logService.Warn("SubtitleService", "字幕消息中没有 data 字段");
                 return;
             }
 
@@ -810,12 +809,12 @@ public class SubtitleService : ISubtitleService
             }
             else
             {
-                LogService.Instance.Warn("SubtitleService", "解析后没有有效的字幕条目");
+                _logService.Warn("SubtitleService", "解析后没有有效的字幕条目");
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("SubtitleService", ex, "解析字幕数据失败");
+            _logService.Error("SubtitleService", ex, "解析字幕数据失败");
         }
     }
 
@@ -838,7 +837,7 @@ public class SubtitleService : ISubtitleService
             Clear();
         }
 
-        LogService.Instance.Debug("SubtitleService", "已从 WebView2 分离并清理数据");
+        _logService.Debug("SubtitleService", "已从 WebView2 分离并清理数据");
     }
 
 #endregion

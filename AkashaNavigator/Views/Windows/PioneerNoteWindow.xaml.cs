@@ -8,6 +8,7 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.PioneerNote;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
 
 namespace AkashaNavigator.Views.Windows
@@ -29,6 +30,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
 #region Fields
 
+    private readonly IPioneerNoteService _pioneerNoteService;
     private ObservableCollection<NoteTreeNode> _treeNodes = new();
     private string _searchKeyword = string.Empty;
 
@@ -36,8 +38,9 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
 #region Constructor
 
-    public PioneerNoteWindow()
+    public PioneerNoteWindow(IPioneerNoteService pioneerNoteService)
     {
+        _pioneerNoteService = pioneerNoteService;
         InitializeComponent();
         LoadNoteTree();
         UpdateSortButton();
@@ -54,7 +57,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
     {
         _treeNodes.Clear();
 
-        var noteData = PioneerNoteService.Instance.GetNoteTree();
+        var noteData = _pioneerNoteService.GetNoteTree();
         var sortDirection = noteData.SortOrder;
 
         // 如果有搜索关键词，显示搜索结果
@@ -101,8 +104,8 @@ public partial class PioneerNoteWindow : AnimatedWindow
     /// </summary>
     private void LoadSearchResults()
     {
-        var searchResults = PioneerNoteService.Instance.SearchNotes(_searchKeyword);
-        var noteData = PioneerNoteService.Instance.GetNoteTree();
+        var searchResults = _pioneerNoteService.SearchNotes(_searchKeyword);
+        var noteData = _pioneerNoteService.GetNoteTree();
         var sortDirection = noteData.SortOrder;
 
         // 收集所有匹配项的目录 ID
@@ -280,7 +283,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
     /// </summary>
     private void UpdateSortButton()
     {
-        var sortOrder = PioneerNoteService.Instance.CurrentSortOrder;
+        var sortOrder = _pioneerNoteService.CurrentSortOrder;
         BtnSort.Content = sortOrder == SortDirection.Descending ? "↓ 最新" : "↑ 最早";
     }
 
@@ -317,12 +320,12 @@ public partial class PioneerNoteWindow : AnimatedWindow
             {
                 if (node.IsFolder)
                 {
-                    PioneerNoteService.Instance.UpdateFolder(node.Id!, editDialog.InputText);
+                    _pioneerNoteService.UpdateFolder(node.Id!, editDialog.InputText);
                 }
                 else
                 {
                     // 更新笔记项，包括 URL
-                    PioneerNoteService.Instance.UpdateNote(node.Id!, editDialog.InputText, editDialog.UrlText);
+                    _pioneerNoteService.UpdateNote(node.Id!, editDialog.InputText, editDialog.UrlText);
                 }
                 RefreshNoteTree();
             }
@@ -353,11 +356,11 @@ public partial class PioneerNoteWindow : AnimatedWindow
             {
                 if (node.IsFolder)
                 {
-                    PioneerNoteService.Instance.DeleteFolder(node.Id!, true);
+                    _pioneerNoteService.DeleteFolder(node.Id!, true);
                 }
                 else
                 {
-                    PioneerNoteService.Instance.DeleteNote(node.Id!);
+                    _pioneerNoteService.DeleteNote(node.Id!);
                 }
                 RefreshNoteTree();
             }
@@ -384,7 +387,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
         {
             try
             {
-                PioneerNoteService.Instance.CreateFolder(editDialog.InputText, parentId);
+                _pioneerNoteService.CreateFolder(editDialog.InputText, parentId);
                 RefreshNoteTree();
             }
             catch (Exception ex)
@@ -403,7 +406,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
             return;
 
         // 获取所有目录用于选择
-        var noteData = PioneerNoteService.Instance.GetNoteTree();
+        var noteData = _pioneerNoteService.GetNoteTree();
         var folders = noteData.Folders;
 
         // 创建目录选择对话框
@@ -415,7 +418,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
         {
             try
             {
-                PioneerNoteService.Instance.MoveNote(node.Id!, moveDialog.SelectedFolderId);
+                _pioneerNoteService.MoveNote(node.Id!, moveDialog.SelectedFolderId);
                 RefreshNoteTree();
             }
             catch (Exception ex)
@@ -466,7 +469,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
     private void ShowRecordNoteDialog()
     {
         // 使用完整的笔记对话框，支持选择目录
-        var noteDialog = new RecordNoteDialog("", "");
+        var noteDialog = new RecordNoteDialog(_pioneerNoteService, "", "");
         noteDialog.Owner = this;
         noteDialog.ShowDialog();
 
@@ -482,7 +485,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
     /// </summary>
     private void BtnSort_Click(object sender, RoutedEventArgs e)
     {
-        PioneerNoteService.Instance.ToggleSortOrder();
+        _pioneerNoteService.ToggleSortOrder();
         UpdateSortButton();
         RefreshNoteTree();
     }

@@ -5,6 +5,7 @@ using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Common;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -141,7 +142,7 @@ public class PluginLibraryChangedEventArgs : EventArgs
 /// 全局插件库管理服务
 /// 负责插件本体的安装、卸载、更新
 /// </summary>
-public class PluginLibrary
+public class PluginLibrary : IPluginLibrary
 {
 #region Singleton
 
@@ -201,7 +202,10 @@ public class PluginLibrary
 
 #region Constructor
 
-    private PluginLibrary()
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public PluginLibrary()
     {
         _index = LoadIndex();
     }

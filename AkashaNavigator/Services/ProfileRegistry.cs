@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -60,28 +61,19 @@ internal class ProfileRegistryData
 /// Profile 注册表服务
 /// 管理内置 Profile 模板索引（只读）
 /// </summary>
-public class ProfileRegistry
+public class ProfileRegistry : IProfileRegistry
 {
 #region Singleton
 
-    private static ProfileRegistry? _instance;
-    private static readonly object _lock = new();
+    private static IProfileRegistry? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（向后兼容）
     /// </summary>
-    public static ProfileRegistry Instance
+    public static IProfileRegistry Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new ProfileRegistry();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("ProfileRegistry not initialized");
+        set => _instance = value;
     }
 
     /// <summary>
@@ -89,10 +81,7 @@ public class ProfileRegistry
     /// </summary>
     internal static void ResetInstance()
     {
-        lock (_lock)
-        {
-            _instance = null;
-        }
+        _instance = null;
     }
 
 #endregion
@@ -119,12 +108,27 @@ public class ProfileRegistry
     /// </summary>
     private bool _isLoaded = false;
 
+    /// <summary>
+    /// 日志服务
+    /// </summary>
+    private readonly ILogService _logService;
+
 #endregion
 
 #region Constructor
 
-    private ProfileRegistry()
+    public ProfileRegistry()
     {
+        _logService = _logService;
+        BuiltInProfilesDirectory = AppPaths.BuiltInProfilesDirectory;
+    }
+
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public ProfileRegistry(ILogService logService)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         BuiltInProfilesDirectory = AppPaths.BuiltInProfilesDirectory;
     }
 
@@ -134,6 +138,7 @@ public class ProfileRegistry
     /// <param name="builtInProfilesDirectory">内置 Profile 目录路径</param>
     internal ProfileRegistry(string builtInProfilesDirectory)
     {
+        _logService = _logService;
         BuiltInProfilesDirectory = builtInProfilesDirectory;
     }
 
@@ -220,7 +225,7 @@ public class ProfileRegistry
 
         if (!File.Exists(RegistryFilePath))
         {
-            LogService.Instance.Warn("ProfileRegistry", "索引文件不存在: {RegistryFilePath}", RegistryFilePath);
+            _logService.Warn("ProfileRegistry", "索引文件不存在: {RegistryFilePath}", RegistryFilePath);
             return;
         }
 
@@ -230,12 +235,12 @@ public class ProfileRegistry
             if (data?.Profiles != null)
             {
                 _profiles = data.Profiles;
-                LogService.Instance.Debug("ProfileRegistry", "已加载 {ProfileCount} 个内置 Profile", _profiles.Count);
+                _logService.Debug("ProfileRegistry", "已加载 {ProfileCount} 个内置 Profile", _profiles.Count);
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("ProfileRegistry", ex, "加载索引文件失败");
+            _logService.Error("ProfileRegistry", ex, "加载索引文件失败");
         }
     }
 

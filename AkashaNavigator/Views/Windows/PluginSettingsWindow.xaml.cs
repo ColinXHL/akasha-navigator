@@ -2,10 +2,12 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Windows
 {
@@ -17,6 +19,11 @@ public partial class PluginSettingsWindow : AnimatedWindow
 {
 #region Fields
 
+    private readonly IProfileManager _profileManager;
+    private readonly ILogService _logService;
+    private readonly IPluginHost _pluginHost;
+    private readonly INotificationService _notificationService;
+    private readonly IOverlayManager _overlayManager;
     private readonly string _pluginId;
     private readonly string _pluginName;
     private readonly string _pluginDirectory;
@@ -38,9 +45,24 @@ public partial class PluginSettingsWindow : AnimatedWindow
     /// <param name="pluginDirectory">插件源码目录</param>
     /// <param name="configDirectory">插件配置目录</param>
     /// <param name="profileId">所属的 Profile ID（可选）</param>
-    public PluginSettingsWindow(string pluginId, string pluginName, string pluginDirectory, string configDirectory,
-                                string? profileId = null)
+    public PluginSettingsWindow(
+        IProfileManager profileManager,
+        ILogService logService,
+        IPluginHost pluginHost,
+        INotificationService notificationService,
+        IOverlayManager overlayManager,
+        string pluginId,
+        string pluginName,
+        string pluginDirectory,
+        string configDirectory,
+        string? profileId = null)
     {
+        _profileManager = profileManager;
+        _logService = logService;
+        _pluginHost = pluginHost;
+        _notificationService = notificationService;
+        _overlayManager = overlayManager;
+
         InitializeComponent();
 
         _pluginId = pluginId;
@@ -170,14 +192,14 @@ public partial class PluginSettingsWindow : AnimatedWindow
     private void EnterOverlayEditMode()
     {
         // 检查是否是当前激活的 Profile
-        var currentProfileId = ProfileManager.Instance.CurrentProfile?.Id;
+        var currentProfileId = _profileManager.CurrentProfile?.Id;
         var isCurrentProfile = !string.IsNullOrEmpty(_profileId) && !string.IsNullOrEmpty(currentProfileId) &&
                                string.Equals(_profileId, currentProfileId, StringComparison.OrdinalIgnoreCase);
 
         if (!isCurrentProfile)
         {
             // 非当前激活的 Profile，提示用户先激活
-            NotificationService.Instance.Warning("请先激活此 Profile 后再调整覆盖层位置");
+            _notificationService.Warning("请先激活此 Profile 后再调整覆盖层位置");
             return;
         }
 
@@ -189,7 +211,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
         HideParentModalWindows();
 
         // 当前激活的 Profile，使用 OverlayManager 中已存在的 overlay
-        var overlay = OverlayManager.Instance.GetOverlay(_pluginId);
+        var overlay = _overlayManager.GetOverlay(_pluginId);
         if (overlay == null)
         {
             // overlay 不存在，从配置创建
@@ -198,7 +220,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
             var size = _config.Get("overlay.size", 200.0);
 
             var options = new OverlayOptions { X = x, Y = y, Width = size, Height = size };
-            overlay = OverlayManager.Instance.CreateOverlay(_pluginId, options);
+            overlay = _overlayManager.CreateOverlay(_pluginId, options);
         }
 
         overlay.Show();
@@ -298,7 +320,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", ex, "打开插件目录失败");
+            _logService.Error("PluginSettingsWindow", ex, "打开插件目录失败");
         }
     }
 
@@ -388,7 +410,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", ex, "保存配置失败");
+            _logService.Error("PluginSettingsWindow", ex, "保存配置失败");
         }
     }
 
@@ -400,11 +422,11 @@ public partial class PluginSettingsWindow : AnimatedWindow
         try
         {
             // 广播 configChanged 事件
-            PluginHost.Instance.BroadcastEvent("configChanged", new { pluginId = _pluginId, key = key, value = value });
+            _pluginHost.BroadcastEvent("configChanged", new { pluginId = _pluginId, key = key, value = value });
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", ex, "通知插件配置变更失败");
+            _logService.Error("PluginSettingsWindow", ex, "通知插件配置变更失败");
         }
     }
 
@@ -416,11 +438,11 @@ public partial class PluginSettingsWindow : AnimatedWindow
         try
         {
             // 广播 settingsAction 事件
-            PluginHost.Instance.BroadcastEvent("settingsAction", new { pluginId = _pluginId, action = action });
+            _pluginHost.BroadcastEvent("settingsAction", new { pluginId = _pluginId, action = action });
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginSettingsWindow", ex, "通知插件动作失败");
+            _logService.Error("PluginSettingsWindow", ex, "通知插件动作失败");
         }
     }
 
@@ -467,10 +489,10 @@ public partial class PluginSettingsWindow : AnimatedWindow
 
         // 检查是否需要重新加载插件
         // 只有当设置窗口对应的 Profile 是当前激活的 Profile 时，才重新加载
-        var currentProfileId = ProfileManager.Instance.CurrentProfile?.Id;
+        var currentProfileId = _profileManager.CurrentProfile?.Id;
 
         // 调试日志
-        LogService.Instance.Debug("PluginSettingsWindow",
+        _logService.Debug("PluginSettingsWindow",
                                   "保存配置 - pluginId={PluginId}, _profileId={ProfileId}, " +
                                       "currentProfileId={CurrentProfileId}, configDirectory={ConfigDirectory}",
                                   _pluginId, _profileId ?? "null", currentProfileId ?? "null", _configDirectory);
@@ -478,17 +500,17 @@ public partial class PluginSettingsWindow : AnimatedWindow
         var needsReload = !string.IsNullOrEmpty(_profileId) && !string.IsNullOrEmpty(currentProfileId) &&
                           string.Equals(_profileId, currentProfileId, StringComparison.OrdinalIgnoreCase);
 
-        LogService.Instance.Debug("PluginSettingsWindow", "needsReload={NeedsReload}", needsReload);
+        _logService.Debug("PluginSettingsWindow", "needsReload={NeedsReload}", needsReload);
 
         if (needsReload)
         {
             // 重新加载插件以应用新配置
-            PluginHost.Instance.ReloadPlugin(_pluginId);
-            NotificationService.Instance.Success("设置已保存，插件已重新加载");
+            _pluginHost.ReloadPlugin(_pluginId);
+            _notificationService.Success("设置已保存，插件已重新加载");
         }
         else
         {
-            NotificationService.Instance.Success("设置已保存");
+            _notificationService.Success("设置已保存");
         }
 
         CloseWithAnimation();
@@ -524,7 +546,16 @@ public partial class PluginSettingsWindow : AnimatedWindow
     public static void ShowSettings(string pluginId, string pluginName, string pluginDirectory, string configDirectory,
                                     Window? owner = null, string? profileId = null)
     {
-        var window = new PluginSettingsWindow(pluginId, pluginName, pluginDirectory, configDirectory, profileId);
+        // 从 DI 容器获取服务
+        var serviceProvider = App.Services;
+        var profileManager = serviceProvider.GetRequiredService<IProfileManager>();
+        var logService = serviceProvider.GetRequiredService<ILogService>();
+        var pluginHost = serviceProvider.GetRequiredService<IPluginHost>();
+        var notificationService = serviceProvider.GetRequiredService<INotificationService>();
+        var overlayManager = serviceProvider.GetRequiredService<IOverlayManager>();
+
+        var window = new PluginSettingsWindow(profileManager, logService, pluginHost, notificationService, overlayManager,
+                                               pluginId, pluginName, pluginDirectory, configDirectory, profileId);
 
         if (owner != null)
         {

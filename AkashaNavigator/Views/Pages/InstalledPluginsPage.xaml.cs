@@ -3,10 +3,12 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.Views.Windows;
 
@@ -17,8 +19,19 @@ namespace AkashaNavigator.Views.Pages
 /// </summary>
 public partial class InstalledPluginsPage : UserControl
 {
-    public InstalledPluginsPage()
+    private readonly PluginLibrary _pluginLibrary;
+    private readonly IPluginAssociationManager _pluginAssociationManager;
+    private readonly INotificationService _notificationService;
+
+    // DI构造函数（推荐使用）
+    public InstalledPluginsPage(
+        PluginLibrary pluginLibrary,
+        IPluginAssociationManager pluginAssociationManager,
+        INotificationService notificationService)
     {
+        _pluginLibrary = pluginLibrary;
+        _pluginAssociationManager = pluginAssociationManager;
+        _notificationService = notificationService;
         InitializeComponent();
         Loaded += InstalledPluginsPage_Loaded;
     }
@@ -35,7 +48,7 @@ public partial class InstalledPluginsPage : UserControl
     public void CheckAndRefreshPluginList()
     {
         // 检查所有插件的更新
-        var updates = PluginLibrary.Instance.CheckAllUpdates();
+        var updates = _pluginLibrary.CheckAllUpdates();
 
         // 刷新列表（带更新信息）
         RefreshPluginList(updates);
@@ -54,7 +67,7 @@ public partial class InstalledPluginsPage : UserControl
     /// </summary>
     private string GetProfilesText(string pluginId)
     {
-        var profiles = PluginAssociationManager.Instance.GetProfilesUsingPlugin(pluginId);
+        var profiles = _pluginAssociationManager.GetProfilesUsingPlugin(pluginId);
         if (profiles.Count == 0)
             return "无";
         if (profiles.Count <= 3)
@@ -76,18 +89,18 @@ public partial class InstalledPluginsPage : UserControl
     private void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
     {
         // 调用 PluginLibrary.CheckAllUpdates
-        var updates = PluginLibrary.Instance.CheckAllUpdates();
+        var updates = _pluginLibrary.CheckAllUpdates();
 
         if (updates.Count == 0)
         {
             // 没有可用更新
-            NotificationService.Instance.Show("所有插件都是最新版本", NotificationType.Success);
+            _notificationService.Show("所有插件都是最新版本", NotificationType.Success);
         }
         else
         {
             // 有可用更新，刷新列表以显示更新信息
             RefreshPluginList(updates);
-            NotificationService.Instance.Show($"发现 {updates.Count} 个插件有可用更新", NotificationType.Info);
+            _notificationService.Show($"发现 {updates.Count} 个插件有可用更新", NotificationType.Info);
         }
     }
 
@@ -96,7 +109,7 @@ public partial class InstalledPluginsPage : UserControl
     /// </summary>
     private void RefreshPluginList(List<UpdateCheckResult>? updateResults = null)
     {
-        var plugins = PluginLibrary.Instance.GetInstalledPlugins();
+        var plugins = _pluginLibrary.GetInstalledPlugins();
         var searchText = SearchBox?.Text?.ToLower() ?? "";
 
         // 过滤搜索
@@ -123,7 +136,7 @@ public partial class InstalledPluginsPage : UserControl
                                 Version = p.Version,
                                 Description = p.Description,
                                 Author = p.Author,
-                                ReferenceCount = PluginAssociationManager.Instance.GetPluginReferenceCount(p.Id),
+                                ReferenceCount = _pluginAssociationManager.GetPluginReferenceCount(p.Id),
                                 ProfilesText = GetProfilesText(p.Id),
                                 HasDescription = !string.IsNullOrWhiteSpace(p.Description)
                             };
@@ -151,7 +164,8 @@ public partial class InstalledPluginsPage : UserControl
     {
         if (sender is Button btn && btn.Tag is string pluginId)
         {
-            var dialog = new ProfileSelectorDialog(pluginId);
+            var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+            var dialog = dialogFactory.CreateProfileSelectorDialog(pluginId);
             dialog.Owner = Window.GetWindow(this);
             if (dialog.ShowDialog() == true)
             {
@@ -168,11 +182,12 @@ public partial class InstalledPluginsPage : UserControl
         if (sender is Button btn && btn.Tag is string pluginId)
         {
             // 获取插件名称用于显示
-            var pluginInfo = PluginLibrary.Instance.GetInstalledPluginInfo(pluginId);
+            var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
             var pluginName = pluginInfo?.Name ?? pluginId;
 
             // 显示卸载确认对话框
-            var dialog = new UninstallConfirmDialog(pluginId, pluginName);
+            var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+            var dialog = dialogFactory.CreateUninstallConfirmDialog(pluginId, pluginName);
             dialog.Owner = Window.GetWindow(this);
 
             if (dialog.ShowDialog() == true && dialog.UninstallSucceeded)
@@ -190,16 +205,16 @@ public partial class InstalledPluginsPage : UserControl
         if (sender is Button btn && btn.Tag is string pluginId)
         {
             // 获取插件名称用于显示
-            var pluginInfo = PluginLibrary.Instance.GetInstalledPluginInfo(pluginId);
+            var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
             var pluginName = pluginInfo?.Name ?? pluginId;
 
             // 调用 PluginLibrary.UpdatePlugin
-            var result = PluginLibrary.Instance.UpdatePlugin(pluginId);
+            var result = _pluginLibrary.UpdatePlugin(pluginId);
 
             if (result.IsSuccess)
             {
                 // 显示成功通知
-                NotificationService.Instance.Show($"{pluginName} 已更新到 v{result.NewVersion}",
+                _notificationService.Show($"{pluginName} 已更新到 v{result.NewVersion}",
                                                   NotificationType.Success);
 
                 // 刷新列表
@@ -208,7 +223,7 @@ public partial class InstalledPluginsPage : UserControl
             else
             {
                 // 显示失败通知
-                NotificationService.Instance.Show($"更新 {pluginName} 失败: {result.ErrorMessage}",
+                _notificationService.Show($"更新 {pluginName} 失败: {result.ErrorMessage}",
                                                   NotificationType.Error);
             }
         }

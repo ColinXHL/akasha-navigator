@@ -18,6 +18,7 @@ namespace AkashaNavigator.Tests
         private readonly string _builtInProfilesDir;
         private readonly string _builtInPluginsDir;
         private readonly string _subscriptionsFilePath;
+        private readonly LogService _logService;
 
         public SubscriptionManagerTests()
         {
@@ -32,6 +33,10 @@ namespace AkashaNavigator.Tests
             Directory.CreateDirectory(_profilesDir);
             Directory.CreateDirectory(_builtInProfilesDir);
             Directory.CreateDirectory(_builtInPluginsDir);
+
+            // 初始化 LogService
+            _logService = new LogService();
+            LogService.Instance = _logService;
 
             // 重置单例实例
             SubscriptionManager.ResetInstance();
@@ -193,7 +198,7 @@ namespace AkashaNavigator.Tests
         /// </summary>
         private SubscriptionManager CreateManager()
         {
-            return new SubscriptionManager(_subscriptionsFilePath, _profilesDir);
+            return new SubscriptionManager(_logService, _subscriptionsFilePath, _profilesDir);
         }
 
         /// <summary>

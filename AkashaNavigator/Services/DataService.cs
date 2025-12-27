@@ -16,30 +16,23 @@ public class DataService : IDataService
 {
 #region Singleton
 
-    private static DataService? _instance;
-    private static readonly object _lock = new();
+    private static IDataService? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 向后兼容的单例属性（临时保留，步骤7将移除）
     /// </summary>
-    public static DataService Instance
+    public static IDataService Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new DataService();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("DataService not initialized. Use DI container.");
+        set => _instance = value;
     }
 
 #endregion
 
 #region Fields
 
+    private readonly ILogService _logService;
+    private readonly IProfileManager _profileManager;
     private List<HistoryItem> _historyCache = new();
     private List<BookmarkItem> _bookmarkCache = new();
     private bool _historyCacheLoaded;
@@ -49,10 +42,32 @@ public class DataService : IDataService
 
 #region Constructor
 
+    // 构造函数改为internal，允许DI容器创建实例
     private DataService()
     {
+        _logService = _logService;
+        _profileManager = _profileManager;
+
         // 监听 Profile 切换，清除缓存
-        ProfileManager.Instance.ProfileChanged += (s, e) =>
+        _profileManager.ProfileChanged += (s, e) =>
+        {
+            _historyCacheLoaded = false;
+            _bookmarkCacheLoaded = false;
+            _historyCache.Clear();
+            _bookmarkCache.Clear();
+        };
+    }
+
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public DataService(ILogService logService, IProfileManager profileManager)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+
+        // 监听 Profile 切换，清除缓存
+        _profileManager.ProfileChanged += (s, e) =>
         {
             _historyCacheLoaded = false;
             _bookmarkCacheLoaded = false;
@@ -260,12 +275,12 @@ public class DataService : IDataService
 
     private string GetHistoryFilePath()
     {
-        return Path.Combine(ProfileManager.Instance.GetCurrentProfileDirectory(), AppConstants.HistoryFileName);
+        return Path.Combine(_profileManager.GetCurrentProfileDirectory(), AppConstants.HistoryFileName);
     }
 
     private string GetBookmarksFilePath()
     {
-        return Path.Combine(ProfileManager.Instance.GetCurrentProfileDirectory(), AppConstants.BookmarksFileName);
+        return Path.Combine(_profileManager.GetCurrentProfileDirectory(), AppConstants.BookmarksFileName);
     }
 
     private void EnsureHistoryLoaded()
@@ -280,7 +295,7 @@ public class DataService : IDataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("DataService", "加载历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Warn("DataService", "加载历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
                                      ex.Message);
             _historyCache = new();
         }
@@ -299,7 +314,7 @@ public class DataService : IDataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Warn("DataService", "加载收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Warn("DataService", "加载收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
                                      ex.Message);
             _bookmarkCache = new();
         }
@@ -315,7 +330,7 @@ public class DataService : IDataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("DataService", "保存历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Debug("DataService", "保存历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
                                       ex.Message);
         }
     }
@@ -329,7 +344,7 @@ public class DataService : IDataService
         }
         catch (Exception ex)
         {
-            LogService.Instance.Debug("DataService", "保存收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
+            _logService.Debug("DataService", "保存收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
                                       ex.Message);
         }
     }

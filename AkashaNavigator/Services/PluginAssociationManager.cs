@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -96,28 +97,19 @@ public class PluginEnabledChangedEventArgs : EventArgs
 /// 插件关联管理服务
 /// 管理插件与Profile的关联关系，支持双向查询
 /// </summary>
-public class PluginAssociationManager
+public class PluginAssociationManager : IPluginAssociationManager
 {
 #region Singleton
 
-    private static PluginAssociationManager? _instance;
-    private static readonly object _lock = new();
+    private static IPluginAssociationManager? _instance;
 
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（向后兼容）
     /// </summary>
-    public static PluginAssociationManager Instance
+    public static IPluginAssociationManager Instance
     {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new PluginAssociationManager();
-                }
-            }
-            return _instance;
-        }
+        get => _instance ?? throw new InvalidOperationException("PluginAssociationManager not initialized");
+        set => _instance = value;
     }
 
     /// <summary>
@@ -125,11 +117,15 @@ public class PluginAssociationManager
     /// </summary>
     internal static void ResetInstance()
     {
-        lock (_lock)
-        {
-            _instance = null;
-        }
+        _instance = null;
     }
+
+#endregion
+
+#region Fields
+
+    private readonly ILogService _logService;
+    private readonly IPluginLibrary _pluginLibrary;
 
 #endregion
 
@@ -153,14 +149,27 @@ public class PluginAssociationManager
 
     private PluginAssociationManager()
     {
+        _pluginLibrary = PluginLibrary.Instance;
+        _index = LoadIndex();
+    }
+
+    /// <summary>
+    /// DI容器使用的构造函数
+    /// </summary>
+    public PluginAssociationManager(ILogService logService, IPluginLibrary pluginLibrary)
+    {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _index = LoadIndex();
     }
 
     /// <summary>
     /// 用于测试的构造函数
     /// </summary>
-    internal PluginAssociationManager(string indexPath)
+    internal PluginAssociationManager(ILogService logService, string indexPath)
     {
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _pluginLibrary = PluginLibrary.Instance;
         _index = AssociationIndex.LoadFromFile(indexPath);
     }
 
@@ -270,7 +279,7 @@ public class PluginAssociationManager
                 {
                     reference.Status = PluginInstallStatus.Disabled;
                 }
-                else if (!PluginLibrary.Instance.IsInstalled(reference.PluginId))
+                else if (!_pluginLibrary.IsInstalled(reference.PluginId))
                 {
                     reference.Status = PluginInstallStatus.Missing;
                 }
@@ -304,7 +313,7 @@ public class PluginAssociationManager
             var result = new List<string>();
             foreach (var entry in entries)
             {
-                if (!PluginLibrary.Instance.IsInstalled(entry.PluginId))
+                if (!_pluginLibrary.IsInstalled(entry.PluginId))
                 {
                     result.Add(entry.PluginId);
                 }
@@ -392,16 +401,16 @@ public class PluginAssociationManager
         {
             // 全局配置路径（插件库目录）
             var globalConfigPath =
-                Path.Combine(PluginLibrary.Instance.GetPluginDirectory(pluginId), AppConstants.PluginConfigFileName);
+                Path.Combine(_pluginLibrary.GetPluginDirectory(pluginId), AppConstants.PluginConfigFileName);
 
             // Profile 配置目录
-            var profileConfigDir = PluginHost.Instance.GetPluginConfigDirectory(profileId, pluginId);
+            var profileConfigDir = AppPaths.GetPluginConfigDirectory(profileId, pluginId);
             var profileConfigPath = Path.Combine(profileConfigDir, AppConstants.PluginConfigFileName);
 
             // 如果 Profile 配置已存在，不覆盖
             if (File.Exists(profileConfigPath))
             {
-                LogService.Instance.Debug("PluginAssociationManager",
+                _logService.Debug("PluginAssociationManager",
                                           $"Profile 配置已存在，跳过复制: {profileConfigPath}");
                 return;
             }
@@ -413,18 +422,18 @@ public class PluginAssociationManager
             if (File.Exists(globalConfigPath))
             {
                 File.Copy(globalConfigPath, profileConfigPath);
-                LogService.Instance.Debug("PluginAssociationManager",
+                _logService.Debug("PluginAssociationManager",
                                           $"已复制全局配置到 Profile: {globalConfigPath} -> {profileConfigPath}");
             }
             else
             {
-                LogService.Instance.Debug("PluginAssociationManager",
+                _logService.Debug("PluginAssociationManager",
                                           "全局配置不存在，将使用默认配置: {GlobalConfigPath}", globalConfigPath);
             }
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("PluginAssociationManager", ex, "复制全局配置失败");
+            _logService.Error("PluginAssociationManager", ex, "复制全局配置失败");
         }
     }
 

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -10,13 +11,29 @@ namespace AkashaNavigator.Views.Dialogs
 /// </summary>
 public partial class ProfileSelectorDialog : AnimatedWindow
 {
+    private readonly IProfileManager _profileManager;
+    private readonly IPluginAssociationManager _pluginAssociationManager;
+    private readonly INotificationService _notificationService;
+    private readonly ILogService _logService;
     private readonly string _pluginId;
     private List<ProfileSelectionItem> _profiles = new();
 
-    public ProfileSelectorDialog(string pluginId)
+    /// <summary>
+    /// DI容器注入的构造函数
+    /// </summary>
+    public ProfileSelectorDialog(
+        IProfileManager profileManager,
+        IPluginAssociationManager pluginAssociationManager,
+        INotificationService notificationService,
+        ILogService logService,
+        string pluginId)
     {
-        InitializeComponent();
+        _profileManager = profileManager;
+        _pluginAssociationManager = pluginAssociationManager;
+        _notificationService = notificationService;
+        _logService = logService;
         _pluginId = pluginId;
+        InitializeComponent();
         LoadProfiles();
     }
 
@@ -25,8 +42,8 @@ public partial class ProfileSelectorDialog : AnimatedWindow
     /// </summary>
     private void LoadProfiles()
     {
-        var allProfiles = ProfileManager.Instance.InstalledProfiles;
-        var profilesWithPlugin = PluginAssociationManager.Instance.GetProfilesUsingPlugin(_pluginId);
+        var allProfiles = _profileManager.InstalledProfiles;
+        var profilesWithPlugin = _pluginAssociationManager.GetProfilesUsingPlugin(_pluginId);
         var profilesWithPluginSet = profilesWithPlugin.ToHashSet();
 
         _profiles = allProfiles
@@ -84,7 +101,7 @@ public partial class ProfileSelectorDialog : AnimatedWindow
 
         if (selectedProfiles.Count == 0)
         {
-            NotificationService.Instance.Warning("请至少选择一个 Profile", "提示");
+            _notificationService.Warning("请至少选择一个 Profile", "提示");
             return;
         }
 
@@ -94,24 +111,24 @@ public partial class ProfileSelectorDialog : AnimatedWindow
         {
             try
             {
-                PluginAssociationManager.Instance.AddPluginToProfile(_pluginId, profileId);
+                _pluginAssociationManager.AddPluginToProfile(_pluginId, profileId);
                 successCount++;
             }
             catch (Exception ex)
             {
-                LogService.Instance.Error("ProfileSelectorDialog",
+                _logService.Error("ProfileSelectorDialog",
                                           "添加插件到 Profile {ProfileId} 失败: {ErrorMessage}", profileId, ex.Message);
             }
         }
 
         if (successCount > 0)
         {
-            NotificationService.Instance.Success($"已成功将插件添加到 {successCount} 个 Profile", "添加成功");
+            _notificationService.Success($"已成功将插件添加到 {successCount} 个 Profile", "添加成功");
             DialogResult = true;
         }
         else
         {
-            NotificationService.Instance.Error("添加失败，请查看日志了解详情", "添加失败");
+            _notificationService.Error("添加失败，请查看日志了解详情", "添加失败");
             DialogResult = false;
         }
 

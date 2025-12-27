@@ -132,6 +132,17 @@ public static class AppPaths
     }
 
     /// <summary>
+    /// 获取插件配置目录
+    /// </summary>
+    /// <param name="profileId">Profile ID</param>
+    /// <param name="pluginId">插件 ID</param>
+    /// <returns>配置目录路径</returns>
+    public static string GetPluginConfigDirectory(string profileId, string pluginId)
+    {
+        return Path.Combine(ProfilesDirectory, profileId, AppConstants.PluginsDirectoryName, pluginId);
+    }
+
+    /// <summary>
     /// 确保所有必要目录存在
     /// </summary>
     private static void EnsureDirectoriesExist()

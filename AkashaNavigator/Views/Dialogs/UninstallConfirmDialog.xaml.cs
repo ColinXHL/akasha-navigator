@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media.Animation;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -12,6 +13,10 @@ namespace AkashaNavigator.Views.Dialogs
 /// </summary>
 public partial class UninstallConfirmDialog : AnimatedWindow
 {
+    private readonly IPluginAssociationManager _pluginAssociationManager;
+    private readonly INotificationService _notificationService;
+    private readonly ILogService _logService;
+    private readonly IPluginLibrary _pluginLibrary;
     private readonly string _pluginId;
     private readonly string _pluginName;
     private readonly List<string> _referencingProfiles;
@@ -27,17 +32,25 @@ public partial class UninstallConfirmDialog : AnimatedWindow
     public string? ErrorMessage { get; private set; }
 
     /// <summary>
-    /// 创建卸载确认对话框
+    /// DI容器注入的构造函数
     /// </summary>
-    /// <param name="pluginId">插件ID</param>
-    /// <param name="pluginName">插件名称（用于显示）</param>
-    public UninstallConfirmDialog(string pluginId, string? pluginName = null)
+    public UninstallConfirmDialog(
+        IPluginAssociationManager pluginAssociationManager,
+        INotificationService notificationService,
+        ILogService logService,
+        IPluginLibrary pluginLibrary,
+        string pluginId,
+        string? pluginName = null)
     {
+        _pluginAssociationManager = pluginAssociationManager;
+        _notificationService = notificationService;
+        _logService = logService;
+        _pluginLibrary = pluginLibrary;
         InitializeComponent();
 
         _pluginId = pluginId;
         _pluginName = pluginName ?? pluginId;
-        _referencingProfiles = PluginAssociationManager.Instance.GetProfilesUsingPlugin(pluginId);
+        _referencingProfiles = _pluginAssociationManager.GetProfilesUsingPlugin(pluginId);
 
         InitializeUI();
         Loaded += UninstallConfirmDialog_Loaded;
@@ -129,7 +142,7 @@ public partial class UninstallConfirmDialog : AnimatedWindow
         else
         {
             // 使用 NotificationService 显示错误
-            NotificationService.Instance.Error(ErrorMessage ?? "卸载失败，请稍后重试。", "卸载失败");
+            _notificationService.Error(ErrorMessage ?? "卸载失败，请稍后重试。", "卸载失败");
         }
     }
 
@@ -142,24 +155,24 @@ public partial class UninstallConfirmDialog : AnimatedWindow
         // 1. 如果有关联的Profile，先清理关联关系
         if (_referencingProfiles.Count > 0)
         {
-            var removedCount = PluginAssociationManager.Instance.RemovePluginFromAllProfiles(_pluginId);
-            LogService.Instance.Info("UninstallConfirmDialog",
+            var removedCount = _pluginAssociationManager.RemovePluginFromAllProfiles(_pluginId);
+            _logService.Info("UninstallConfirmDialog",
                                      "已从 {RemovedCount} 个 Profile 中移除插件 {PluginId} 的引用", removedCount,
                                      _pluginId);
         }
 
         // 2. 执行卸载（强制模式，因为关联已清理）
-        var uninstallResult = PluginLibrary.Instance.UninstallPlugin(_pluginId, force: true);
+        var uninstallResult = _pluginLibrary.UninstallPlugin(_pluginId, force: true);
 
         if (uninstallResult.IsSuccess)
         {
-            LogService.Instance.Info("UninstallConfirmDialog", "插件 {PluginId} 卸载成功", _pluginId);
+            _logService.Info("UninstallConfirmDialog", "插件 {PluginId} 卸载成功", _pluginId);
             return true;
         }
         else
         {
             ErrorMessage = uninstallResult.ErrorMessage;
-            LogService.Instance.Error("UninstallConfirmDialog", "插件 {PluginId} 卸载失败: {ErrorMessage}", _pluginId,
+            _logService.Error("UninstallConfirmDialog", "插件 {PluginId} 卸载失败: {ErrorMessage}", _pluginId,
                                       ErrorMessage ?? "未知错误");
             return false;
         }

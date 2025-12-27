@@ -5,6 +5,7 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Data;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -24,8 +25,11 @@ public partial class BookmarkPopup : AnimatedWindow
 
 #region Constructor
 
-    public BookmarkPopup()
+    private readonly IDataService _dataService;
+
+    public BookmarkPopup(IDataService dataService)
     {
+        _dataService = dataService;
         InitializeComponent();
         LoadBookmarks();
     }
@@ -40,8 +44,8 @@ public partial class BookmarkPopup : AnimatedWindow
     private void LoadBookmarks()
     {
         var searchText = SearchBox.Text.Trim();
-        var bookmarks = string.IsNullOrEmpty(searchText) ? DataService.Instance.GetBookmarks()
-                                                         : DataService.Instance.SearchBookmarks(searchText);
+        var bookmarks = string.IsNullOrEmpty(searchText) ? _dataService.GetBookmarks()
+                                                         : _dataService.SearchBookmarks(searchText);
 
         BookmarkList.ItemsSource = bookmarks;
 
@@ -72,7 +76,7 @@ public partial class BookmarkPopup : AnimatedWindow
 
         if (dialog.Result == true)
         {
-            DataService.Instance.ClearBookmarks();
+            _dataService.ClearBookmarks();
             LoadBookmarks();
         }
     }
@@ -84,7 +88,7 @@ public partial class BookmarkPopup : AnimatedWindow
     {
         if (sender is Button btn && btn.Tag is int id)
         {
-            DataService.Instance.DeleteBookmark(id);
+            _dataService.DeleteBookmark(id);
             LoadBookmarks();
         }
     }

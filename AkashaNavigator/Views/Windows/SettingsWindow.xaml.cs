@@ -9,6 +9,7 @@ using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using HotkeyModifierKeys = AkashaNavigator.Models.Config.ModifierKeys;
 
 namespace AkashaNavigator.Views.Windows
@@ -20,6 +21,9 @@ public partial class SettingsWindow : AnimatedWindow
 {
 #region Fields
 
+    private readonly IConfigService _configService;
+    private readonly IProfileManager _profileManager;
+    private readonly INotificationService _notificationService;
     private AppConfig _config;
     private bool _isInitializing = true;
     private TextBox? _currentHotkeyTextBox;
@@ -31,10 +35,17 @@ public partial class SettingsWindow : AnimatedWindow
 
 #region Constructor
 
-    public SettingsWindow()
+    public SettingsWindow(
+        IConfigService configService,
+        IProfileManager profileManager,
+        INotificationService notificationService)
     {
+        _configService = configService;
+        _profileManager = profileManager;
+        _notificationService = notificationService;
+
         InitializeComponent();
-        _config = ConfigService.Instance.Config;
+        _config = _configService.Config;
         LoadSettings();
         _isInitializing = false;
     }
@@ -177,7 +188,7 @@ public partial class SettingsWindow : AnimatedWindow
     /// </summary>
     private void BtnOpenConfigFolder_Click(object sender, RoutedEventArgs e)
     {
-        var path = ProfileManager.Instance.DataDirectory;
+        var path = _profileManager.DataDirectory;
         if (Directory.Exists(path))
         {
             Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
@@ -195,7 +206,7 @@ public partial class SettingsWindow : AnimatedWindow
 
         // 插件中心关闭后刷新 Profile 列表（可能有变化）
         _isInitializing = true;
-        ProfileManager.Instance.ReloadProfiles();
+        _profileManager.ReloadProfiles();
         LoadProfileList();
         _isInitializing = false;
     }
@@ -337,7 +348,7 @@ public partial class SettingsWindow : AnimatedWindow
     private void BtnSave_Click(object sender, RoutedEventArgs e)
     {
         SaveSettingsToConfig();
-        ConfigService.Instance.UpdateConfig(_config);
+        _configService.UpdateConfig(_config);
         CloseWithAnimation();
     }
 
@@ -346,11 +357,11 @@ public partial class SettingsWindow : AnimatedWindow
     /// </summary>
     private void LoadProfileList()
     {
-        var profiles = ProfileManager.Instance.InstalledProfiles;
+        var profiles = _profileManager.InstalledProfiles;
         ProfileComboBox.ItemsSource = profiles;
 
         // 选中当前 Profile
-        var currentProfile = ProfileManager.Instance.CurrentProfile;
+        var currentProfile = _profileManager.CurrentProfile;
         for (int i = 0; i < profiles.Count; i++)
         {
             if (profiles[i].Id.Equals(currentProfile.Id, StringComparison.OrdinalIgnoreCase))
@@ -386,12 +397,12 @@ public partial class SettingsWindow : AnimatedWindow
 
         if (ProfileComboBox.SelectedItem is GameProfile selectedProfile)
         {
-            var currentProfile = ProfileManager.Instance.CurrentProfile;
+            var currentProfile = _profileManager.CurrentProfile;
 
             // 如果选择了不同的 Profile，切换
             if (!selectedProfile.Id.Equals(currentProfile.Id, StringComparison.OrdinalIgnoreCase))
             {
-                ProfileManager.Instance.SwitchProfile(selectedProfile.Id);
+                _profileManager.SwitchProfile(selectedProfile.Id);
                 Debug.WriteLine($"[Settings] 已切换到配置: {selectedProfile.Name}");
             }
 
@@ -411,19 +422,19 @@ public partial class SettingsWindow : AnimatedWindow
         // 不能删除默认 Profile
         if (selectedProfile.Id.Equals("default", StringComparison.OrdinalIgnoreCase))
         {
-            NotificationService.Instance.Info("不能取消订阅默认配置。", "提示");
+            _notificationService.Info("不能取消订阅默认配置。", "提示");
             return;
         }
 
         // 显示确认对话框
-        var confirmed = await NotificationService.Instance.ConfirmAsync(
+        var confirmed = await _notificationService.ConfirmAsync(
             $"确定要取消订阅配置 \"{selectedProfile.Name}\" 吗？\n\n此操作将删除该配置，无法撤销。", "确认取消订阅");
 
         if (!confirmed)
             return;
 
         // 调用 ProfileManager.UnsubscribeProfile
-        var unsubscribeResult = ProfileManager.Instance.UnsubscribeProfile(selectedProfile.Id);
+        var unsubscribeResult = _profileManager.UnsubscribeProfile(selectedProfile.Id);
 
         if (unsubscribeResult.Success)
         {
@@ -436,7 +447,7 @@ public partial class SettingsWindow : AnimatedWindow
         }
         else
         {
-            NotificationService.Instance.Error(unsubscribeResult.ErrorMessage ?? "取消订阅失败", "错误");
+            _notificationService.Error(unsubscribeResult.ErrorMessage ?? "取消订阅失败", "错误");
             Debug.WriteLine($"[Settings] 取消订阅配置失败: {unsubscribeResult.ErrorMessage}");
         }
     }

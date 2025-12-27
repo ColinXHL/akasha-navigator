@@ -6,6 +6,7 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -16,9 +17,14 @@ public partial class PluginSelectorDialog : AnimatedWindow
 {
     private readonly string _profileId;
     private readonly List<PluginSelectorItem> _items;
+    private readonly IPluginAssociationManager _pluginAssociationManager;
 
-    public PluginSelectorDialog(List<InstalledPluginInfo> availablePlugins, string profileId)
+    public PluginSelectorDialog(
+        IPluginAssociationManager pluginAssociationManager,
+        List<InstalledPluginInfo> availablePlugins,
+        string profileId)
     {
+        _pluginAssociationManager = pluginAssociationManager;
         InitializeComponent();
         _profileId = profileId;
 
@@ -81,7 +87,7 @@ public partial class PluginSelectorDialog : AnimatedWindow
         }
 
         // 添加到 Profile
-        var addedCount = PluginAssociationManager.Instance.AddPluginsToProfile(selectedPlugins, _profileId);
+        var addedCount = _pluginAssociationManager.AddPluginsToProfile(selectedPlugins, _profileId);
 
         if (addedCount > 0)
         {

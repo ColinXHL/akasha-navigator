@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using AkashaNavigator.Services;
+using AkashaNavigator.Core.Interfaces;
 using FsCheck;
 using FsCheck.Xunit;
 using Serilog.Events;
@@ -29,7 +30,11 @@ public class LogServiceTests
         // 限制调用次数在合理范围内
         var count = Math.Min(callCount.Get, 1000);
 
-        var instances = new LogService[count];
+        // 初始化 LogService.Instance（步骤4：需要手动初始化）
+        var tempDir = Path.GetTempPath();
+        LogService.Instance = new LogService(tempDir);
+
+        var instances = new ILogService[count];
         for (int i = 0; i < count; i++)
         {
             instances[i] = LogService.Instance;

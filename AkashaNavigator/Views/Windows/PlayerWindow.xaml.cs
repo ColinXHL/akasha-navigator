@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using Microsoft.Extensions.DependencyInjection;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Profile;
@@ -36,6 +38,16 @@ public partial class PlayerWindow : Window
 #endregion
 
 #region Fields
+
+    // DI注入的服务
+    private readonly IConfigService _configService;
+    private readonly IProfileManager _profileManager;
+    private readonly IWindowStateService _windowStateService;
+    private readonly ISubtitleService _subtitleService;
+    private readonly IDataService _dataService;
+    private readonly IPluginHost _pluginHost;
+    private readonly ILogService _logService;
+    private readonly ICursorDetectionService _cursorDetectionService;
 
     /// <summary>
     /// 是否最大化
@@ -81,16 +93,33 @@ public partial class PlayerWindow : Window
 
 #region Constructor
 
-    public PlayerWindow()
+    public PlayerWindow(
+        IConfigService configService,
+        IProfileManager profileManager,
+        IWindowStateService windowStateService,
+        ISubtitleService subtitleService,
+        IDataService dataService,
+        IPluginHost pluginHost,
+        ILogService logService,
+        ICursorDetectionService cursorDetectionService)
     {
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+        _windowStateService = windowStateService ?? throw new ArgumentNullException(nameof(windowStateService));
+        _subtitleService = subtitleService ?? throw new ArgumentNullException(nameof(subtitleService));
+        _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
+        _pluginHost = pluginHost ?? throw new ArgumentNullException(nameof(pluginHost));
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _cursorDetectionService = cursorDetectionService ?? throw new ArgumentNullException(nameof(cursorDetectionService));
+
         InitializeComponent();
-        _config = ConfigService.Instance.Config;
+        _config = _configService.Config;
         InitializeWindowPosition();
         InitializeWindowBehavior();
         InitializeWebView();
 
         // 订阅 Profile 切换事件
-        ProfileManager.Instance.ProfileChanged += OnProfileChanged;
+        _profileManager.ProfileChanged += OnProfileChanged;
 
         // 初始化鼠标检测（如果当前 Profile 启用了）
         InitializeCursorDetection();
@@ -113,7 +142,7 @@ public partial class PlayerWindow : Window
     /// </summary>
     private void InitializeWindowPosition()
     {
-        var state = WindowStateService.Instance.Load();
+        var state = _windowStateService.Load();
 
         // 应用保存的位置和大小
         Left = state.Left;
@@ -139,7 +168,7 @@ public partial class PlayerWindow : Window
     /// </summary>
     private void InitializeWindowBehavior()
     {
-        var state = WindowStateService.Instance.Load();
+        var state = _windowStateService.Load();
         _windowBehavior = new WindowBehaviorHelper(this, _config, state.Opacity);
     }
 
@@ -148,7 +177,7 @@ public partial class PlayerWindow : Window
     /// </summary>
     private void SaveWindowState()
     {
-        var state = WindowStateService.Instance.Load();
+        var state = _windowStateService.Load();
         state.Left = Left;
         state.Top = Top;
         state.Width = Width;
@@ -157,7 +186,7 @@ public partial class PlayerWindow : Window
         state.IsMaximized = _isMaximized;
         state.LastUrl = WebView.CoreWebView2?.Source ?? AppConstants.DefaultHomeUrl;
         state.IsMuted = WebView.CoreWebView2?.IsMuted ?? false;
-        WindowStateService.Instance.Save(state);
+        _windowStateService.Save(state);
     }
 
 #endregion
@@ -215,13 +244,13 @@ public partial class PlayerWindow : Window
             WebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
 
             // 附加字幕服务以拦截字幕数据
-            SubtitleService.Instance.AttachToWebView(WebView.CoreWebView2);
+            _subtitleService.AttachToWebView(WebView.CoreWebView2);
 
             // 启动视频时间同步
             StartVideoTimeSync();
 
             // 从保存的状态加载 URL 和静音设置
-            var state = WindowStateService.Instance.Load();
+            var state = _windowStateService.Load();
 
             // 恢复静音状态
             WebView.CoreWebView2.IsMuted = state.IsMuted;
@@ -262,7 +291,7 @@ public partial class PlayerWindow : Window
                     if (type == "subtitle_url" || type == "subtitle_data" || type == "subtitle_error" ||
                         type == "subtitle_info")
                     {
-                        SubtitleService.Instance.HandleSubtitleMessage(message);
+                        _subtitleService.HandleSubtitleMessage(message);
                         return;
                     }
                 }
@@ -312,7 +341,7 @@ public partial class PlayerWindow : Window
             // 过滤掉空白页和内部页面
             if (!string.IsNullOrWhiteSpace(url) && !url.StartsWith("about:") && !url.StartsWith("data:"))
             {
-                DataService.Instance.AddHistory(url, title);
+                _dataService.AddHistory(url, title);
             }
 
             // 注意：字幕获取现在由被动拦截处理（SubtitleService.OnWebResourceResponseReceived）
@@ -336,7 +365,7 @@ public partial class PlayerWindow : Window
         // 广播 urlChanged 事件到插件
         if (!string.IsNullOrEmpty(currentUrl))
         {
-            PluginHost.Instance.BroadcastUrlChanged(currentUrl);
+            _pluginHost.BroadcastUrlChanged(currentUrl);
         }
 
         // 注意：字幕获取现在由被动拦截处理（SubtitleService.OnWebResourceResponseReceived）
@@ -709,7 +738,7 @@ public partial class PlayerWindow : Window
         _videoTimeSyncTimer.Tick += VideoTimeSyncTimer_Tick;
         _videoTimeSyncTimer.Start();
 
-        LogService.Instance.Debug("PlayerWindow", "视频时间同步已启动");
+        _logService.Debug("PlayerWindow", "视频时间同步已启动");
     }
 
     /// <summary>
@@ -723,7 +752,7 @@ public partial class PlayerWindow : Window
             _videoTimeSyncTimer.Tick -= VideoTimeSyncTimer_Tick;
             _videoTimeSyncTimer = null;
 
-            LogService.Instance.Debug("PlayerWindow", "视频时间同步已停止");
+            _logService.Debug("PlayerWindow", "视频时间同步已停止");
         }
     }
 
@@ -770,10 +799,10 @@ public partial class PlayerWindow : Window
                         var duration = durEl.GetDouble();
 
                         // 更新字幕服务的当前时间
-                        SubtitleService.Instance.UpdateCurrentTime(currentTime);
+                        _subtitleService.UpdateCurrentTime(currentTime);
 
                         // 广播 timeUpdate 事件到插件
-                        PluginHost.Instance.BroadcastTimeUpdate(currentTime, duration);
+                        _pluginHost.BroadcastTimeUpdate(currentTime, duration);
                     }
                 }
             }
@@ -793,7 +822,7 @@ public partial class PlayerWindow : Window
     /// </summary>
     private void InitializeCursorDetection()
     {
-        var profile = ProfileManager.Instance.CurrentProfile;
+        var profile = _profileManager.CurrentProfile;
         var config = profile.CursorDetection;
 
         if (config?.Enabled == true)
@@ -822,11 +851,11 @@ public partial class PlayerWindow : Window
         }
 
         // 订阅事件
-        CursorDetectionService.Instance.CursorShown += OnCursorShown;
-        CursorDetectionService.Instance.CursorHidden += OnCursorHidden;
+        _cursorDetectionService.CursorShown += OnCursorShown;
+        _cursorDetectionService.CursorHidden += OnCursorHidden;
 
         // 启动检测
-        CursorDetectionService.Instance.Start(targetProcess, config.CheckIntervalMs);
+        _cursorDetectionService.Start(targetProcess, config.CheckIntervalMs);
     }
 
     /// <summary>
@@ -834,9 +863,9 @@ public partial class PlayerWindow : Window
     /// </summary>
     private void StopCursorDetection()
     {
-        CursorDetectionService.Instance.CursorShown -= OnCursorShown;
-        CursorDetectionService.Instance.CursorHidden -= OnCursorHidden;
-        CursorDetectionService.Instance.Stop();
+        _cursorDetectionService.CursorShown -= OnCursorShown;
+        _cursorDetectionService.CursorHidden -= OnCursorHidden;
+        _cursorDetectionService.Stop();
 
         // 如果之前因鼠标检测降低了透明度，恢复
         if (_isOpacityReducedByCursorDetection)
@@ -930,7 +959,8 @@ public partial class PlayerWindow : Window
                 if (ExitRecordPrompt.ShouldShowPrompt(currentUrl))
                 {
                     // 显示退出记录提示窗口
-                    var exitPrompt = new ExitRecordPrompt(currentUrl, currentTitle);
+                    var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+                    var exitPrompt = dialogFactory.CreateExitRecordPrompt(currentUrl, currentTitle);
                     exitPrompt.Owner = this;
                     exitPrompt.ShowDialog();
 
@@ -945,7 +975,8 @@ public partial class PlayerWindow : Window
                     case ExitRecordPrompt.PromptResult.OpenPioneerNotes:
                         // 取消退出，打开开荒笔记窗口
                         e.Cancel = true;
-                        var noteWindow = new PioneerNoteWindow();
+                        var pioneerNoteService = App.Services.GetRequiredService<IPioneerNoteService>();
+                        var noteWindow = new PioneerNoteWindow(pioneerNoteService);
                         noteWindow.Owner = this;
                         noteWindow.NoteItemSelected += (s, url) => Navigate(url);
                         noteWindow.Show();
@@ -954,7 +985,8 @@ public partial class PlayerWindow : Window
                     case ExitRecordPrompt.PromptResult.QuickRecord:
                         // 取消退出，打开记录笔记对话框
                         e.Cancel = true;
-                        var recordDialog = new RecordNoteDialog(currentUrl, currentTitle);
+                        var pioneerNoteService2 = App.Services.GetRequiredService<IPioneerNoteService>();
+                        var recordDialog = new RecordNoteDialog(pioneerNoteService2, currentUrl, currentTitle);
                         recordDialog.Owner = this;
                         recordDialog.ShowDialog();
                         return;
@@ -982,13 +1014,13 @@ public partial class PlayerWindow : Window
         StopVideoTimeSync();
 
         // 取消 Profile 事件订阅
-        ProfileManager.Instance.ProfileChanged -= OnProfileChanged;
+        _profileManager.ProfileChanged -= OnProfileChanged;
 
         // 取消事件订阅
         if (WebView.CoreWebView2 != null)
         {
             // 分离字幕服务
-            SubtitleService.Instance.DetachFromWebView(WebView.CoreWebView2);
+            _subtitleService.DetachFromWebView(WebView.CoreWebView2);
 
             WebView.CoreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
             WebView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
