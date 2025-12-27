@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Models.Profile
 {
@@ -38,8 +39,8 @@ public class MarketplaceSourceConfig
 
         try
         {
-            var config = JsonHelper.LoadFromFile<MarketplaceSourceConfig>(filePath);
-            return config ?? new MarketplaceSourceConfig();
+            var configResult = JsonHelper.LoadFromFile<MarketplaceSourceConfig>(filePath);
+            return configResult.GetValueOrDefault(new MarketplaceSourceConfig());
         }
         catch
         {

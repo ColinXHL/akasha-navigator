@@ -572,8 +572,10 @@ public class ProfileMarketplaceService
             var json = File.ReadAllText(profilePath);
             var gameProfile = JsonHelper.Deserialize<GameProfile>(json);
 
-            if (gameProfile == null)
+            if (gameProfile.IsFailure || gameProfile.Value == null)
                 return null;
+
+            var profile = gameProfile.Value;
 
             // 从注册表获取插件列表
             var registryPath = Path.Combine(AppPaths.BuiltInProfilesDirectory, "registry.json");
@@ -594,9 +596,9 @@ public class ProfileMarketplaceService
             // 创建导出数据
             return new ProfileExportData {
                 Version = 1,
-                ProfileId = gameProfile.Id,
-                ProfileName = gameProfile.Name,
-                ProfileConfig = gameProfile,
+                ProfileId = profile.Id,
+                ProfileName = profile.Name,
+                ProfileConfig = profile,
                 PluginReferences =
                     pluginIds.Select(id => new PluginReferenceEntry { PluginId = id, Enabled = true }).ToList(),
                 ExportedAt = DateTime.Now

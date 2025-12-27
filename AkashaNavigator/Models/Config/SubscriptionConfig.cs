@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Models.Config
 {
@@ -50,15 +51,8 @@ public class SubscriptionConfig
             return new SubscriptionConfig();
         }
 
-        try
-        {
-            var config = JsonHelper.LoadFromFile<SubscriptionConfig>(filePath);
-            return config ?? new SubscriptionConfig();
-        }
-        catch
-        {
-            return new SubscriptionConfig();
-        }
+        var config = JsonHelper.LoadFromFile<SubscriptionConfig>(filePath);
+        return config.GetValueOrDefault(new SubscriptionConfig());
     }
 
     /// <summary>

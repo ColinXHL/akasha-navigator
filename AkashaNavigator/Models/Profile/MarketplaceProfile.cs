@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Models.Profile
 {
@@ -76,7 +77,8 @@ public class MarketplaceProfile
     /// </summary>
     public string ToJson()
     {
-        return JsonHelper.Serialize(this);
+        var result = JsonHelper.Serialize(this);
+        return result.IsSuccess ? result.Value : "{}";
     }
 
     /// <summary>
@@ -89,14 +91,8 @@ public class MarketplaceProfile
         if (string.IsNullOrWhiteSpace(json))
             return null;
 
-        try
-        {
-            return JsonHelper.Deserialize<MarketplaceProfile>(json);
-        }
-        catch
-        {
-            return null;
-        }
+        var result = JsonHelper.Deserialize<MarketplaceProfile>(json);
+        return result.IsSuccess ? result.Value : null;
     }
 
     /// <summary>

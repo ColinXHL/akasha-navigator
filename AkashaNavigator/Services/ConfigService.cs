@@ -2,6 +2,7 @@ using System;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Services
 {
@@ -79,19 +80,16 @@ public class ConfigService : IConfigService
     /// </summary>
     public AppConfig Load()
     {
-        try
+        var result = JsonHelper.LoadFromFile<AppConfig>(ConfigFilePath);
+
+        if (result.IsSuccess)
         {
-            var config = JsonHelper.LoadFromFile<AppConfig>(ConfigFilePath);
-            if (config != null)
-            {
-                return config;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logService.Warn("ConfigService", "加载配置失败，将使用默认配置: {ErrorMessage}", ex.Message);
+            return result.Value!;
         }
 
+        // 记录错误并返回默认配置
+        _logService.Warn("ConfigService", "加载配置失败，将使用默认配置: {ErrorMessage}",
+            result.Error?.Message ?? "未知错误");
         return new AppConfig();
     }
 
@@ -100,13 +98,12 @@ public class ConfigService : IConfigService
     /// </summary>
     public void Save()
     {
-        try
+        var result = JsonHelper.SaveToFile(ConfigFilePath, Config);
+
+        if (result.IsFailure)
         {
-            JsonHelper.SaveToFile(ConfigFilePath, Config);
-        }
-        catch (Exception ex)
-        {
-            _logService.Debug("ConfigService", "保存配置失败: {ErrorMessage}", ex.Message);
+            _logService.Debug("ConfigService", "保存配置失败: {ErrorMessage}",
+                result.Error?.Message ?? "未知错误");
         }
     }
 

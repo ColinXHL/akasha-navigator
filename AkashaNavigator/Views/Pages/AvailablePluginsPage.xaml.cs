@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Services;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
@@ -77,25 +78,18 @@ public partial class AvailablePluginsPage : UserControl
             if (!File.Exists(manifestPath))
                 continue;
 
-            try
-            {
-                var manifest = JsonHelper.LoadFromFile<PluginManifest>(manifestPath);
-                if (manifest == null || string.IsNullOrEmpty(manifest.Id))
-                    continue;
+            var manifest = JsonHelper.LoadFromFile<PluginManifest>(manifestPath);
+            if (manifest.IsFailure || string.IsNullOrEmpty(manifest.Value.Id))
+                continue;
 
-                var isInstalled = installedIds.Contains(manifest.Id);
+            var isInstalled = installedIds.Contains(manifest.Value.Id);
 
-                result.Add(new AvailablePluginViewModel {
-                    Id = manifest.Id, Name = manifest.Name ?? manifest.Id, Version = manifest.Version ?? "1.0.0",
-                    Description = manifest.Description, Author = manifest.Author, SourceDirectory = pluginDir,
-                    HasDescription = !string.IsNullOrWhiteSpace(manifest.Description),
-                    HasAuthor = !string.IsNullOrWhiteSpace(manifest.Author), IsInstalled = isInstalled
-                });
-            }
-            catch
-            {
-                // 忽略无效的插件清单
-            }
+            result.Add(new AvailablePluginViewModel {
+                Id = manifest.Value.Id, Name = manifest.Value.Name ?? manifest.Value.Id, Version = manifest.Value.Version ?? "1.0.0",
+                Description = manifest.Value.Description, Author = manifest.Value.Author, SourceDirectory = pluginDir,
+                HasDescription = !string.IsNullOrWhiteSpace(manifest.Value.Description),
+                HasAuthor = !string.IsNullOrWhiteSpace(manifest.Value.Author), IsInstalled = isInstalled
+            });
         }
 
         return result;

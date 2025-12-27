@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
@@ -256,9 +257,9 @@ public class PluginRegistry : IPluginRegistry
         try
         {
             var data = JsonHelper.LoadFromFile<PluginRegistryData>(RegistryFilePath);
-            if (data?.Plugins != null)
+            if (data.IsSuccess && data.Value?.Plugins != null)
             {
-                _plugins = data.Plugins;
+                _plugins = data.Value.Plugins;
                 _logService.Debug("PluginRegistry", "已加载 {PluginCount} 个内置插件", _plugins.Count);
             }
         }

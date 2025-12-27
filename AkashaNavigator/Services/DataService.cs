@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Data;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
@@ -282,13 +283,14 @@ public class DataService : IDataService
         var filePath = GetHistoryFilePath();
         try
         {
-            _historyCache = JsonHelper.LoadFromFile<List<HistoryItem>>(filePath) ?? new();
+            var result = JsonHelper.LoadFromFile<List<HistoryItem>>(filePath);
+            _historyCache = result.IsSuccess ? result.Value : new List<HistoryItem>();
         }
         catch (Exception ex)
         {
             _logService.Warn("DataService", "加载历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
                                      ex.Message);
-            _historyCache = new();
+            _historyCache = new List<HistoryItem>();
         }
         _historyCacheLoaded = true;
     }
@@ -301,13 +303,14 @@ public class DataService : IDataService
         var filePath = GetBookmarksFilePath();
         try
         {
-            _bookmarkCache = JsonHelper.LoadFromFile<List<BookmarkItem>>(filePath) ?? new();
+            var result = JsonHelper.LoadFromFile<List<BookmarkItem>>(filePath);
+            _bookmarkCache = result.IsSuccess ? result.Value : new List<BookmarkItem>();
         }
         catch (Exception ex)
         {
             _logService.Warn("DataService", "加载收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
                                      ex.Message);
-            _bookmarkCache = new();
+            _bookmarkCache = new List<BookmarkItem>();
         }
         _bookmarkCacheLoaded = true;
     }

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.PioneerNote;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
@@ -613,7 +614,8 @@ public class PioneerNoteService : IPioneerNoteService
         var filePath = GetNoteFilePath();
         try
         {
-            _cache = JsonHelper.LoadFromFile<PioneerNoteData>(filePath) ?? new PioneerNoteData();
+            var result = JsonHelper.LoadFromFile<PioneerNoteData>(filePath);
+            _cache = result.IsSuccess ? result.Value : new PioneerNoteData();
         }
         catch (Exception ex)
         {
@@ -632,7 +634,12 @@ public class PioneerNoteService : IPioneerNoteService
         var filePath = GetNoteFilePath();
         try
         {
-            JsonHelper.SaveToFile(filePath, _cache);
+            var result = JsonHelper.SaveToFile(filePath, _cache);
+            if (result.IsFailure)
+            {
+                _logService.Debug("PioneerNoteService", "保存笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
+                                          result.Error?.Message ?? "Unknown error");
+            }
         }
         catch (Exception ex)
         {

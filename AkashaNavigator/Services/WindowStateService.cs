@@ -3,6 +3,7 @@ using System.IO;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Services
 {
@@ -66,14 +67,16 @@ public class WindowStateService : IWindowStateService
             return _cachedState;
 
         var filePath = GetFilePath();
-        try
+        var result = JsonHelper.LoadFromFile<WindowState>(filePath);
+
+        if (result.IsSuccess)
         {
-            _cachedState = JsonHelper.LoadFromFile<WindowState>(filePath);
+            _cachedState = result.Value;
         }
-        catch (Exception ex)
+        else
         {
             _logService.Warn("WindowStateService", "加载窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                     ex.Message);
+                                     result.Error?.Message ?? "未知错误");
             _cachedState = null;
         }
 
@@ -83,7 +86,7 @@ public class WindowStateService : IWindowStateService
             _cachedState = CreateDefaultState();
         }
 
-        return _cachedState;
+        return _cachedState!;
     }
 
     /// <summary>
@@ -94,14 +97,12 @@ public class WindowStateService : IWindowStateService
         _cachedState = state;
 
         var filePath = GetFilePath();
-        try
-        {
-            JsonHelper.SaveToFile(filePath, state);
-        }
-        catch (Exception ex)
+        var result = JsonHelper.SaveToFile(filePath, state);
+
+        if (result.IsFailure)
         {
             _logService.Debug("WindowStateService", "保存窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                      ex.Message);
+                                      result.Error?.Message ?? "未知错误");
         }
     }
 

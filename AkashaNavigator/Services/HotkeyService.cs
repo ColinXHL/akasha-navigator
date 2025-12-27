@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
+using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Services
 {
@@ -176,8 +177,9 @@ public class HotkeyService : IDisposable
             // 获取当前修饰键状态
             var modifiers = Win32Helper.GetCurrentModifiers();
 
-            // 获取前台进程名
-            var processName = Win32Helper.GetForegroundWindowProcessName();
+            // 获取前台进程名（失败时返回 null，FindProfileForProcess 会处理）
+            var processName = Win32Helper.GetForegroundWindowProcessName()
+                .GetValueOrDefault((string?)null);
 
             // 同步检测是否匹配快捷键（用于决定是否拦截 Alt 组合键）
             var profile = _config.FindProfileForProcess(processName);

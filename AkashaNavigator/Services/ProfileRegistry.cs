@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
@@ -239,9 +240,9 @@ public class ProfileRegistry : IProfileRegistry
         try
         {
             var data = JsonHelper.LoadFromFile<ProfileRegistryData>(RegistryFilePath);
-            if (data?.Profiles != null)
+            if (data.IsSuccess && data.Value?.Profiles != null)
             {
-                _profiles = data.Profiles;
+                _profiles = data.Value.Profiles;
                 _logService.Debug("ProfileRegistry", "已加载 {ProfileCount} 个内置 Profile", _profiles.Count);
             }
         }

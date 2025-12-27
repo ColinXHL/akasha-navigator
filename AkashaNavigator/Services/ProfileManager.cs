@@ -1038,14 +1038,15 @@ public class ProfileManager : IProfileManager
         if (!File.Exists(configPath))
             return null;
 
-        try
+        var result = JsonHelper.LoadFromFile<Dictionary<string, object>>(configPath);
+        if (result.IsSuccess)
         {
-            return JsonHelper.LoadFromFile<Dictionary<string, object>>(configPath);
+            return result.Value;
         }
-        catch (Exception ex)
+        else
         {
             _logService.Debug("ProfileManager", "加载插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
-                                      ex.Message);
+                                      result.Error?.Message ?? "Unknown error");
             return null;
         }
     }
@@ -1151,9 +1152,9 @@ public class ProfileManager : IProfileManager
             {
                 var pluginId = Path.GetFileNameWithoutExtension(file);
                 var config = JsonHelper.LoadFromFile<Dictionary<string, object>>(file);
-                if (config != null)
+                if (config.IsSuccess)
                 {
-                    result[pluginId] = config;
+                    result[pluginId] = config.Value;
                 }
             }
         }
@@ -1204,9 +1205,9 @@ public class ProfileManager : IProfileManager
             try
             {
                 var profile = JsonHelper.LoadFromFile<GameProfile>(profilePath);
-                if (profile != null)
+                if (profile.IsSuccess)
                 {
-                    Profiles.Add(profile);
+                    Profiles.Add(profile.Value);
                     _logService.Debug("ProfileManager", "已加载订阅的 Profile: {ProfileId}", profileId);
                 }
             }
@@ -1304,10 +1305,10 @@ public class ProfileManager : IProfileManager
                 CopyDirectory(templateDir, profileDir);
 
                 var profile = JsonHelper.LoadFromFile<GameProfile>(profilePath);
-                if (profile != null)
+                if (profile.IsSuccess)
                 {
                     _logService.Info("ProfileManager", "已从内置模板创建默认 Profile");
-                    return profile;
+                    return profile.Value;
                 }
             }
             catch (Exception ex)
