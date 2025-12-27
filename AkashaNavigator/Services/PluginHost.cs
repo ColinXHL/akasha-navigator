@@ -15,7 +15,7 @@ namespace AkashaNavigator.Services
 /// 插件宿主服务
 /// 负责插件的加载、执行和生命周期管理
 /// </summary>
-public class PluginHost : IDisposable
+public class PluginHost : IPluginHost, IDisposable
 {
 #region Singleton
 

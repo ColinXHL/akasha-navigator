@@ -81,7 +81,7 @@ public class DeleteProfileResult
 /// 负责加载、切换、保存 Profile 配置
 /// 集成订阅机制：只加载已订阅的 Profile
 /// </summary>
-public class ProfileManager
+public class ProfileManager : IProfileManager
 {
 #region Singleton
 
@@ -348,6 +348,11 @@ public class ProfileManager
     /// 预定义的 Profile 图标列表
     /// </summary>
     public static readonly string[] ProfileIcons = new[] { "📦", "🎮", "🎬", "📺", "🎵", "📚", "🎯", "⚡", "🔧", "💡" };
+
+    /// <summary>
+    /// 预定义的 Profile 图标列表（接口实现）
+    /// </summary>
+    string[] IProfileManager.ProfileIcons => ProfileIcons;
 
     /// <summary>
     /// 创建新的 Profile
