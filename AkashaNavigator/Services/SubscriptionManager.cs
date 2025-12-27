@@ -71,15 +71,6 @@ public class SubscriptionManager : ISubscriptionManager
 
 #region Constructor
 
-    private SubscriptionManager()
-    {
-        _profileRegistry = ProfileRegistry.Instance;
-        _pluginRegistry = PluginRegistry.Instance;
-        SubscriptionsFilePath = AppPaths.SubscriptionsFilePath;
-        UserProfilesDirectory = AppPaths.ProfilesDirectory;
-        _config = new SubscriptionConfig();
-    }
-
     /// <summary>
     /// DI容器使用的构造函数
     /// </summary>
@@ -97,13 +88,16 @@ public class SubscriptionManager : ISubscriptionManager
     /// 用于测试的构造函数
     /// </summary>
     /// <param name="logService">日志服务</param>
+    /// <param name="profileRegistry">Profile 注册表</param>
+    /// <param name="pluginRegistry">插件注册表</param>
     /// <param name="subscriptionsFilePath">订阅配置文件路径</param>
     /// <param name="userProfilesDirectory">用户 Profiles 目录</param>
-    internal SubscriptionManager(ILogService logService, string subscriptionsFilePath, string userProfilesDirectory)
+    internal SubscriptionManager(ILogService logService, IProfileRegistry profileRegistry, IPluginRegistry pluginRegistry,
+                                string subscriptionsFilePath, string userProfilesDirectory)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
-        _profileRegistry = ProfileRegistry.Instance;
-        _pluginRegistry = PluginRegistry.Instance;
+        _profileRegistry = profileRegistry ?? throw new ArgumentNullException(nameof(profileRegistry));
+        _pluginRegistry = pluginRegistry ?? throw new ArgumentNullException(nameof(pluginRegistry));
         SubscriptionsFilePath = subscriptionsFilePath;
         UserProfilesDirectory = userProfilesDirectory;
         _config = new SubscriptionConfig();

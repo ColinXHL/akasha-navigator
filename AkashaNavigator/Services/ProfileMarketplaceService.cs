@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Profile;
@@ -179,37 +180,15 @@ public class ProfileMarketplaceService
 {
 #region Singleton
 
-    private static ProfileMarketplaceService? _instance;
-    private static readonly object _lock = new();
-
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（通过 DI 容器）
     /// </summary>
-    public static ProfileMarketplaceService Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new ProfileMarketplaceService();
-                }
-            }
-            return _instance;
-        }
-        internal set => _instance = value;
-    }
+    public static ProfileMarketplaceService Instance => App.Services.GetRequiredService<ProfileMarketplaceService>();
 
     /// <summary>
     /// 重置单例实例（仅用于测试）
     /// </summary>
-    internal static void ResetInstance()
-    {
-        lock (_lock)
-        {
-            _instance = null;
-        }
-    }
+    internal static void ResetInstance() { }
 
 #endregion
 
@@ -243,17 +222,6 @@ public class ProfileMarketplaceService
 
 #region Constructor
 
-    private ProfileMarketplaceService()
-    {
-        _logService = LogService.Instance;
-        _profileManager = ProfileManager.Instance;
-        _pluginAssociationManager = PluginAssociationManager.Instance;
-        _pluginLibrary = PluginLibrary.Instance;
-        _configFilePath = Path.Combine(AppPaths.DataDirectory, "marketplace-sources.json");
-        _sourceConfig = LoadConfig();
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
-    }
-
     /// <summary>
     /// DI容器使用的构造函数
     /// </summary>
@@ -271,9 +239,9 @@ public class ProfileMarketplaceService
     /// <summary>
     /// 用于测试的构造函数
     /// </summary>
-    internal ProfileMarketplaceService(string configFilePath, HttpClient? httpClient = null, ILogService? logService = null)
+    internal ProfileMarketplaceService(ILogService logService, string configFilePath, HttpClient? httpClient = null)
     {
-        _logService = logService ?? LogService.Instance;
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _configFilePath = configFilePath;
         _sourceConfig = LoadConfig();
         _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };

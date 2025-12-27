@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
@@ -80,36 +81,10 @@ public class DataMigration
 {
 #region Singleton
 
-    private static DataMigration? _instance;
-    private static readonly object _lock = new();
-
     /// <summary>
-    /// 获取单例实例
+    /// 获取单例实例（通过 DI 容器）
     /// </summary>
-    public static DataMigration Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new DataMigration();
-                }
-            }
-            return _instance;
-        }
-    }
-
-    /// <summary>
-    /// 重置单例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance()
-    {
-        lock (_lock)
-        {
-            _instance = null;
-        }
-    }
+    public static DataMigration Instance => App.Services.GetRequiredService<DataMigration>();
 
 #endregion
 
@@ -149,11 +124,6 @@ public class DataMigration
 #endregion
 
 #region Constructor
-
-    private DataMigration()
-    {
-        _logService = LogService.Instance;
-    }
 
     /// <summary>
     /// DI容器使用的构造函数

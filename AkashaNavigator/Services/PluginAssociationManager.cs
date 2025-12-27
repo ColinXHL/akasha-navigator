@@ -147,12 +147,6 @@ public class PluginAssociationManager : IPluginAssociationManager
 
 #region Constructor
 
-    private PluginAssociationManager()
-    {
-        _pluginLibrary = PluginLibrary.Instance;
-        _index = LoadIndex();
-    }
-
     /// <summary>
     /// DI容器使用的构造函数
     /// </summary>
@@ -166,10 +160,10 @@ public class PluginAssociationManager : IPluginAssociationManager
     /// <summary>
     /// 用于测试的构造函数
     /// </summary>
-    internal PluginAssociationManager(ILogService logService, string indexPath)
+    internal PluginAssociationManager(ILogService logService, IPluginLibrary pluginLibrary, string indexPath)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
-        _pluginLibrary = PluginLibrary.Instance;
+        _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _index = AssociationIndex.LoadFromFile(indexPath);
     }
 
