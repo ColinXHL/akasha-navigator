@@ -4,6 +4,7 @@ using System.Windows;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Views.Dialogs;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -11,7 +12,7 @@ namespace AkashaNavigator.Services
 /// 通知服务（单例）
 /// 负责管理和显示应用内通知，替代系统原生 MessageBox
 /// </summary>
-public class NotificationService
+public class NotificationService : INotificationService
 {
 #region Singleton
 

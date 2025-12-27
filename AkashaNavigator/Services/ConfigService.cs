@@ -1,6 +1,7 @@
 using System;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -8,7 +9,7 @@ namespace AkashaNavigator.Services
 /// 配置管理服务（单例）
 /// 负责全局配置的加载、保存、访问
 /// </summary>
-public class ConfigService
+public class ConfigService : IConfigService
 {
 #region Singleton
 

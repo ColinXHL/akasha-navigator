@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Serilog;
 using Serilog.Events;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -9,7 +10,7 @@ namespace AkashaNavigator.Services
 /// 日志服务（单例）
 /// 作为 Serilog 的 Facade，提供简化的日志 API
 /// </summary>
-public class LogService
+public class LogService : ILogService
 {
 #region Singleton
 

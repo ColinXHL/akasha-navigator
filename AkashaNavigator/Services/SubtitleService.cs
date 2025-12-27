@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AkashaNavigator.Models.Data;
+using AkashaNavigator.Core.Interfaces;
 using Microsoft.Web.WebView2.Core;
 
 namespace AkashaNavigator.Services
@@ -12,7 +13,7 @@ namespace AkashaNavigator.Services
 /// 字幕服务（单例）
 /// 负责拦截、解析和管理 B站视频字幕数据
 /// </summary>
-public class SubtitleService
+public class SubtitleService : ISubtitleService
 {
 #region Static HttpClient
 

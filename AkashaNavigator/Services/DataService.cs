@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Data;
+using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Services
 {
@@ -11,7 +12,7 @@ namespace AkashaNavigator.Services
 /// JSON 数据服务
 /// 负责历史记录和收藏夹的 CRUD 操作
 /// </summary>
-public class DataService
+public class DataService : IDataService
 {
 #region Singleton
 

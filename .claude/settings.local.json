@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(dotnet build:*)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "mcp__time__get_current_time",
+      "mcp__context7__resolve-library-id"
     ]
   }
 }
