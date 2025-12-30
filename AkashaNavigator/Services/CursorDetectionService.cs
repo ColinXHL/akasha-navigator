@@ -2,7 +2,6 @@ using System;
 using System.Windows.Threading;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Core.Interfaces;
-using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Services
 {
@@ -163,16 +162,12 @@ namespace AkashaNavigator.Services
             // 如果指定了目标进程，检查是否在前台
             if (!string.IsNullOrEmpty(_targetProcessName))
             {
-                var foregroundProcessResult = Win32Helper.GetForegroundWindowProcessName();
+                var foregroundProcess = Win32Helper.GetForegroundWindowProcessName();
 
-                // 如果获取失败，使用默认值（不检测）
-                if (foregroundProcessResult.IsFailure)
-                    return;
-
-                var foregroundProcess = foregroundProcessResult.Value;
-                if (!string.Equals(foregroundProcess, _targetProcessName, StringComparison.OrdinalIgnoreCase))
+                // 如果获取失败或目标进程不在前台，不检测
+                if (foregroundProcess == null ||
+                    !string.Equals(foregroundProcess, _targetProcessName, StringComparison.OrdinalIgnoreCase))
                 {
-                    // 目标进程不在前台，不检测
                     return;
                 }
             }

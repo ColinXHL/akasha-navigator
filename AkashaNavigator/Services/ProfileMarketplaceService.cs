@@ -572,10 +572,10 @@ public class ProfileMarketplaceService
             var json = File.ReadAllText(profilePath);
             var gameProfile = JsonHelper.Deserialize<GameProfile>(json);
 
-            if (gameProfile.IsFailure || gameProfile.Value == null)
+            if (gameProfile == null)
                 return null;
 
-            var profile = gameProfile.Value;
+            var profile = gameProfile;
 
             // 从注册表获取插件列表
             var registryPath = Path.Combine(AppPaths.BuiltInProfilesDirectory, "registry.json");

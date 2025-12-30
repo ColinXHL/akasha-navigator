@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using AkashaNavigator.Models.Config;
-using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Helpers
 {
@@ -792,29 +791,25 @@ public static class Win32Helper
     /// <summary>
     /// 获取前台窗口的进程名（不含路径和扩展名）
     /// </summary>
-    /// <returns>进程名，失败返回 Result</returns>
-    public static Result<string> GetForegroundWindowProcessName()
+    /// <returns>进程名，失败返回 null</returns>
+    public static string? GetForegroundWindowProcessName()
     {
         try
         {
             IntPtr hwnd = GetForegroundWindow();
             if (hwnd == IntPtr.Zero)
-                return Result<string>.Failure(Error.Unknown("NO_FOREGROUND_WINDOW", "没有前台窗口"));
+                return null;
 
             GetWindowThreadProcessId(hwnd, out uint processId);
             if (processId == 0)
-                return Result<string>.Failure(Error.Unknown("INVALID_PROCESS_ID", "无法获取进程ID"));
+                return null;
 
             using var process = Process.GetProcessById((int)processId);
-            return Result<string>.Success(process.ProcessName);
+            return process.ProcessName;
         }
-        catch (ArgumentException ex)
+        catch
         {
-            return Result<string>.Failure(Error.Unknown("PROCESS_NOT_FOUND", "进程不存在", ex));
-        }
-        catch (Exception ex)
-        {
-            return Result<string>.Failure(Error.Unknown("GET_PROCESS_NAME_FAILED", "获取进程名失败", ex));
+            return null;
         }
     }
 

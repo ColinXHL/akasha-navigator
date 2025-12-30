@@ -8,7 +8,7 @@ namespace AkashaNavigator.Helpers
     /// <summary>
     /// JSON 序列化辅助类
     /// 提供统一的 JSON 序列化/反序列化配置和便捷方法
-    /// 所有操作返回 Result 类型以提供统一的错误处理
+    /// 文件 I/O 操作返回 Result 类型以提供统一的错误处理
     /// </summary>
     public static class JsonHelper
     {
@@ -35,24 +35,13 @@ namespace AkashaNavigator.Helpers
         /// </summary>
         /// <typeparam name="T">目标类型</typeparam>
         /// <param name="json">JSON 字符串</param>
-        /// <returns>反序列化后的对象，失败返回 Result</returns>
-        public static Result<T> Deserialize<T>(string json)
+        /// <returns>反序列化后的对象，失败返回 default</returns>
+        public static T? Deserialize<T>(string json)
         {
             if (string.IsNullOrWhiteSpace(json))
-                return Result<T>.Failure(Error.Validation("EMPTY_JSON", "JSON 字符串为空"));
+                return default;
 
-            try
-            {
-                var result = JsonSerializer.Deserialize<T>(json, ReadOptions);
-                if (result == null)
-                    return Result<T>.Failure(Error.Serialization("DESERIALIZATION_NULL", "反序列化结果为 null"));
-
-                return Result<T>.Success(result);
-            }
-            catch (JsonException ex)
-            {
-                return Result<T>.Failure(Error.Serialization("JSON_PARSE_ERROR", $"JSON 解析错误: {ex.Message}", ex));
-            }
+            return JsonSerializer.Deserialize<T>(json, ReadOptions);
         }
 
         /// <summary>
@@ -60,18 +49,10 @@ namespace AkashaNavigator.Helpers
         /// </summary>
         /// <typeparam name="T">对象类型</typeparam>
         /// <param name="obj">要序列化的对象</param>
-        /// <returns>JSON 字符串，失败返回 Result</returns>
-        public static Result<string> Serialize<T>(T obj)
+        /// <returns>JSON 字符串</returns>
+        public static string Serialize<T>(T obj)
         {
-            try
-            {
-                var json = JsonSerializer.Serialize(obj, WriteOptions);
-                return Result<string>.Success(json);
-            }
-            catch (Exception ex) when (ex is JsonException or NotSupportedException)
-            {
-                return Result<string>.Failure(Error.Serialization("SERIALIZE_ERROR", $"序列化失败: {ex.Message}", ex));
-            }
+            return JsonSerializer.Serialize(obj, WriteOptions);
         }
 
         /// <summary>
@@ -93,7 +74,16 @@ namespace AkashaNavigator.Helpers
             try
             {
                 var json = File.ReadAllText(filePath);
-                return Deserialize<T>(json);
+                var result = Deserialize<T>(json);
+
+                if (result == null)
+                    return Result<T>.Failure(Error.Serialization("DESERIALIZATION_NULL", $"反序列化结果为 null: {filePath}"));
+
+                return Result<T>.Success(result);
+            }
+            catch (JsonException ex)
+            {
+                return Result<T>.Failure(Error.Serialization("JSON_PARSE_ERROR", $"JSON 解析错误: {ex.Message}", ex));
             }
             catch (IOException ex)
             {
@@ -127,13 +117,9 @@ namespace AkashaNavigator.Helpers
                     Directory.CreateDirectory(directory);
                 }
 
-                // 序列化对象
-                var serializeResult = Serialize(obj);
-                if (serializeResult.IsFailure)
-                    return Result.Failure(serializeResult.Error!);
-
-                // 写入文件
-                File.WriteAllText(filePath, serializeResult.Value!);
+                // 序列化并写入文件
+                var json = Serialize(obj);
+                File.WriteAllText(filePath, json);
                 return Result.Success();
             }
             catch (IOException ex)
