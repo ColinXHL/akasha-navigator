@@ -127,6 +127,7 @@ WebView2Data/
 
 #claude code
 CLAUDE.md
+.claude/*
 
 #dev-docs
 .dev-docs/*
