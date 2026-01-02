@@ -31,6 +31,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
 #region Fields
 
     private readonly IPioneerNoteService _pioneerNoteService;
+    private readonly IDialogFactory _dialogFactory;
     private ObservableCollection<NoteTreeNode> _treeNodes = new();
     private string _searchKeyword = string.Empty;
 
@@ -38,9 +39,10 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
 #region Constructor
 
-    public PioneerNoteWindow(IPioneerNoteService pioneerNoteService)
+    public PioneerNoteWindow(IPioneerNoteService pioneerNoteService, IDialogFactory dialogFactory)
     {
-        _pioneerNoteService = pioneerNoteService;
+        _pioneerNoteService = pioneerNoteService ?? throw new ArgumentNullException(nameof(pioneerNoteService));
+        _dialogFactory = dialogFactory ?? throw new ArgumentNullException(nameof(dialogFactory));
         InitializeComponent();
         LoadNoteTree();
         UpdateSortButton();
@@ -308,13 +310,18 @@ public partial class PioneerNoteWindow : AnimatedWindow
     {
         // 如果是笔记项，显示 URL 输入框
         var showUrl = !node.IsFolder;
-        var editDialog = new NoteEditDialog(node.IsFolder ? "编辑目录" : "编辑笔记", node.Title, "请输入新名称：",
-                                            showUrl: showUrl, isConfirmDialog: false, defaultUrl: node.Url);
+        var editDialog = _dialogFactory.CreateNoteEditDialog(
+            node.IsFolder ? "编辑目录" : "编辑笔记",
+            node.Title,
+            "请输入新名称：",
+            showUrl: showUrl,
+            isConfirmDialog: false,
+            defaultUrl: node.Url);
 
         editDialog.Owner = this;
         editDialog.ShowDialog();
 
-        if (editDialog.Result && !string.IsNullOrWhiteSpace(editDialog.InputText))
+        if (editDialog.Result == true && !string.IsNullOrWhiteSpace(editDialog.InputText))
         {
             try
             {
@@ -346,11 +353,11 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
         // 使用自定义对话框而不是系统 MessageBox
         // 参数顺序: title, defaultValue, prompt, showUrl, isConfirmDialog
-        var confirmDialog = new NoteEditDialog("确认删除", "", message, false, true);
+        var confirmDialog = _dialogFactory.CreateNoteEditDialog("确认删除", "", message, false, true);
         confirmDialog.Owner = this;
         confirmDialog.ShowDialog();
 
-        if (confirmDialog.Result)
+        if (confirmDialog.Result == true)
         {
             try
             {
@@ -366,7 +373,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
             }
             catch (Exception ex)
             {
-                var errorDialog = new NoteEditDialog("错误", "", $"删除失败: {ex.Message}", false, true);
+                var errorDialog = _dialogFactory.CreateNoteEditDialog("错误", "", $"删除失败: {ex.Message}", false, true);
                 errorDialog.Owner = this;
                 errorDialog.ShowDialog();
             }
@@ -378,12 +385,12 @@ public partial class PioneerNoteWindow : AnimatedWindow
     /// </summary>
     private void ShowNewFolderDialog(string? parentId = null)
     {
-        var editDialog = new NoteEditDialog("新建目录", "", "请输入目录名称：");
+        var editDialog = _dialogFactory.CreateNoteEditDialog("新建目录", "", "请输入目录名称：");
 
         editDialog.Owner = this;
         editDialog.ShowDialog();
 
-        if (editDialog.Result && !string.IsNullOrWhiteSpace(editDialog.InputText))
+        if (editDialog.Result == true && !string.IsNullOrWhiteSpace(editDialog.InputText))
         {
             try
             {
@@ -409,8 +416,8 @@ public partial class PioneerNoteWindow : AnimatedWindow
         var noteData = _pioneerNoteService.GetNoteTree();
         var folders = noteData.Folders;
 
-        // 创建目录选择对话框
-        var moveDialog = new NoteMoveDialog(folders, node.FolderId);
+        // 创建目录选择对话框（使用 DialogFactory）
+        var moveDialog = _dialogFactory.CreateNoteMoveDialog(folders, node.FolderId);
         moveDialog.Owner = this;
         moveDialog.ShowDialog();
 
@@ -468,8 +475,8 @@ public partial class PioneerNoteWindow : AnimatedWindow
     /// </summary>
     private void ShowRecordNoteDialog()
     {
-        // 使用完整的笔记对话框，支持选择目录
-        var noteDialog = new RecordNoteDialog(_pioneerNoteService, "", "");
+        // 使用 IDialogFactory 创建对话框
+        var noteDialog = _dialogFactory.CreateRecordNoteDialog("", "");
         noteDialog.Owner = this;
         noteDialog.ShowDialog();
 

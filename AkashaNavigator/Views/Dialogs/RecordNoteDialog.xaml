@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:helpers="clr-namespace:AkashaNavigator.Helpers"
+        xmlns:vm="clr-namespace:AkashaNavigator.ViewModels.Dialogs"
         Title="记录笔记"
         Width="420"
         Height="480"
@@ -75,9 +76,11 @@
                     <TextBox x:Name="TxtTitle"
                              Style="{StaticResource DarkTextBoxStyle}"
                              Tag="输入笔记标题..."
-                             TextChanged="TxtTitle_TextChanged"/>
+                             Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"/>
                     <TextBlock x:Name="TxtError" Foreground="#F87171" FontSize="11"
-                               Margin="0,4,0,0" Visibility="Collapsed"/>
+                               Margin="0,4,0,0"
+                               Text="{Binding ErrorMessage}"
+                               Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 </StackPanel>
 
                 <!-- URL 输入 -->
@@ -96,7 +99,7 @@
                     <TextBox x:Name="TxtUrl"
                              Style="{StaticResource DarkTextBoxStyle}"
                              Tag="输入或粘贴 URL..."
-                             TextChanged="TxtUrl_TextChanged"/>
+                             Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <!-- 目录选择标签 -->
@@ -108,7 +111,7 @@
                     <TextBlock Grid.Column="0" Text="选择目录（可选）" Foreground="#888" FontSize="12"
                                VerticalAlignment="Center"/>
                     <Button Grid.Column="1" Content="📁 新建目录" Style="{StaticResource SmallButtonStyle}"
-                            Click="BtnNewFolder_Click"/>
+                            Command="{Binding ShowNewFolderCommand}"/>
                 </Grid>
 
                 <!-- 目录树 -->
@@ -137,7 +140,8 @@
                 </Border>
 
                 <!-- 新建目录输入区（默认隐藏） -->
-                <Grid x:Name="NewFolderPanel" Grid.Row="4" Margin="0,8,0,0" Visibility="Collapsed">
+                <Grid x:Name="NewFolderPanel" Grid.Row="4" Margin="0,8,0,0"
+                      Visibility="{Binding ShowNewFolderPanel, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" MinWidth="100"/>
                         <ColumnDefinition Width="Auto"/>
@@ -146,11 +150,12 @@
                     <TextBox x:Name="TxtNewFolderName" Grid.Column="0"
                              Style="{StaticResource DarkTextBoxStyle}"
                              Tag="输入目录名称..."
+                             Text="{Binding NewFolderName, UpdateSourceTrigger=PropertyChanged}"
                              KeyDown="TxtNewFolderName_KeyDown"/>
                     <Button Grid.Column="1" Content="✓" Style="{StaticResource SquareButtonStyle}"
-                            Margin="6,0,0,0" Click="BtnConfirmNewFolder_Click"/>
+                            Margin="6,0,0,0" Command="{Binding ConfirmNewFolderCommand}"/>
                     <Button Grid.Column="2" Content="✕" Style="{StaticResource SquareButtonStyle}"
-                            Margin="6,0,0,0" Click="BtnCancelNewFolder_Click"/>
+                            Margin="6,0,0,0" Command="{Binding HideNewFolderCommand}"/>
                 </Grid>
             </Grid>
 
@@ -171,8 +176,8 @@
                     <!-- 右侧：确定和取消按钮 -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button x:Name="BtnConfirm" Content="确定" Style="{StaticResource PrimaryButtonStyle}"
-                                Click="BtnConfirm_Click" Margin="0,0,8,0" IsEnabled="False"/>
-                        <Button Content="取消" Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ConfirmCommand}" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnCancel" Content="取消" Style="{StaticResource SecondaryButtonStyle}"
                                 Click="BtnCancel_Click"/>
                     </StackPanel>
                 </Grid>

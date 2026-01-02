@@ -4,122 +4,100 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Data;
-using AkashaNavigator.Services;
-using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
 {
-/// <summary>
-/// BookmarkPopup - 收藏夹弹出窗口
-/// </summary>
-public partial class BookmarkPopup : AnimatedWindow
-{
-#region Events
-
     /// <summary>
-    /// 选择收藏项事件
-    /// </summary>000
-    public event EventHandler<string>? BookmarkItemSelected;
-
-#endregion
-
-#region Constructor
-
-    private readonly IDataService _dataService;
-
-    public BookmarkPopup(IDataService dataService)
-    {
-        _dataService = dataService;
-        InitializeComponent();
-        LoadBookmarks();
-    }
-
-#endregion
-
-#region Private Methods
-
-    /// <summary>
-    /// 加载收藏夹
+    /// BookmarkPopup - 收藏夹弹出窗口
     /// </summary>
-    private void LoadBookmarks()
+    public partial class BookmarkPopup : AnimatedWindow
     {
-        var searchText = SearchBox.Text.Trim();
-        var bookmarks = string.IsNullOrEmpty(searchText) ? _dataService.GetBookmarks()
-                                                         : _dataService.SearchBookmarks(searchText);
+        #region Events
 
-        BookmarkList.ItemsSource = bookmarks;
+        /// <summary>
+        /// 选择收藏项事件
+        /// </summary>
+        public event EventHandler<string>? BookmarkItemSelected;
 
-        // 更新空状态提示
-        EmptyHint.Visibility = bookmarks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-    }
+        #endregion
 
-#endregion
+        #region Constructor
 
-#region Event Handlers
+        private readonly BookmarkPopupViewModel _viewModel;
 
-    /// <summary>
-    /// 搜索框文本变化
-    /// </summary>
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        LoadBookmarks();
-    }
-
-    /// <summary>
-    /// 清空全部
-    /// </summary>
-    private void BtnClearAll_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new ConfirmDialog("确定要清空所有收藏吗？此操作不可撤销。", "确认清空", "清空", "取消");
-        dialog.Owner = this;
-        dialog.ShowDialog();
-
-        if (dialog.Result == true)
+        public BookmarkPopup(BookmarkPopupViewModel viewModel)
         {
-            _dataService.ClearBookmarks();
-            LoadBookmarks();
-        }
-    }
+            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            InitializeComponent();
+            DataContext = _viewModel;
 
-    /// <summary>
-    /// 删除单项
-    /// </summary>
-    private void BtnDelete_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is int id)
+            // 订阅 ViewModel 的选择事件，转换为对外的事件
+            _viewModel.ItemSelected += OnViewModelItemSelected;
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        /// <summary>
+        /// 处理 ViewModel 的选择事件
+        /// </summary>
+        private void OnViewModelItemSelected(object? sender, BookmarkItem? item)
         {
-            _dataService.DeleteBookmark(id);
-            LoadBookmarks();
+            if (item != null)
+            {
+                CloseWithAnimation(() => BookmarkItemSelected?.Invoke(this, item.Url));
+            }
         }
-    }
 
-    /// <summary>
-    /// 双击打开链接
-    /// </summary>
-    private void BookmarkList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        if (BookmarkList.SelectedItem is BookmarkItem item)
+        #endregion
+
+        #region Event Handlers
+
+        /// <summary>
+        /// 清空全部
+        /// </summary>
+        private void BtnClearAll_Click(object sender, RoutedEventArgs e)
         {
-            CloseWithAnimation(() => BookmarkItemSelected?.Invoke(this, item.Url));
+            var dialog = new ConfirmDialog("确定要清空所有收藏吗？此操作不可撤销。", "确认清空", "清空", "取消");
+            dialog.Owner = this;
+            dialog.ShowDialog();
+
+            if (dialog.Result == true)
+            {
+                _viewModel.ClearAll();
+            }
         }
-    }
 
-    /// <summary>
-    /// 标题栏拖动
-    /// </summary>
-    private new void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        base.TitleBar_MouseLeftButtonDown(sender, e);
-    }
+        /// <summary>
+        /// 双击打开链接
+        /// </summary>
+        private void BookmarkList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (BookmarkList.SelectedItem is BookmarkItem item)
+            {
+                // 调用 ViewModel 的选择方法
+                _viewModel.SelectItemCommand.Execute(item);
+            }
+        }
 
-    /// <summary>
-    /// 关闭按钮
-    /// </summary>
-    private void BtnClose_Click(object sender, RoutedEventArgs e)
-    {
-        CloseWithAnimation();
-    }
+        /// <summary>
+        /// 标题栏拖动
+        /// </summary>
+        private new void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            base.TitleBar_MouseLeftButtonDown(sender, e);
+        }
 
-#endregion
-}
+        /// <summary>
+        /// 关闭按钮
+        /// </summary>
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            CloseWithAnimation();
+        }
+
+        #endregion
+    }
 }

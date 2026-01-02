@@ -144,14 +144,13 @@ namespace AkashaNavigator.Core
             services.AddTransient<ProfileCreateDialogViewModel>();
             services.AddTransient<ProfileCreateDialog>();
 
-            // RecordNoteDialog 工厂方法（依赖IPioneerNoteService + url, title参数 + PioneerNoteWindow工厂）
+            // RecordNoteDialog 工厂方法（委托到 IDialogFactory）
             services.AddSingleton<Func<string, string, RecordNoteDialog>>(sp =>
             {
                 return (url, title) =>
                 {
-                    var pioneerNoteService = sp.GetRequiredService<IPioneerNoteService>();
-                    var pioneerNoteWindowFactory = () => sp.GetRequiredService<PioneerNoteWindow>();
-                    return new RecordNoteDialog(pioneerNoteService, url, title, pioneerNoteWindowFactory);
+                    var dialogFactory = sp.GetRequiredService<IDialogFactory>();
+                    return dialogFactory.CreateRecordNoteDialog(url, title);
                 };
             });
 

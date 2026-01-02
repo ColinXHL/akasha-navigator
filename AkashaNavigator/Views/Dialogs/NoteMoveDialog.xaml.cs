@@ -1,154 +1,91 @@
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Input;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Models.PioneerNote;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
 {
-/// <summary>
-/// 笔记移动对话框
-/// 用于选择目标目录移动笔记项
-/// </summary>
-public partial class NoteMoveDialog : AnimatedWindow
-{
-#region Properties
-
     /// <summary>
-    /// 对话框结果：true=确定，false=取消
+    /// 笔记移动对话框
+    /// 用于选择目标目录移动笔记项
     /// </summary>
-    public bool Result { get; private set; }
-
-    /// <summary>
-    /// 选中的目录 ID（null 表示根目录）
-    /// </summary>
-    public string? SelectedFolderId { get; private set; }
-
-#endregion
-
-#region Constructor
-
-    /// <summary>
-    /// 创建移动对话框
-    /// </summary>
-    /// <param name="folders">可选的目录列表</param>
-    /// <param name="currentFolderId">当前所在目录 ID</param>
-    public NoteMoveDialog(List<NoteFolder> folders, string? currentFolderId)
+    public partial class NoteMoveDialog : AnimatedWindow
     {
-        InitializeComponent();
+        #region Properties
 
-        // 构建目录列表（包含根目录选项）
-        var folderItems =
-            new List<FolderItem> { new FolderItem { Id = null, Name = "根目录", Icon = "🏠", Indent = 0 } };
+        /// <summary>
+        /// 对话框结果：true=确定，false=取消
+        /// </summary>
+        public bool Result { get; private set; }
 
-        // 添加所有目录（扁平化显示，带缩进）
-        AddFoldersRecursive(folderItems, folders, null, 0);
+        /// <summary>
+        /// 选中的目录 ID（null 表示根目录）
+        /// </summary>
+        public string? SelectedFolderId => _viewModel?.SelectedFolderId;
 
-        FolderList.ItemsSource = folderItems;
+        #endregion
 
-        // 选中当前目录
-        var currentItem = folderItems.FirstOrDefault(f => f.Id == currentFolderId);
-        if (currentItem != null)
+        #region Constructor
+
+        private readonly NoteMoveDialogViewModel _viewModel;
+
+        /// <summary>
+        /// 创建移动对话框
+        /// </summary>
+        /// <param name="viewModel">ViewModel</param>
+        public NoteMoveDialog(NoteMoveDialogViewModel viewModel)
         {
-            FolderList.SelectedItem = currentItem;
+            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            InitializeComponent();
+            DataContext = _viewModel;
+
+            // 订阅 ViewModel 的关闭请求事件
+            _viewModel.RequestClose += OnRequestClose;
         }
-        else
+
+        #endregion
+
+        #region Event Handlers
+
+        /// <summary>
+        /// 处理 ViewModel 的关闭请求
+        /// </summary>
+        private void OnRequestClose(object? sender, bool? result)
         {
-            FolderList.SelectedIndex = 0; // 默认选中根目录
+            if (result.HasValue)
+            {
+                Result = result.Value;
+            }
+            CloseWithAnimation();
         }
-    }
 
-#endregion
-
-#region Private Methods
-
-    /// <summary>
-    /// 递归添加目录到列表
-    /// </summary>
-    private void AddFoldersRecursive(List<FolderItem> items, List<NoteFolder> allFolders, string? parentId, int indent)
-    {
-        var childFolders = allFolders.Where(f => f.ParentId == parentId).OrderBy(f => f.SortOrder).ToList();
-
-        foreach (var folder in childFolders)
+        /// <summary>
+        /// 关闭按钮点击
+        /// </summary>
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
-            var prefix = new string(' ', indent * 4);
-            items.Add(new FolderItem { Id = folder.Id, Name = prefix + folder.Name, Icon = folder.Icon ?? "📁",
-                                       Indent = indent });
-
-            // 递归添加子目录
-            AddFoldersRecursive(items, allFolders, folder.Id, indent + 1);
+            Result = false;
+            CloseWithAnimation();
         }
-    }
 
-#endregion
-
-#region Event Handlers
-
-    /// <summary>
-    /// 目录列表选择变化
-    /// </summary>
-    private void FolderList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (FolderList.SelectedItem is FolderItem item)
+        /// <summary>
+        /// 取消按钮点击
+        /// </summary>
+        private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
-            SelectedFolderId = item.Id;
+            Result = false;
+            CloseWithAnimation();
         }
+
+        /// <summary>
+        /// 标题栏拖动
+        /// </summary>
+        private new void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            base.TitleBar_MouseLeftButtonDown(sender, e);
+        }
+
+        #endregion
     }
-
-    /// <summary>
-    /// 确定按钮点击
-    /// </summary>
-    private void BtnConfirm_Click(object sender, RoutedEventArgs e)
-    {
-        Result = true;
-        CloseWithAnimation();
-    }
-
-    /// <summary>
-    /// 取消按钮点击
-    /// </summary>
-    private void BtnCancel_Click(object sender, RoutedEventArgs e)
-    {
-        Result = false;
-        CloseWithAnimation();
-    }
-
-    /// <summary>
-    /// 关闭按钮点击
-    /// </summary>
-    private void BtnClose_Click(object sender, RoutedEventArgs e)
-    {
-        Result = false;
-        CloseWithAnimation();
-    }
-
-#endregion
-}
-
-/// <summary>
-/// 目录列表项
-/// </summary>
-public class FolderItem
-{
-    /// <summary>
-    /// 目录 ID（null 表示根目录）
-    /// </summary>
-    public string? Id { get; set; }
-
-    /// <summary>
-    /// 显示名称
-    /// </summary>
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 图标
-    /// </summary>
-    public string Icon { get; set; } = "📁";
-
-    /// <summary>
-    /// 缩进级别
-    /// </summary>
-    public int Indent { get; set; }
-}
 }

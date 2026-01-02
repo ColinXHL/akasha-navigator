@@ -45,11 +45,10 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="SearchBox"
-                             Grid.Column="0"
+                    <TextBox Grid.Column="0"
                              Style="{StaticResource SearchBoxStyle}"
                              Tag="搜索收藏夹..."
-                             TextChanged="SearchBox_TextChanged"/>
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
                     <Button Grid.Column="1" Content="清空全部" Style="{StaticResource DeleteButtonStyle}"
                             Margin="10,0,0,0" Click="BtnClearAll_Click"/>
                 </Grid>
@@ -65,6 +64,7 @@
                         <ListBox x:Name="BookmarkList"
                                  Background="Transparent"
                                  BorderThickness="0"
+                                 ItemsSource="{Binding Bookmarks}"
                                  ItemContainerStyle="{StaticResource DarkListBoxItemStyle}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  MouseDoubleClick="BookmarkList_MouseDoubleClick">
@@ -83,14 +83,17 @@
                                             <TextBlock Text="{Binding Url}" FontSize="11" Foreground="#888" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                                         </StackPanel>
                                         <Button Grid.Column="2" Content="✕" Style="{StaticResource ActionButtonStyle}"
-                                                FontSize="12" Padding="8,4" Tag="{Binding Id}" Click="BtnDelete_Click"/>
+                                                FontSize="12" Padding="8,4" Tag="{Binding Id}"
+                                                Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding Id}"/>
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <!-- 空状态提示 -->
                         <TextBlock x:Name="EmptyHint" Text="暂无收藏" Foreground="#888" FontSize="14"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}"/>
                     </Grid>
                 </Border>
             </Grid>
