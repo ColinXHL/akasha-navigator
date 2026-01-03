@@ -8,6 +8,7 @@ using AkashaNavigator.Models.Common;
 using AkashaNavigator.Plugins.Core;
 using AkashaNavigator.Plugins.Utils;
 using AkashaNavigator.Core.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Services
 {
@@ -35,10 +36,15 @@ public class PluginHost : IPluginHost, IDisposable
                 {
                     if (_instance == null)
                     {
+                        // 使用 DI 容器中的实例，确保与注入的实例一致
+                        var logService = App.Services?.GetRequiredService<ILogService>() ?? LogService.Instance;
+                        var pluginAssociationManager = App.Services?.GetRequiredService<IPluginAssociationManager>() ?? PluginAssociationManager.Instance;
+                        var pluginLibrary = App.Services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance;
+
                         _instance = new PluginHost(
-                            LogService.Instance,
-                            PluginAssociationManager.Instance,
-                            PluginLibrary.Instance
+                            logService,
+                            pluginAssociationManager,
+                            pluginLibrary
                         );
                     }
                 }

@@ -5,6 +5,7 @@ using System.Linq;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Core.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Services
 {
@@ -105,6 +106,7 @@ public class PluginAssociationManager : IPluginAssociationManager
 
     /// <summary>
     /// 获取单例实例（插件系统使用）
+    /// 使用 DI 容器中的实例，确保与注入的 PluginLibrary 实例一致
     /// </summary>
     public static IPluginAssociationManager Instance
     {
@@ -112,7 +114,10 @@ public class PluginAssociationManager : IPluginAssociationManager
         {
             if (_instance == null)
             {
-                _instance = new PluginAssociationManager(LogService.Instance, PluginLibrary.Instance);
+                // 使用 DI 容器中的实例，避免创建单独的 PluginLibrary.Instance
+                var logService = App.Services?.GetRequiredService<ILogService>() ?? LogService.Instance;
+                var pluginLibrary = App.Services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance;
+                _instance = new PluginAssociationManager(logService, pluginLibrary);
             }
             return _instance;
         }

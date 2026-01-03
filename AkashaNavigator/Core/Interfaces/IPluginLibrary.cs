@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using AkashaNavigator.Models.Plugin;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Services;
 
 namespace AkashaNavigator.Core.Interfaces
@@ -56,11 +57,40 @@ namespace AkashaNavigator.Core.Interfaces
         InstalledPluginInfo? GetInstalledPluginInfo(string pluginId);
 
         /// <summary>
+        /// 安装插件到全局库
+        /// </summary>
+        /// <param name="pluginId">插件ID</param>
+        /// <param name="sourceDirectory">源目录（为null时从内置插件目录查找）</param>
+        /// <returns>安装结果</returns>
+        InstallResult InstallPlugin(string pluginId, string? sourceDirectory = null);
+
+        /// <summary>
         /// 卸载插件
         /// </summary>
         /// <param name="pluginId">插件 ID</param>
         /// <param name="force">是否强制卸载</param>
         /// <param name="getReferencingProfiles">获取引用此插件的Profile列表的函数</param>
+        /// <returns>卸载结果</returns>
         UninstallResult UninstallPlugin(string pluginId, bool force = false, Func<string, List<string>>? getReferencingProfiles = null);
+
+        /// <summary>
+        /// 检查插件是否有可用更新
+        /// </summary>
+        /// <param name="pluginId">插件ID</param>
+        /// <returns>更新检查结果</returns>
+        UpdateCheckResult CheckForUpdate(string pluginId);
+
+        /// <summary>
+        /// 检查所有已安装插件的更新
+        /// </summary>
+        /// <returns>有更新的插件列表</returns>
+        List<UpdateCheckResult> CheckAllUpdates();
+
+        /// <summary>
+        /// 更新插件到最新版本
+        /// </summary>
+        /// <param name="pluginId">插件ID</param>
+        /// <returns>更新结果</returns>
+        UpdateResult UpdatePlugin(string pluginId);
     }
 }

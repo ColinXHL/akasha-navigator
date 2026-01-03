@@ -191,12 +191,13 @@ public class ProfileMarketplaceService
         {
             if (_instance == null)
             {
-                // 使用各个服务的 Instance 获取依赖（插件系统专用）
+                // 使用 DI 容器中的实例，确保与注入的实例一致
+                var services = App.Services;
                 _instance = new ProfileMarketplaceService(
-                    LogService.Instance,
-                    ProfileManager.Instance,
-                    PluginAssociationManager.Instance,
-                    PluginLibrary.Instance
+                    services?.GetRequiredService<ILogService>() ?? LogService.Instance,
+                    services?.GetRequiredService<IProfileManager>() ?? ProfileManager.Instance,
+                    services?.GetRequiredService<IPluginAssociationManager>() ?? PluginAssociationManager.Instance,
+                    services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance
                 );
             }
             return _instance;

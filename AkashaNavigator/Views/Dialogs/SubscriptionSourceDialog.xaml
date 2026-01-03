@@ -1,6 +1,7 @@
 <Window x:Class="AkashaNavigator.Views.Dialogs.SubscriptionSourceDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:AkashaNavigator.ViewModels.Dialogs"
         Title="订阅源管理" Height="450" Width="550"
         WindowStartupLocation="CenterOwner"
         Background="#1E1E1E" ResizeMode="NoResize">
@@ -14,7 +15,7 @@
         </Grid.RowDefinitions>
 
         <!-- 标题 -->
-        <TextBlock Grid.Row="0" Text="订阅源管理" FontSize="18" FontWeight="SemiBold" 
+        <TextBlock Grid.Row="0" Text="订阅源管理" FontSize="18" FontWeight="SemiBold"
                    Foreground="White" Margin="0,0,0,16"/>
 
         <!-- 添加订阅源 -->
@@ -24,28 +25,31 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBox x:Name="UrlInput" Grid.Column="0" Style="{StaticResource DarkTextBoxStyle}"
+                     Text="{Binding UrlInput, UpdateSourceTrigger=PropertyChanged}"
                      KeyDown="UrlInput_KeyDown"/>
-            <TextBlock Grid.Column="0" Text="输入订阅源 URL..." 
+            <TextBlock Grid.Column="0" Text="输入订阅源 URL..."
                        Foreground="#666" FontSize="13"
                        IsHitTestVisible="False" Margin="10,0,0,0"
                        VerticalAlignment="Center"
-                       x:Name="UrlPlaceholder"/>
-            <Button x:Name="BtnAdd" Grid.Column="1" Content="添加" 
+                       Visibility="{Binding ShowPlaceholder, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <Button x:Name="BtnAdd" Grid.Column="1"
+                    Content="{Binding AddButtonText}"
                     Style="{StaticResource PrimaryButtonStyle}"
-                    Click="BtnAdd_Click" Margin="8,0,0,0"/>
+                    Command="{Binding AddCommand}" Margin="8,0,0,0"/>
         </Grid>
 
         <!-- 订阅源列表 -->
         <Border Grid.Row="2" Background="#252525" CornerRadius="4" Padding="8">
             <Grid>
-                <TextBlock x:Name="NoSourcesText" Text="暂无订阅源" 
+                <TextBlock Text="暂无订阅源"
                            Foreground="#666" FontSize="13"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding ShowEmptyHint, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="SourceList">
+                    <ItemsControl ItemsSource="{Binding Sources}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#2A2A2A" CornerRadius="4" 
+                                <Border Background="#2A2A2A" CornerRadius="4"
                                         Padding="12" Margin="0,0,0,8">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -53,7 +57,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding DisplayName}" Foreground="White" 
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="White"
                                                        FontSize="13" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding Url}" Foreground="#888" FontSize="11"
                                                        TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
@@ -62,9 +66,10 @@
                                                        Margin="0,2,0,0"
                                                        Visibility="{Binding HasLastFetched, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </StackPanel>
-                                        <Button Grid.Column="1" Content="删除" 
+                                        <Button Grid.Column="1" Content="删除"
                                                 Style="{StaticResource DangerButtonStyle}"
-                                                Click="BtnRemoveSource_Click" Tag="{Binding Url}"
+                                                Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding Url}"
                                                 VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
@@ -78,7 +83,7 @@
         <!-- 底部按钮 -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="关闭" Style="{StaticResource SecondaryButtonStyle}"
-                    Click="BtnClose_Click" Width="80"/>
+                    Command="{Binding CloseCommand}" Width="80"/>
         </StackPanel>
     </Grid>
 </Window>

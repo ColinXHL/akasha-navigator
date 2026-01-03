@@ -19,13 +19,13 @@ namespace AkashaNavigator.Views.Pages
 /// </summary>
 public partial class InstalledPluginsPage : UserControl
 {
-    private readonly PluginLibrary _pluginLibrary;
+    private readonly IPluginLibrary _pluginLibrary;
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly INotificationService _notificationService;
 
     // DI构造函数（推荐使用）
     public InstalledPluginsPage(
-        PluginLibrary pluginLibrary,
+        IPluginLibrary pluginLibrary,
         IPluginAssociationManager pluginAssociationManager,
         INotificationService notificationService)
     {

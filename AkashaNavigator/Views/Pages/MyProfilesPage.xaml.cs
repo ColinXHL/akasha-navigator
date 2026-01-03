@@ -23,7 +23,7 @@ public partial class MyProfilesPage : UserControl
 {
     private readonly IProfileManager _profileManager;
     private readonly IPluginAssociationManager _pluginAssociationManager;
-    private readonly PluginLibrary _pluginLibrary; // 使用具体类，因为需要 InstallPlugin 方法
+    private readonly IPluginLibrary _pluginLibrary;
     private readonly IPluginHost _pluginHost;
     private readonly INotificationService _notificationService;
     private readonly IDialogFactory _dialogFactory;
@@ -33,7 +33,7 @@ public partial class MyProfilesPage : UserControl
     public MyProfilesPage(
         IProfileManager profileManager,
         IPluginAssociationManager pluginAssociationManager,
-        PluginLibrary pluginLibrary,
+        IPluginLibrary pluginLibrary,
         IPluginHost pluginHost,
         INotificationService notificationService,
         IDialogFactory dialogFactory)
@@ -143,8 +143,13 @@ public partial class MyProfilesPage : UserControl
     /// </summary>
     private ProfilePluginViewModel CreateMissingOriginalPluginViewModel(string pluginId)
     {
+        // 根据实际安装状态设置状态（而非硬编码为 Missing）
+        var actualStatus = _pluginLibrary.IsInstalled(pluginId)
+            ? PluginInstallStatus.Installed
+            : PluginInstallStatus.Missing;
+
         var vm = new ProfilePluginViewModel {
-            PluginId = pluginId, Enabled = false, Status = PluginInstallStatus.Missing,
+            PluginId = pluginId, Enabled = actualStatus == PluginInstallStatus.Installed, Status = actualStatus,
             IsRemovedFromOriginal = true // 标记为从原始列表移除
         };
 

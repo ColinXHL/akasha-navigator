@@ -10,6 +10,7 @@ using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Plugins.Utils;
 using AkashaNavigator.Core.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Services
 {
@@ -101,14 +102,16 @@ public class ProfileManager : IProfileManager
                 {
                     if (_instance == null)
                     {
+                        // 使用 DI 容器中的实例，确保与注入的实例一致
+                        var services = App.Services;
                         _instance = new ProfileManager(
-                            ConfigService.Instance,
-                            LogService.Instance,
-                            PluginHost.Instance,
-                            PluginAssociationManager.Instance,
-                            SubscriptionManager.Instance,
-                            PluginLibrary.Instance,
-                            ProfileRegistry.Instance
+                            services?.GetRequiredService<IConfigService>() ?? ConfigService.Instance,
+                            services?.GetRequiredService<ILogService>() ?? LogService.Instance,
+                            services?.GetRequiredService<IPluginHost>() ?? PluginHost.Instance,
+                            services?.GetRequiredService<IPluginAssociationManager>() ?? PluginAssociationManager.Instance,
+                            services?.GetRequiredService<ISubscriptionManager>() ?? SubscriptionManager.Instance,
+                            services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance,
+                            services?.GetRequiredService<IProfileRegistry>() ?? ProfileRegistry.Instance
                         );
                     }
                 }

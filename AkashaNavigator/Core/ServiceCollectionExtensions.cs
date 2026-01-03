@@ -41,8 +41,8 @@ namespace AkashaNavigator.Core
             services.AddSingleton<IProfileRegistry, ProfileRegistry>();
 
             // PluginLibrary（无依赖）
+            // 只注册接口，避免重复注册导致多个实例
             services.AddSingleton<IPluginLibrary, PluginLibrary>();
-            services.AddSingleton<PluginLibrary, PluginLibrary>();
 
             // HotkeyService（无依赖，使用Win32钩子）
             services.AddSingleton<HotkeyService>();
@@ -156,9 +156,18 @@ namespace AkashaNavigator.Core
             // PluginSelectorDialog（依赖PluginSelectorDialogViewModel）
             services.AddTransient<PluginSelectorDialogViewModel>();
 
+            // MarketplaceProfileDetailDialog（依赖MarketplaceProfileDetailDialogViewModel）
+            services.AddTransient<MarketplaceProfileDetailDialogViewModel>();
+
             // WelcomeDialog（依赖WelcomeDialogViewModel）
             services.AddTransient<WelcomeDialogViewModel>();
             services.AddTransient<WelcomeDialog>();
+
+            // SubscriptionSourceDialog（依赖SubscriptionSourceDialogViewModel）
+            services.AddTransient<SubscriptionSourceDialogViewModel>();
+
+            // UninstallConfirmDialog（依赖UninstallConfirmDialogViewModel）
+            services.AddTransient<UninstallConfirmDialogViewModel>();
 
             // RecordNoteDialog 工厂方法（委托到 IDialogFactory）
             services.AddSingleton<Func<string, string, RecordNoteDialog>>(sp =>
@@ -177,14 +186,12 @@ namespace AkashaNavigator.Core
             // Dialogs（Transient，每次请求创建新实例）
             // ============================================================
 
-            // SubscriptionSourceDialog（依赖ProfileMarketplaceService, INotificationService）
-            services.AddTransient<SubscriptionSourceDialog>();
+            // SubscriptionSourceDialog 已迁移到 MVVM，通过 DialogFactory 创建
 
             // ProfileSelectorDialog（依赖IProfileManager, IPluginAssociationManager, INotificationService, ILogService）
             services.AddTransient<ProfileSelectorDialog>();
 
-            // UninstallConfirmDialog（依赖INotificationService, ILogService）
-            services.AddTransient<UninstallConfirmDialog>();
+            // UninstallConfirmDialog 已迁移到 MVVM，通过 DialogFactory 创建
 
             // ExitRecordPrompt（依赖IPioneerNoteService）
             services.AddTransient<ExitRecordPrompt>();

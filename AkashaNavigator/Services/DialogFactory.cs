@@ -23,14 +23,12 @@ namespace AkashaNavigator.Services
         }
 
         /// <summary>
-        /// 创建订阅源管理对话框
+        /// 创建订阅源管理对话框（带 ViewModel）
         /// </summary>
         public SubscriptionSourceDialog CreateSubscriptionSourceDialog()
         {
-            var profileMarketplaceService = _serviceProvider.GetRequiredService<ProfileMarketplaceService>();
-            var notificationService = _serviceProvider.GetRequiredService<INotificationService>();
-
-            return new SubscriptionSourceDialog(profileMarketplaceService, notificationService);
+            var viewModel = _serviceProvider.GetRequiredService<SubscriptionSourceDialogViewModel>();
+            return new SubscriptionSourceDialog(viewModel);
         }
 
         /// <summary>
@@ -48,18 +46,14 @@ namespace AkashaNavigator.Services
         }
 
         /// <summary>
-        /// 创建卸载确认对话框
+        /// 创建卸载确认对话框（带 ViewModel）
         /// </summary>
         /// <param name="pluginId">插件ID</param>
         /// <param name="pluginName">插件名称（可选）</param>
         public UninstallConfirmDialog CreateUninstallConfirmDialog(string pluginId, string? pluginName = null)
         {
-            var pluginAssociationManager = _serviceProvider.GetRequiredService<IPluginAssociationManager>();
-            var notificationService = _serviceProvider.GetRequiredService<INotificationService>();
-            var logService = _serviceProvider.GetRequiredService<ILogService>();
-            var pluginLibrary = _serviceProvider.GetRequiredService<IPluginLibrary>();
-
-            return new UninstallConfirmDialog(pluginAssociationManager, notificationService, logService, pluginLibrary, pluginId, pluginName);
+            var viewModel = _serviceProvider.GetRequiredService<UninstallConfirmDialogViewModel>();
+            return new UninstallConfirmDialog(viewModel, pluginId, pluginName);
         }
 
         /// <summary>

@@ -18,13 +18,13 @@ namespace AkashaNavigator.Views.Pages
 /// </summary>
 public partial class AvailablePluginsPage : UserControl
 {
-    private readonly PluginLibrary _pluginLibrary;
+    private readonly IPluginLibrary _pluginLibrary;
     private readonly INotificationService _notificationService;
 
     /// <summary>
     /// DI容器注入的构造函数
     /// </summary>
-    public AvailablePluginsPage(PluginLibrary pluginLibrary, INotificationService notificationService)
+    public AvailablePluginsPage(IPluginLibrary pluginLibrary, INotificationService notificationService)
     {
         _pluginLibrary = pluginLibrary;
         _notificationService = notificationService;

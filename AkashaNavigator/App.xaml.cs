@@ -229,7 +229,7 @@ public partial class App : System.Windows.Application
     /// </summary>
     private void SetupPluginUpdateCheck(Views.Windows.PlayerWindow playerWindow)
     {
-        var pluginLibrary = Services.GetRequiredService<PluginLibrary>();
+        var pluginLibrary = Services.GetRequiredService<IPluginLibrary>();
         var notificationService = Services.GetRequiredService<INotificationService>();
         var eventBus = Services.GetRequiredService<Core.Events.IEventBus>();
 

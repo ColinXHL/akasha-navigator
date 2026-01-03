@@ -1,183 +1,58 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
-using AkashaNavigator.Helpers;
-using AkashaNavigator.Models.Profile;
-using AkashaNavigator.Services;
-using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
 {
-/// <summary>
-/// 订阅源管理对话框
-/// </summary>
-public partial class SubscriptionSourceDialog : Window
-{
-    private readonly ProfileMarketplaceService _profileMarketplaceService;
-    private readonly INotificationService _notificationService;
-    private bool _hasChanges = false;
-
     /// <summary>
-    /// DI容器注入的构造函数
+    /// 订阅源管理对话框
     /// </summary>
-    public SubscriptionSourceDialog(
-        ProfileMarketplaceService profileMarketplaceService,
-        INotificationService notificationService)
+    public partial class SubscriptionSourceDialog : Window
     {
-        _profileMarketplaceService = profileMarketplaceService;
-        _notificationService = notificationService;
-        InitializeComponent();
-        Loaded += SubscriptionSourceDialog_Loaded;
-        UrlInput.TextChanged += UrlInput_TextChanged;
-    }
+        private readonly SubscriptionSourceDialogViewModel _viewModel;
 
-    private void SubscriptionSourceDialog_Loaded(object sender, RoutedEventArgs e)
-    {
-        RefreshSourceList();
-        UrlInput.Focus();
-    }
-
-    private void UrlInput_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        UrlPlaceholder.Visibility = string.IsNullOrEmpty(UrlInput.Text) ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    /// <summary>
-    /// 刷新订阅源列表
-    /// </summary>
-    private void RefreshSourceList()
-    {
-        var sources = _profileMarketplaceService.GetSubscriptionSources();
-        var viewModels = sources.Select(s => new SubscriptionSourceViewModel(s)).ToList();
-
-        SourceList.ItemsSource = viewModels;
-        NoSourcesText.Visibility = viewModels.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    /// <summary>
-    /// URL 输入框按键事件
-    /// </summary>
-    private void UrlInput_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
+        /// <summary>
+        /// DI容器注入的构造函数
+        /// </summary>
+        public SubscriptionSourceDialog(SubscriptionSourceDialogViewModel viewModel)
         {
-            AddSource();
-        }
-    }
+            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            InitializeComponent();
+            DataContext = _viewModel;
 
-    /// <summary>
-    /// 添加按钮点击
-    /// </summary>
-    private void BtnAdd_Click(object sender, RoutedEventArgs e)
-    {
-        AddSource();
-    }
-
-    /// <summary>
-    /// 添加订阅源
-    /// </summary>
-    private async void AddSource()
-    {
-        var url = UrlInput.Text?.Trim();
-        if (string.IsNullOrEmpty(url))
-        {
-            _notificationService.Info("请输入订阅源 URL", "提示");
-            return;
+            Loaded += SubscriptionSourceDialog_Loaded;
+            _viewModel.RequestClose += OnRequestClose;
         }
 
-        // 禁用输入
-        UrlInput.IsEnabled = false;
-        BtnAdd.IsEnabled = false;
-        BtnAdd.Content = "添加中...";
-
-        try
+        private void SubscriptionSourceDialog_Loaded(object sender, RoutedEventArgs e)
         {
-            var result = await _profileMarketplaceService.AddSubscriptionSourceAsync(url);
-
-            if (result.IsSuccess)
-            {
-                UrlInput.Text = string.Empty;
-                RefreshSourceList();
-                _hasChanges = true;
-
-                var message = $"订阅源添加成功！";
-                if (!string.IsNullOrEmpty(result.SourceName))
-                {
-                    message += $"\n\n名称: {result.SourceName}";
-                }
-                if (result.ProfileCount > 0)
-                {
-                    message += $"\n包含 {result.ProfileCount} 个 Profile";
-                }
-
-                _notificationService.Success(message, "添加成功");
-            }
-            else
-            {
-                _notificationService.Error($"添加失败: {result.ErrorMessage}", "添加失败");
-            }
-        }
-        finally
-        {
-            UrlInput.IsEnabled = true;
-            BtnAdd.IsEnabled = true;
-            BtnAdd.Content = "添加";
+            _viewModel.Initialize();
             UrlInput.Focus();
         }
-    }
 
-    /// <summary>
-    /// 删除订阅源按钮点击
-    /// </summary>
-    private async void BtnRemoveSource_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is string url)
+        /// <summary>
+        /// URL 输入框按键事件（UI 逻辑：处理 Enter 键）
+        /// </summary>
+        private void UrlInput_KeyDown(object sender, KeyEventArgs e)
         {
-            var confirmed =
-                await _notificationService.ConfirmAsync($"确定要删除此订阅源吗？\n\n{url}", "确认删除");
-
-            if (confirmed)
+            if (e.Key == Key.Enter)
             {
-                _profileMarketplaceService.RemoveSubscriptionSource(url);
-                RefreshSourceList();
-                _hasChanges = true;
+                if (_viewModel.AddCommand.CanExecute(null))
+                {
+                    _viewModel.AddCommand.Execute(null);
+                }
+                e.Handled = true;
             }
         }
+
+        /// <summary>
+        /// 处理 ViewModel 的关闭请求
+        /// </summary>
+        private void OnRequestClose(object? sender, bool hasChanges)
+        {
+            DialogResult = hasChanges;
+            Close();
+        }
     }
-
-    /// <summary>
-    /// 关闭按钮点击
-    /// </summary>
-    private void BtnClose_Click(object sender, RoutedEventArgs e)
-    {
-        DialogResult = _hasChanges;
-        Close();
-    }
-}
-
-/// <summary>
-/// 订阅源视图模型
-/// </summary>
-public class SubscriptionSourceViewModel
-{
-    private readonly MarketplaceSource _source;
-
-    public SubscriptionSourceViewModel(MarketplaceSource source)
-    {
-        _source = source;
-    }
-
-    public string Url => _source.Url;
-    public string Name => _source.Name;
-    public bool Enabled => _source.Enabled;
-    public DateTime? LastFetched => _source.LastFetched;
-
-    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? "未命名订阅源" : Name;
-    public bool HasLastFetched => LastFetched.HasValue;
-    public string LastFetchedText =>
-        LastFetched.HasValue ? $"上次更新: {LastFetched.Value:yyyy-MM-dd HH:mm}" : string.Empty;
-}
 }

@@ -26,11 +26,11 @@
             <!-- 标题栏 -->
             <Border Grid.Row="0" Background="#252525" CornerRadius="8,8,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
-                    <TextBlock Text="卸载插件" FontSize="13" FontWeight="SemiBold" 
+                    <TextBlock Text="卸载插件" FontSize="13" FontWeight="SemiBold"
                                Foreground="#EEE" VerticalAlignment="Center" Margin="16,0"/>
                     <Button Style="{StaticResource TitleBarCloseButtonStyle}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Click="BtnCancel_Click"/>
+                            Command="{Binding CancelCommand}"/>
                 </Grid>
             </Border>
 
@@ -46,32 +46,33 @@
                 <!-- 警告图标和标题 -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
                     <TextBlock Text="⚠" FontSize="24" Foreground="#F59E0B" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="PluginNameText" Text="确定要卸载此插件吗？" 
-                               FontSize="15" FontWeight="SemiBold" Foreground="White" 
+                    <TextBlock Text="{Binding ConfirmPromptText}"
+                               FontSize="15" FontWeight="SemiBold" Foreground="White"
                                VerticalAlignment="Center" Margin="12,0,0,0"/>
                 </StackPanel>
 
                 <!-- 警告信息（有引用时显示） -->
-                <Border x:Name="WarningPanel" Grid.Row="1" Background="#3D2A1A" 
-                        BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="4" 
-                        Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
+                <Border Grid.Row="1" Background="#3D2A1A"
+                        BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="4"
+                        Padding="12" Margin="0,0,0,12"
+                        Visibility="{Binding HasReferencingProfiles, Converter={StaticResource BoolToVisibilityConverter}}">
                     <StackPanel>
                         <TextBlock Text="该插件被以下 Profile 引用：" Foreground="#FBBF24" FontSize="12"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Profile 列表 -->
-                <ScrollViewer x:Name="ProfileListScroller" Grid.Row="2" 
-                              Style="{StaticResource DarkScrollViewer}" 
+                <ScrollViewer Grid.Row="2"
+                              Style="{StaticResource DarkScrollViewer}"
                               VerticalScrollBarVisibility="Auto"
-                              Visibility="Collapsed">
-                    <ItemsControl x:Name="ProfileList">
+                              Visibility="{Binding HasReferencingProfiles, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ItemsControl ItemsSource="{Binding ReferencingProfiles}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="#2A2A2A" CornerRadius="4" Padding="12,8" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="📁" FontSize="14" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding}" Foreground="#DDD" FontSize="13" 
+                                        <TextBlock Text="{Binding}" Foreground="#DDD" FontSize="13"
                                                    VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Border>
@@ -81,10 +82,11 @@
                 </ScrollViewer>
 
                 <!-- 卸载后果说明 -->
-                <TextBlock x:Name="ConsequenceText" Grid.Row="3" 
-                           Text="卸载后，这些 Profile 中将移除该插件的引用。" 
+                <TextBlock Grid.Row="3"
+                           Text="卸载后，这些 Profile 中将移除该插件的引用。"
                            Foreground="#F87171" FontSize="12" TextWrapping="Wrap"
-                           Margin="0,8,0,0" Visibility="Collapsed"/>
+                           Margin="0,8,0,0"
+                           Visibility="{Binding HasReferencingProfiles, Converter={StaticResource BoolToVisibilityConverter}}"/>
             </Grid>
 
             <!-- 底部按钮 -->
@@ -95,12 +97,12 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Button Grid.Column="1" Content="取消" Style="{StaticResource SecondaryButtonStyle}"
-                            Click="BtnCancel_Click" Margin="0,0,8,0"/>
-                    <Button x:Name="BtnConfirm" Grid.Column="2" Content="确认卸载" 
+                            Command="{Binding CancelCommand}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="2" Content="确认卸载"
                             Style="{StaticResource DangerButtonStyle}"
-                            Click="BtnConfirm_Click"/>
+                            Command="{Binding ConfirmCommand}"/>
                 </Grid>
             </Border>
         </Grid>

@@ -1,131 +1,57 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
 using AkashaNavigator.Models.Profile;
-using AkashaNavigator.Services;
-using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
 {
-/// <summary>
-/// 市场 Profile 详情对话框
-/// </summary>
-public partial class MarketplaceProfileDetailDialog : Window
-{
-    private readonly MarketplaceProfile _profile;
-    private readonly IPluginLibrary _pluginLibrary;
-
     /// <summary>
-    /// 是否应该安装
+    /// 市场 Profile 详情对话框
     /// </summary>
-    public bool ShouldInstall { get; private set; }
-
-    public MarketplaceProfileDetailDialog(IPluginLibrary pluginLibrary, MarketplaceProfile profile)
+    public partial class MarketplaceProfileDetailDialog : Window
     {
-        _pluginLibrary = pluginLibrary;
-        InitializeComponent();
-        _profile = profile;
-        LoadProfileDetails();
-    }
+        private readonly MarketplaceProfileDetailDialogViewModel _viewModel;
 
-    /// <summary>
-    /// 标题栏拖动
-    /// </summary>
-    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ClickCount == 1)
+        /// <summary>
+        /// 是否应该安装
+        /// </summary>
+        public bool ShouldInstall { get; private set; }
+
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        public MarketplaceProfileDetailDialog(MarketplaceProfileDetailDialogViewModel viewModel, MarketplaceProfile profile)
         {
-            DragMove();
-        }
-    }
+            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            InitializeComponent();
 
-    /// <summary>
-    /// 关闭按钮点击
-    /// </summary>
-    private void BtnClose_Click(object sender, RoutedEventArgs e)
-    {
-        ShouldInstall = false;
-        DialogResult = false;
-        Close();
-    }
+            DataContext = _viewModel;
+            _viewModel.Initialize(profile);
 
-    /// <summary>
-    /// 加载 Profile 详情
-    /// </summary>
-    private void LoadProfileDetails()
-    {
-        // 基本信息
-        ProfileName.Text = _profile.Name;
-        ProfileVersion.Text = $"v{_profile.Version}";
-        ProfileDescription.Text = string.IsNullOrWhiteSpace(_profile.Description) ? "暂无描述" : _profile.Description;
-
-        // 目标游戏
-        if (string.IsNullOrWhiteSpace(_profile.TargetGame))
-        {
-            TargetGameBorder.Visibility = Visibility.Collapsed;
-        }
-        else
-        {
-            TargetGameText.Text = _profile.TargetGame;
+            // 订阅关闭请求事件
+            _viewModel.CloseRequested += OnCloseRequested;
         }
 
-        // 元信息
-        AuthorText.Text = string.IsNullOrWhiteSpace(_profile.Author) ? "未知" : _profile.Author;
-        UpdatedAtText.Text = _profile.UpdatedAt.ToString("yyyy-MM-dd HH:mm");
-        PluginCountText.Text = $"{_profile.PluginCount} 个";
+        /// <summary>
+        /// 标题栏拖动
+        /// </summary>
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 1)
+            {
+                DragMove();
+            }
+        }
 
-        // 插件列表
-        var pluginViewModels = _profile.PluginIds.Select(id => new PluginStatusViewModel(_pluginLibrary, id)).ToList();
-        PluginList.ItemsSource = pluginViewModels;
+        /// <summary>
+        /// 处理 ViewModel 的关闭请求
+        /// </summary>
+        private void OnCloseRequested(object? sender, EventArgs e)
+        {
+            ShouldInstall = _viewModel.DialogResult == true;
+            DialogResult = _viewModel.DialogResult;
+            Close();
+        }
     }
-
-    /// <summary>
-    /// 取消按钮点击
-    /// </summary>
-    private void BtnCancel_Click(object sender, RoutedEventArgs e)
-    {
-        ShouldInstall = false;
-        DialogResult = false;
-        Close();
-    }
-
-    /// <summary>
-    /// 安装按钮点击
-    /// </summary>
-    private void BtnInstall_Click(object sender, RoutedEventArgs e)
-    {
-        ShouldInstall = true;
-        DialogResult = true;
-        Close();
-    }
-}
-
-/// <summary>
-/// 插件状态视图模型
-/// </summary>
-public class PluginStatusViewModel
-{
-    private readonly IPluginLibrary _pluginLibrary;
-
-    public string PluginId { get; }
-    public bool IsInstalled { get; }
-
-    public PluginStatusViewModel(IPluginLibrary pluginLibrary, string pluginId)
-    {
-        _pluginLibrary = pluginLibrary;
-        PluginId = pluginId;
-        IsInstalled = _pluginLibrary.IsInstalled(pluginId);
-    }
-
-    public string StatusText => IsInstalled ? "已安装" : "缺失";
-
-    public Brush StatusForeground => IsInstalled ? new SolidColorBrush(Color.FromRgb(0x4A, 0xDE, 0x80))  // 绿色
-                                                 : new SolidColorBrush(Color.FromRgb(0xF8, 0x71, 0x71)); // 红色
-
-    public Brush StatusBackground => IsInstalled ? new SolidColorBrush(Color.FromRgb(0x1A, 0x3A, 0x1A))  // 深绿背景
-                                                 : new SolidColorBrush(Color.FromRgb(0x3A, 0x1A, 0x1A)); // 深红背景
-}
 }

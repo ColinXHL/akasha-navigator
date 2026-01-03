@@ -20,7 +20,7 @@ namespace AkashaNavigator.Views.Pages
 public partial class ProfileMarketPage : UserControl
 {
     private readonly ProfileMarketplaceService _profileMarketplaceService;
-    private readonly PluginLibrary _pluginLibrary;
+    private readonly IPluginLibrary _pluginLibrary;
     private readonly INotificationService _notificationService;
     private bool _isLoading = false;
     private List<MarketplaceProfileViewModel> _allProfiles = new();
@@ -30,7 +30,7 @@ public partial class ProfileMarketPage : UserControl
     /// </summary>
     public ProfileMarketPage(
         ProfileMarketplaceService profileMarketplaceService,
-        PluginLibrary pluginLibrary,
+        IPluginLibrary pluginLibrary,
         INotificationService notificationService)
     {
         _profileMarketplaceService = profileMarketplaceService;
@@ -163,7 +163,8 @@ public partial class ProfileMarketPage : UserControl
     {
         if (sender is Button btn && btn.Tag is MarketplaceProfileViewModel vm)
         {
-            var dialog = new MarketplaceProfileDetailDialog(_pluginLibrary, vm.Profile);
+            var dialogViewModel = App.Services.GetRequiredService<MarketplaceProfileDetailDialogViewModel>();
+            var dialog = new MarketplaceProfileDetailDialog(dialogViewModel, vm.Profile);
             dialog.Owner = Window.GetWindow(this);
             if (dialog.ShowDialog() == true && dialog.ShouldInstall)
             {

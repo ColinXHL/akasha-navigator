@@ -18,7 +18,7 @@ namespace AkashaNavigator.Core
     /// </summary>
     public class PluginUpdateChecker
     {
-        private readonly PluginLibrary _pluginLibrary;
+        private readonly IPluginLibrary _pluginLibrary;
         private readonly INotificationService _notificationService;
         private readonly IServiceProvider _serviceProvider;
         private readonly IEventBus _eventBus;
@@ -29,7 +29,7 @@ namespace AkashaNavigator.Core
         /// 初始化 PluginUpdateChecker
         /// </summary>
         public PluginUpdateChecker(
-            PluginLibrary pluginLibrary,
+            IPluginLibrary pluginLibrary,
             INotificationService notificationService,
             IServiceProvider serviceProvider,
             IEventBus eventBus,
