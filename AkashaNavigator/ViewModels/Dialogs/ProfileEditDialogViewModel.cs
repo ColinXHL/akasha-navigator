@@ -14,9 +14,10 @@ namespace AkashaNavigator.ViewModels.Dialogs
     public partial class ProfileEditDialogViewModel : ObservableObject
     {
         private readonly IProfileManager _profileManager;
-        private readonly string _originalName;
-        private readonly string _originalIcon;
-        private readonly string _profileId;
+        private string _originalName = string.Empty;
+        private string _originalIcon = string.Empty;
+        private string _profileId = string.Empty;
+        private GameProfile? _profile;
 
         /// <summary>
         /// 可用图标列表
@@ -57,9 +58,20 @@ namespace AkashaNavigator.ViewModels.Dialogs
         /// </summary>
         public event EventHandler<bool?>? RequestClose;
 
-        public ProfileEditDialogViewModel(IProfileManager profileManager, GameProfile profile)
+        /// <summary>
+        /// 构造函数 - 只接收服务依赖
+        /// </summary>
+        public ProfileEditDialogViewModel(IProfileManager profileManager)
         {
             _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+            LoadIcons();
+        }
+
+        /// <summary>
+        /// 初始化方法 - 接收运行时参数
+        /// </summary>
+        public void Initialize(GameProfile profile)
+        {
             _profile = profile ?? throw new ArgumentNullException(nameof(profile));
 
             _profileId = profile.Id;
@@ -69,11 +81,7 @@ namespace AkashaNavigator.ViewModels.Dialogs
             // 初始化值
             ProfileName = profile.Name;
             SelectedIcon = profile.Icon;
-
-            LoadIcons();
         }
-
-        private readonly GameProfile _profile;
 
         /// <summary>
         /// 加载图标列表

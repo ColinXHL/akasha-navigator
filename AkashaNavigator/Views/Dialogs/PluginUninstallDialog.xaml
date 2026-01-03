@@ -30,7 +30,7 @@
                                Foreground="#EEE" VerticalAlignment="Center" Margin="16,0"/>
                     <Button Style="{StaticResource TitleBarCloseButtonStyle}"
                             HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Click="BtnCancel_Click"/>
+                            Command="{Binding CancelCommand}"/>
                 </Grid>
             </Border>
 
@@ -47,9 +47,8 @@
                 <StackPanel Grid.Row="0" Margin="0,0,0,12">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="⚠" FontSize="24" Foreground="#F59E0B" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="ProfileNameText" Text="确定要卸载此 Profile 吗？" 
-                                   FontSize="15" FontWeight="SemiBold" Foreground="White" 
-                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="{Binding ProfileNameText}" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="White" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -62,16 +61,16 @@
 
                 <!-- 全选/全不选 -->
                 <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
-                    <Button x:Name="BtnSelectAll" Content="全选" Style="{StaticResource SmallButtonStyle}"
-                            Click="BtnSelectAll_Click"/>
-                    <Button x:Name="BtnSelectNone" Content="全不选" Style="{StaticResource SmallButtonStyle}"
-                            Click="BtnSelectNone_Click" Margin="8,0,0,0"/>
+                    <Button Content="全选" Style="{StaticResource SmallButtonStyle}"
+                            Command="{Binding SelectAllCommand}"/>
+                    <Button Content="全不选" Style="{StaticResource SmallButtonStyle}"
+                            Command="{Binding SelectNoneCommand}" Margin="8,0,0,0"/>
                 </StackPanel>
 
                 <!-- 插件列表 -->
-                <ScrollViewer Grid.Row="3" Style="{StaticResource DarkScrollViewer}" 
+                <ScrollViewer Grid.Row="3" Style="{StaticResource DarkScrollViewer}"
                               VerticalScrollBarVisibility="Auto" Margin="0,0,0,8">
-                    <ItemsControl x:Name="PluginList">
+                    <ItemsControl ItemsSource="{Binding Plugins}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="#2A2A2A" CornerRadius="4" Padding="12,10" Margin="0,0,0,6">
@@ -111,12 +110,12 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Button Grid.Column="1" Content="取消" Style="{StaticResource SecondaryButtonStyle}"
-                            Click="BtnCancel_Click" Margin="0,0,8,0"/>
-                    <Button x:Name="BtnConfirm" Grid.Column="2" Content="确认卸载" 
+                            Command="{Binding CancelCommand}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="2" Content="确认卸载"
                             Style="{StaticResource DangerButtonStyle}"
-                            Click="BtnConfirm_Click"/>
+                            Command="{Binding ConfirmCommand}"/>
                 </Grid>
             </Border>
         </Grid>

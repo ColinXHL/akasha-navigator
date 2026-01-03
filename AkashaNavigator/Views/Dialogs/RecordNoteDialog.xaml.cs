@@ -399,9 +399,10 @@ namespace AkashaNavigator.Views.Dialogs
             }
 
             // 确认删除
-            var confirmDialog = new ConfirmDialog(
+            var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+            var confirmDialog = dialogFactory.CreateConfirmDialog(
                 $"确定要删除目录 \"{folderToDelete.Name}\" 吗？\n\n该目录下的所有子目录和笔记项也将被删除。",
-                "删除目录") { Owner = this };
+                "删除目录");
 
             confirmDialog.ShowDialog();
 

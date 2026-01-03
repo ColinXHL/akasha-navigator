@@ -1,122 +1,75 @@
-using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Models.Common;
-using AkashaNavigator.Services;
-using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
 {
-/// <summary>
-/// 插件更新提示对话框
-/// </summary>
-public partial class PluginUpdatePromptDialog : AnimatedWindow
-{
-#region Properties
-
     /// <summary>
-    /// 有更新的插件列表
+    /// 插件更新提示对话框
     /// </summary>
-    public List<UpdateCheckResult> UpdatesAvailable { get; }
-
-    /// <summary>
-    /// 用户选择的操作结果
-    /// </summary>
-    public PluginUpdatePromptResult Result { get; private set; } = PluginUpdatePromptResult.Cancel;
-
-    /// <summary>
-    /// 用户是否选择了不再提示
-    /// </summary>
-    public bool DontShowAgain => DontShowAgainCheckBox.IsChecked == true;
-
-#endregion
-
-#region Fields
-
-    private readonly IConfigService _configService;
-
-#endregion
-
-#region Constructor
-
-    /// <summary>
-    /// DI容器注入的构造函数
-    /// </summary>
-    public PluginUpdatePromptDialog(IConfigService configService, List<UpdateCheckResult> updates)
+    public partial class PluginUpdatePromptDialog : AnimatedWindow
     {
-        _configService = configService;
-        InitializeComponent();
-        UpdatesAvailable = updates;
+        #region Fields
 
-        // 设置提示文字
-        var count = updates.Count;
-        UpdateMessageText.Text = $"发现 {count} 个插件有可用更新。\n是否立即更新？";
-    }
+        private readonly PluginUpdatePromptDialogViewModel _viewModel;
 
-#endregion
+        #endregion
 
-#region Event Handlers
+        #region Properties
 
-    private new void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.LeftButton == MouseButtonState.Pressed)
+        /// <summary>
+        /// 用户选择的操作结果
+        /// </summary>
+        public PluginUpdatePromptResult Result => _viewModel.Result;
+
+        /// <summary>
+        /// 用户是否选择了不再提示
+        /// </summary>
+        public bool DontShowAgain => _viewModel.DontShowAgain;
+
+        #endregion
+
+        #region Constructor
+
+        /// <summary>
+        /// 构造函数（接收 ViewModel）
+        /// </summary>
+        public PluginUpdatePromptDialog(PluginUpdatePromptDialogViewModel viewModel)
         {
-            DragMove();
+            _viewModel = viewModel ?? throw new System.ArgumentNullException(nameof(viewModel));
+            InitializeComponent();
+            DataContext = _viewModel;
+
+            // 订阅 ViewModel 的关闭请求事件
+            _viewModel.RequestClose += OnRequestClose;
         }
-    }
 
-    private void BtnOpenPluginCenter_Click(object sender, RoutedEventArgs e)
-    {
-        Result = PluginUpdatePromptResult.OpenPluginCenter;
-        SaveDontShowAgainSetting();
-        DialogResult = true;
-        Close();
-    }
+        #endregion
 
-    private void BtnUpdateAll_Click(object sender, RoutedEventArgs e)
-    {
-        Result = PluginUpdatePromptResult.UpdateAll;
-        SaveDontShowAgainSetting();
-        DialogResult = true;
-        Close();
-    }
+        #region Event Handlers (UI 逻辑)
 
-    private void BtnClose_Click(object sender, RoutedEventArgs e)
-    {
-        Result = PluginUpdatePromptResult.Cancel;
-        SaveDontShowAgainSetting();
-        DialogResult = false;
-        Close();
-    }
-
-#endregion
-
-#region Private Methods
-
-    private void SaveDontShowAgainSetting()
-    {
-        if (DontShowAgain)
+        /// <summary>
+        /// 标题栏拖动
+        /// </summary>
+        private new void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            var config = _configService.Config;
-            config.EnablePluginUpdateNotification = false;
-            _configService.Save();
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                DragMove();
+            }
         }
+
+        /// <summary>
+        /// 处理 ViewModel 的关闭请求
+        /// </summary>
+        private void OnRequestClose(object? sender, PluginUpdatePromptResult result)
+        {
+            // 设置 DialogResult 并关闭窗口
+            DialogResult = result != PluginUpdatePromptResult.Cancel;
+            Close();
+        }
+
+        #endregion
     }
-
-#endregion
-}
-
-/// <summary>
-/// 插件更新提示对话框的操作结果
-/// </summary>
-public enum PluginUpdatePromptResult
-{
-    /// <summary>取消</summary>
-    Cancel,
-    /// <summary>打开插件中心</summary>
-    OpenPluginCenter,
-    /// <summary>一键更新</summary>
-    UpdateAll
-}
 }

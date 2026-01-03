@@ -335,7 +335,7 @@ public partial class MyProfilesPage : UserControl
         }
 
         // 显示插件选择对话框
-        var dialog = new PluginSelectorDialog(_pluginAssociationManager, availablePlugins, _currentProfileId);
+        var dialog = _dialogFactory.CreatePluginSelectorDialog(availablePlugins, _currentProfileId);
         dialog.Owner = Window.GetWindow(this);
         if (dialog.ShowDialog() == true)
         {

@@ -1,6 +1,8 @@
 using System;
 using System.Windows;
+using System.Windows.Input;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -8,75 +10,60 @@ namespace AkashaNavigator.Views.Dialogs
 /// ConfirmDialog - 确认对话框
 /// 继承 AnimatedWindow，提供淡入淡出动画效果
 /// 用于替代系统 MessageBox 的确认对话框
+/// 采用 MVVM 模式，ViewModel 处理业务逻辑
 /// </summary>
 public partial class ConfirmDialog : AnimatedWindow
 {
+#region Fields
+
+private readonly ConfirmDialogViewModel _viewModel;
+
+#endregion
+
 #region Properties
 
-    /// <summary>
-    /// 对话框结果：true=确定，false=取消，null=关闭按钮
-    /// </summary>
-    public bool? Result { get; private set; } = null;
+/// <summary>
+/// 对话框结果：true=确定，false=取消，null=关闭按钮
+/// </summary>
+public bool? Result => _viewModel.Result;
 
 #endregion
 
 #region Constructor
 
-    /// <summary>
-    /// 创建确认对话框
-    /// </summary>
-    /// <param name="message">消息内容</param>
-    /// <param name="title">标题（可选）</param>
-    /// <param name="confirmText">确定按钮文本</param>
-    /// <param name="cancelText">取消按钮文本</param>
-    public ConfirmDialog(string message, string? title = null, string confirmText = "确定", string cancelText = "取消")
-    {
-        InitializeComponent();
+/// <summary>
+/// 创建确认对话框（带 ViewModel）
+/// </summary>
+/// <param name="viewModel">ViewModel 实例</param>
+public ConfirmDialog(ConfirmDialogViewModel viewModel)
+{
+    _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+    InitializeComponent();
+    DataContext = _viewModel;
 
-        // 设置消息
-        MessageText.Text = message;
-
-        // 设置标题
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            TitleText.Text = title;
-        }
-
-        // 设置按钮文本
-        BtnConfirm.Content = confirmText;
-        BtnCancel.Content = cancelText;
-    }
+    // 订阅 ViewModel 的关闭请求事件
+    _viewModel.CloseRequested += OnCloseRequested;
+}
 
 #endregion
 
 #region Event Handlers
 
-    /// <summary>
-    /// 确定按钮点击
-    /// </summary>
-    private void BtnConfirm_Click(object sender, RoutedEventArgs e)
-    {
-        Result = true;
-        CloseWithAnimation();
-    }
+/// <summary>
+/// 处理 ViewModel 的关闭请求
+/// </summary>
+private void OnCloseRequested(object? sender, EventArgs e)
+{
+    CloseWithAnimation();
+}
 
-    /// <summary>
-    /// 取消按钮点击
-    /// </summary>
-    private void BtnCancel_Click(object sender, RoutedEventArgs e)
-    {
-        Result = false;
-        CloseWithAnimation();
-    }
-
-    /// <summary>
-    /// 关闭按钮点击（返回 false）
-    /// </summary>
-    private void BtnClose_Click(object sender, RoutedEventArgs e)
-    {
-        Result = false;
-        CloseWithAnimation();
-    }
+/// <summary>
+/// 标题栏拖动（保留 UI 逻辑）
+/// </summary>
+private new void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+{
+    base.TitleBar_MouseLeftButtonDown(sender, e);
+}
 
 #endregion
 }

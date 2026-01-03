@@ -1061,18 +1061,16 @@ public partial class PlayerWindow : Window
                     case ExitRecordPrompt.PromptResult.OpenPioneerNotes:
                         // 取消退出，打开开荒笔记窗口
                         e.Cancel = true;
-                        var pioneerNoteService = App.Services.GetRequiredService<IPioneerNoteService>();
-                        var noteWindow = new PioneerNoteWindow(pioneerNoteService);
-                        noteWindow.Owner = this;
-                        noteWindow.NoteItemSelected += (s, url) => Navigate(url);
-                        noteWindow.Show();
+                        var pioneerNoteWindow = App.Services.GetRequiredService<PioneerNoteWindow>();
+                        pioneerNoteWindow.Owner = this;
+                        pioneerNoteWindow.NoteItemSelected += (s, url) => Navigate(url);
+                        pioneerNoteWindow.Show();
                         return;
 
                     case ExitRecordPrompt.PromptResult.QuickRecord:
                         // 取消退出，打开记录笔记对话框
                         e.Cancel = true;
-                        var pioneerNoteService2 = App.Services.GetRequiredService<IPioneerNoteService>();
-                        var recordDialog = new RecordNoteDialog(pioneerNoteService2, currentUrl, currentTitle);
+                        var recordDialog = dialogFactory.CreateRecordNoteDialog(currentUrl, currentTitle);
                         recordDialog.Owner = this;
                         recordDialog.ShowDialog();
                         return;

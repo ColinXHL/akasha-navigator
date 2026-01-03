@@ -144,6 +144,22 @@ namespace AkashaNavigator.Core
             services.AddTransient<ProfileCreateDialogViewModel>();
             services.AddTransient<ProfileCreateDialog>();
 
+            // ProfileEditDialog（依赖ProfileEditDialogViewModel）
+            services.AddTransient<ProfileEditDialogViewModel>();
+
+            // PluginUpdatePromptDialog（依赖PluginUpdatePromptDialogViewModel）
+            services.AddTransient<PluginUpdatePromptDialogViewModel>();
+
+            // RecordNoteDialog（依赖RecordNoteDialogViewModel）
+            services.AddTransient<RecordNoteDialogViewModel>();
+
+            // PluginSelectorDialog（依赖PluginSelectorDialogViewModel）
+            services.AddTransient<PluginSelectorDialogViewModel>();
+
+            // WelcomeDialog（依赖WelcomeDialogViewModel）
+            services.AddTransient<WelcomeDialogViewModel>();
+            services.AddTransient<WelcomeDialog>();
+
             // RecordNoteDialog 工厂方法（委托到 IDialogFactory）
             services.AddSingleton<Func<string, string, RecordNoteDialog>>(sp =>
             {
@@ -173,8 +189,7 @@ namespace AkashaNavigator.Core
             // ExitRecordPrompt（依赖IPioneerNoteService）
             services.AddTransient<ExitRecordPrompt>();
 
-            // PluginUpdatePromptDialog（依赖IConfigService）
-            services.AddTransient<PluginUpdatePromptDialog>();
+            // PluginUpdatePromptDialog 已迁移到 MVVM，通过 DialogFactory 创建
 
             // DialogFactory（工厂模式创建带参数的Dialog）
             services.AddSingleton<IDialogFactory, DialogFactory>();

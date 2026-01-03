@@ -18,17 +18,16 @@
             </Grid.RowDefinitions>
 
             <!-- 标题 -->
-            <TextBlock Grid.Row="0" Text="选择要添加的插件" FontSize="16" FontWeight="SemiBold" 
+            <TextBlock Grid.Row="0" Text="选择要添加的插件" FontSize="16" FontWeight="SemiBold"
                        Foreground="White" Margin="0,0,0,16"/>
 
             <!-- 插件列表 -->
-            <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewer}" 
+            <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewer}"
                           VerticalScrollBarVisibility="Auto">
-                <ItemsControl x:Name="PluginList">
+                <ItemsControl ItemsSource="{Binding Plugins}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource PluginItemStyle}" 
-                                    MouseLeftButtonUp="PluginItem_Click" Tag="{Binding Id}">
+                            <Border Style="{StaticResource PluginItemStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -39,9 +38,9 @@
                                     <StackPanel Grid.Column="1">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="🔌" FontSize="13" Margin="0,0,6,0"/>
-                                            <TextBlock Text="{Binding Name}" Foreground="White" 
+                                            <TextBlock Text="{Binding Name}" Foreground="White"
                                                        FontSize="13" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}" 
+                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}"
                                                        Foreground="#666" FontSize="11" Margin="6,0,0,0"/>
                                         </StackPanel>
                                         <TextBlock Text="{Binding Description}" Foreground="#888" FontSize="11"
@@ -57,10 +56,10 @@
 
             <!-- 按钮区域 -->
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                <Button Content="取消" Style="{StaticResource SecondaryButtonStyle}" 
-                        Click="BtnCancel_Click" Margin="0,0,8,0"/>
-                <Button x:Name="BtnConfirm" Content="添加选中的插件" Style="{StaticResource PrimaryButtonStyle}" 
-                        Click="BtnConfirm_Click" IsEnabled="False"/>
+                <Button Content="取消" Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding CancelCommand}" Margin="0,0,8,0"/>
+                <Button Content="{Binding ConfirmButtonText}" Style="{StaticResource PrimaryButtonStyle}"
+                        Command="{Binding ConfirmCommand}"/>
             </StackPanel>
         </Grid>
     </Border>

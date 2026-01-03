@@ -1,136 +1,50 @@
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
 using System.Windows;
-using System.Windows.Input;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Models.Plugin;
-using AkashaNavigator.Services;
-using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
 {
-/// <summary>
-/// 插件选择对话框 - 从已安装插件中选择添加到 Profile
-/// </summary>
-public partial class PluginSelectorDialog : AnimatedWindow
-{
-    private readonly string _profileId;
-    private readonly List<PluginSelectorItem> _items;
-    private readonly IPluginAssociationManager _pluginAssociationManager;
-
-    public PluginSelectorDialog(
-        IPluginAssociationManager pluginAssociationManager,
-        List<InstalledPluginInfo> availablePlugins,
-        string profileId)
+    /// <summary>
+    /// 插件选择对话框 - 从已安装插件中选择添加到 Profile
+    /// </summary>
+    public partial class PluginSelectorDialog : AnimatedWindow
     {
-        _pluginAssociationManager = pluginAssociationManager;
-        InitializeComponent();
-        _profileId = profileId;
+        private readonly PluginSelectorDialogViewModel _viewModel;
 
-        // 转换为选择项
-        _items = availablePlugins
-                     .Select(p => new PluginSelectorItem { Id = p.Id, Name = p.Name, Version = p.Version,
-                                                           Description = p.Description, IsSelected = false })
-                     .ToList();
+        /// <summary>
+        /// 添加的插件数量
+        /// </summary>
+        public int AddedCount => _viewModel.AddedCount;
 
-        // 监听选择变化
-        foreach (var item in _items)
+        public PluginSelectorDialog(PluginSelectorDialogViewModel viewModel)
         {
-            item.PropertyChanged += Item_PropertyChanged;
+            _viewModel = viewModel ?? throw new System.ArgumentNullException(nameof(viewModel));
+            InitializeComponent();
+            DataContext = _viewModel;
+
+            // 订阅 ViewModel 的关闭请求
+            _viewModel.RequestClose += OnRequestClose;
         }
 
-        PluginList.ItemsSource = _items;
-    }
-
-    private void Item_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(PluginSelectorItem.IsSelected))
+        /// <summary>
+        /// 初始化插件列表（在设置 DataContext 后调用）
+        /// </summary>
+        public void InitializePlugins(System.Collections.Generic.List<Models.Plugin.InstalledPluginInfo> availablePlugins, string profileId)
         {
-            UpdateConfirmButton();
+            _viewModel.Initialize(profileId, availablePlugins);
         }
-    }
 
-    private void UpdateConfirmButton()
-    {
-        var selectedCount = _items.Count(i => i.IsSelected);
-        BtnConfirm.IsEnabled = selectedCount > 0;
-        BtnConfirm.Content = selectedCount > 0 ? $"添加选中的 {selectedCount} 个插件" : "添加选中的插件";
-    }
+        #region UI Event Handlers
 
-    private void PluginItem_Click(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is FrameworkElement element && element.Tag is string pluginId)
+        /// <summary>
+        /// 处理 ViewModel 的关闭请求
+        /// </summary>
+        private void OnRequestClose(object? sender, bool? dialogResult)
         {
-            var item = _items.FirstOrDefault(i => i.Id == pluginId);
-            if (item != null)
-            {
-                item.IsSelected = !item.IsSelected;
-            }
+            DialogResult = dialogResult;
+            CloseWithAnimation();
         }
+
+        #endregion
     }
-
-    private void BtnCancel_Click(object sender, RoutedEventArgs e)
-    {
-        DialogResult = false;
-        Close();
-    }
-
-    private void BtnConfirm_Click(object sender, RoutedEventArgs e)
-    {
-        var selectedPlugins = _items.Where(i => i.IsSelected).Select(i => i.Id).ToList();
-
-        if (selectedPlugins.Count == 0)
-        {
-            MessageBox.Show("请至少选择一个插件", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        // 添加到 Profile
-        var addedCount = _pluginAssociationManager.AddPluginsToProfile(selectedPlugins, _profileId);
-
-        if (addedCount > 0)
-        {
-            DialogResult = true;
-        }
-        else
-        {
-            MessageBox.Show("添加失败，插件可能已存在于此 Profile 中", "提示", MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-            DialogResult = false;
-        }
-
-        Close();
-    }
-}
-
-/// <summary>
-/// 插件选择项
-/// </summary>
-public class PluginSelectorItem : INotifyPropertyChanged
-{
-    private bool _isSelected;
-
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Version { get; set; } = "1.0.0";
-    public string? Description { get; set; }
-
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set {
-            if (_isSelected != value)
-            {
-                _isSelected = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
-            }
-        }
-    }
-
-    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
-    public Visibility HasDescriptionVisibility => HasDescription ? Visibility.Visible : Visibility.Collapsed;
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-}
 }

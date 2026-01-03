@@ -10,6 +10,7 @@ using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
+using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Pages
 {
@@ -221,7 +222,8 @@ public partial class ProfileMarketPage : UserControl
                                           })
                                   .ToList();
 
-            var dialog = new PluginUninstallDialog(profileName, pluginItems);
+            var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+            var dialog = dialogFactory.CreatePluginUninstallDialog(profileName, pluginItems);
             dialog.Owner = Window.GetWindow(this);
 
             if (dialog.ShowDialog() != true || !dialog.Confirmed)

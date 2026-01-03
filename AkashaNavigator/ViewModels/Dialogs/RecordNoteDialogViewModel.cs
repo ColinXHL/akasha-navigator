@@ -120,15 +120,18 @@ namespace AkashaNavigator.ViewModels.Dialogs
         #region Constructor
 
         /// <summary>
-        /// 创建记录笔记对话框 ViewModel
+        /// 构造函数 - 只接收服务依赖
         /// </summary>
-        /// <param name="pioneerNoteService">开荒笔记服务</param>
-        /// <param name="url">初始 URL</param>
-        /// <param name="defaultTitle">默认标题</param>
-        public RecordNoteDialogViewModel(IPioneerNoteService pioneerNoteService, string url, string defaultTitle)
+        public RecordNoteDialogViewModel(IPioneerNoteService pioneerNoteService)
         {
             _pioneerNoteService = pioneerNoteService ?? throw new ArgumentNullException(nameof(pioneerNoteService));
+        }
 
+        /// <summary>
+        /// 初始化方法 - 接收运行时参数
+        /// </summary>
+        public void Initialize(string url, string defaultTitle)
+        {
             Url = url ?? string.Empty;
             Title = defaultTitle ?? string.Empty;
 

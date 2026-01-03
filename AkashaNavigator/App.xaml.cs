@@ -192,7 +192,8 @@ public partial class App : System.Windows.Application
     {
         if (_config.IsFirstLaunch)
         {
-            var welcomeDialog = new Views.Dialogs.WelcomeDialog();
+            var dialogFactory = Services.GetRequiredService<IDialogFactory>();
+            var welcomeDialog = dialogFactory.CreateWelcomeDialog();
             welcomeDialog.ShowDialog();
 
             _config.IsFirstLaunch = false;

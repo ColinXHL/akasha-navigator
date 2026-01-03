@@ -49,7 +49,7 @@
                     <!-- 关闭按钮 -->
                     <Button Grid.Column="2"
                             Style="{StaticResource DialogCloseButtonStyle}"
-                            Click="BtnClose_Click"/>
+                            Command="{Binding CancelCommand}"/>
                 </Grid>
             </Border>
 
@@ -60,16 +60,18 @@
                     <TextBlock Text="📦" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,16"/>
                     
                     <!-- 更新提示文字 -->
-                    <TextBlock x:Name="UpdateMessageText" TextWrapping="Wrap" FontSize="14" 
-                               Foreground="#DDD" LineHeight="22" TextAlignment="Center" Margin="0,0,0,16"/>
+                    <TextBlock TextWrapping="Wrap" FontSize="14"
+                               Foreground="#DDD" LineHeight="22" TextAlignment="Center" Margin="0,0,0,16"
+                               Text="{Binding UpdateMessage}"/>
 
                     <!-- 分隔线 -->
                     <Border Height="1" Background="#3C3C3C" Margin="0,0,0,16"/>
 
                     <!-- 不再提示复选框 -->
-                    <CheckBox x:Name="DontShowAgainCheckBox" Content="不再提示插件更新 (慎选)"
-                              Style="{StaticResource DarkCheckBoxStyle}" 
-                              HorizontalAlignment="Center" Foreground="#888"/>
+                    <CheckBox Content="不再提示插件更新 (慎选)"
+                              Style="{StaticResource DarkCheckBoxStyle}"
+                              HorizontalAlignment="Center" Foreground="#888"
+                              IsChecked="{Binding DontShowAgain}"/>
                 </StackPanel>
             </Border>
 
@@ -86,14 +88,14 @@
                     <Button Grid.Column="1" Content="打开插件中心"
                             Style="{StaticResource SecondaryButtonStyle}"
                             Margin="0,0,8,0"
-                            Click="BtnOpenPluginCenter_Click"/>
+                            Command="{Binding OpenPluginCenterCommand}"/>
                     <Button Grid.Column="2" Content="一键更新"
                             Style="{StaticResource PrimaryButtonStyle}"
                             Margin="0,0,8,0"
-                            Click="BtnUpdateAll_Click"/>
+                            Command="{Binding UpdateAllCommand}"/>
                     <Button Grid.Column="3" Content="取消"
                             Style="{StaticResource SecondaryButtonStyle}"
-                            Click="BtnClose_Click"/>
+                            Command="{Binding CancelCommand}"/>
                 </Grid>
             </Border>
         </Grid>

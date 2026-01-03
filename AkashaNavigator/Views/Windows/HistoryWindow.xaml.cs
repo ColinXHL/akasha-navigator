@@ -7,6 +7,7 @@ using AkashaNavigator.Models.Data;
 using AkashaNavigator.Services;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Views.Dialogs;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Views.Windows
 {
@@ -83,7 +84,8 @@ public partial class HistoryWindow : AnimatedWindow
     /// </summary>
     private void BtnClearAll_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ConfirmDialog("确定要清空所有历史记录吗？此操作不可撤销。", "确认清空", "清空", "取消");
+        var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+        var dialog = dialogFactory.CreateConfirmDialog("确定要清空所有历史记录吗？此操作不可撤销。", "确认清空", "清空", "取消");
         dialog.Owner = this;
         dialog.ShowDialog();
 

@@ -5,6 +5,8 @@ using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Data;
 using AkashaNavigator.ViewModels.Dialogs;
+using AkashaNavigator.Core.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Views.Dialogs
 {
@@ -60,7 +62,8 @@ namespace AkashaNavigator.Views.Dialogs
         /// </summary>
         private void BtnClearAll_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new ConfirmDialog("确定要清空所有收藏吗？此操作不可撤销。", "确认清空", "清空", "取消");
+            var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+            var dialog = dialogFactory.CreateConfirmDialog("确定要清空所有收藏吗？此操作不可撤销。", "确认清空", "清空", "取消");
             dialog.Owner = this;
             dialog.ShowDialog();
 

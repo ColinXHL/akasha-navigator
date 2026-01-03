@@ -44,44 +44,45 @@
                                VerticalAlignment="Center"
                                Margin="0,0,10,0"/>
 
-                    <!-- 标题 -->
+                    <!-- 标题 - 使用数据绑定 -->
                     <TextBlock x:Name="TitleText" Grid.Column="1"
-                               Text="确认"
+                               Text="{Binding Title}"
                                FontSize="14" FontWeight="SemiBold"
                                Foreground="White"
                                VerticalAlignment="Center"/>
 
-                    <!-- 关闭按钮 -->
+                    <!-- 关闭按钮 - 使用命令绑定 -->
                     <Button Grid.Column="2"
                             Style="{StaticResource DialogCloseButtonStyle}"
-                            Click="BtnClose_Click"/>
+                            Command="{Binding CloseCommand}"/>
                 </Grid>
             </Border>
 
-            <!-- 内容区 -->
+            <!-- 内容区 - 使用数据绑定 -->
             <Border Grid.Row="1" Padding="20,16">
                 <TextBlock x:Name="MessageText"
+                           Text="{Binding Message}"
                            FontSize="13"
                            Foreground="#DDD"
                            TextWrapping="Wrap"
                            LineHeight="20"/>
             </Border>
 
-            <!-- 按钮区 -->
+            <!-- 按钮区 - 使用命令绑定 -->
             <Border Grid.Row="2" Background="#252525" CornerRadius="0,0,8,8" Padding="16,12">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <!-- 确定按钮 -->
                     <Button x:Name="BtnConfirm"
-                            Content="确定"
+                            Content="{Binding ConfirmText}"
                             Style="{StaticResource PrimaryButtonStyle}"
-                            Click="BtnConfirm_Click"
+                            Command="{Binding ConfirmCommand}"
                             Margin="0,0,8,0"/>
-                    
+
                     <!-- 取消按钮 -->
                     <Button x:Name="BtnCancel"
-                            Content="取消"
+                            Content="{Binding CancelText}"
                             Style="{StaticResource SecondaryButtonStyle}"
-                            Click="BtnCancel_Click"/>
+                            Command="{Binding CancelCommand}"/>
                 </StackPanel>
             </Border>
         </Grid>

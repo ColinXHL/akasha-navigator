@@ -5,6 +5,7 @@ using AkashaNavigator.Models.Config;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.Core.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Services
 {
@@ -130,7 +131,8 @@ public class NotificationService : INotificationService
 
             Application.Current.Dispatcher.Invoke(() =>
                                                   {
-                                                      var dialog = new ConfirmDialog(message, title, yesText, noText);
+                                                      var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
+                                                      var dialog = dialogFactory.CreateConfirmDialog(message, title, yesText, noText);
                                                       CenterWindowOnScreen(dialog);
 
                                                       dialog.Closed += (s, e) =>
