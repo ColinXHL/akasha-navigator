@@ -7,6 +7,7 @@ using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Views.Pages;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.ViewModels.Dialogs;
+using AkashaNavigator.ViewModels.Pages;
 
 namespace AkashaNavigator.Core
 {
@@ -115,7 +116,8 @@ namespace AkashaNavigator.Core
             // MyProfilesPage（依赖IProfileManager, IPluginAssociationManager, PluginLibrary, IPluginHost, INotificationService）
             services.AddTransient<MyProfilesPage>();
 
-            // InstalledPluginsPage（依赖PluginLibrary, IPluginAssociationManager, INotificationService）
+            // InstalledPluginsPage（依赖InstalledPluginsPageViewModel）
+            services.AddTransient<InstalledPluginsPageViewModel>();
             services.AddTransient<InstalledPluginsPage>();
 
             // PluginSettingsWindow 工厂方法（用于创建带参数的窗口）

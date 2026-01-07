@@ -1,191 +1,90 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
-using AkashaNavigator.Models.Config;
-using AkashaNavigator.Models.Plugin;
-using AkashaNavigator.Models.Common;
-using AkashaNavigator.Services;
+using AkashaNavigator.ViewModels.Pages;
 using AkashaNavigator.Core.Interfaces;
-using AkashaNavigator.Views.Dialogs;
-using AkashaNavigator.Views.Windows;
+using AkashaNavigator.Models.Plugin;
 
 namespace AkashaNavigator.Views.Pages
 {
-/// <summary>
-/// 已安装插件页面 - 显示全局插件库中的所有插件
-/// </summary>
-public partial class InstalledPluginsPage : UserControl
-{
-    private readonly IPluginLibrary _pluginLibrary;
-    private readonly IPluginAssociationManager _pluginAssociationManager;
-    private readonly INotificationService _notificationService;
-
-    // DI构造函数（推荐使用）
-    public InstalledPluginsPage(
-        IPluginLibrary pluginLibrary,
-        IPluginAssociationManager pluginAssociationManager,
-        INotificationService notificationService)
-    {
-        _pluginLibrary = pluginLibrary;
-        _pluginAssociationManager = pluginAssociationManager;
-        _notificationService = notificationService;
-        InitializeComponent();
-        Loaded += InstalledPluginsPage_Loaded;
-    }
-
-    private void InstalledPluginsPage_Loaded(object sender, RoutedEventArgs e)
-    {
-        // 刷新列表并自动检查更新
-        CheckAndRefreshPluginList();
-    }
-
     /// <summary>
-    /// 检查更新并刷新插件列表（公共方法）
+    /// 已安装插件页面 - 显示全局插件库中的所有插件
     /// </summary>
-    public void CheckAndRefreshPluginList()
+    public partial class InstalledPluginsPage : UserControl
     {
-        // 检查所有插件的更新
-        var updates = _pluginLibrary.CheckAllUpdates();
+        private readonly InstalledPluginsPageViewModel _viewModel;
+        private readonly IPluginLibrary _pluginLibrary;
 
-        // 刷新列表（带更新信息）
-        RefreshPluginList(updates);
-    }
-
-    /// <summary>
-    /// 刷新插件列表（公共方法，不带更新信息）
-    /// </summary>
-    public void RefreshPluginList()
-    {
-        RefreshPluginList(null);
-    }
-
-    /// <summary>
-    /// 获取插件关联的Profile文本
-    /// </summary>
-    private string GetProfilesText(string pluginId)
-    {
-        var profiles = _pluginAssociationManager.GetProfilesUsingPlugin(pluginId);
-        if (profiles.Count == 0)
-            return "无";
-        if (profiles.Count <= 3)
-            return string.Join(", ", profiles);
-        return $"{string.Join(", ", profiles.Take(3))} 等 {profiles.Count} 个";
-    }
-
-    /// <summary>
-    /// 搜索框文本变化
-    /// </summary>
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        RefreshPluginList();
-    }
-
-    /// <summary>
-    /// 检查更新按钮点击
-    /// </summary>
-    private void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
-    {
-        // 调用 PluginLibrary.CheckAllUpdates
-        var updates = _pluginLibrary.CheckAllUpdates();
-
-        if (updates.Count == 0)
+        // DI 构造函数
+        public InstalledPluginsPage(
+            InstalledPluginsPageViewModel viewModel,
+            IPluginLibrary pluginLibrary)
         {
-            // 没有可用更新
-            _notificationService.Show("所有插件都是最新版本", NotificationType.Success);
-        }
-        else
-        {
-            // 有可用更新，刷新列表以显示更新信息
-            RefreshPluginList(updates);
-            _notificationService.Show($"发现 {updates.Count} 个插件有可用更新", NotificationType.Info);
-        }
-    }
+            _viewModel = viewModel ?? throw new System.ArgumentNullException(nameof(viewModel));
+            _pluginLibrary = pluginLibrary ?? throw new System.ArgumentNullException(nameof(pluginLibrary));
+            InitializeComponent();
 
-    /// <summary>
-    /// 刷新插件列表（带更新信息）
-    /// </summary>
-    private void RefreshPluginList(List<UpdateCheckResult>? updateResults = null)
-    {
-        var plugins = _pluginLibrary.GetInstalledPlugins();
-        var searchText = SearchBox?.Text?.ToLower() ?? "";
+            DataContext = _viewModel;
 
-        // 过滤搜索
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
-            plugins = plugins
-                          .Where(p => p.Name.ToLower().Contains(searchText) ||
-                                      (p.Description?.ToLower().Contains(searchText) ?? false))
-                          .ToList();
+            // 订阅 ViewModel 的事件
+            _viewModel.AddToProfileRequested += OnAddToProfileRequested;
+            _viewModel.UninstallRequested += OnUninstallRequested;
+
+            Loaded += InstalledPluginsPage_Loaded;
         }
 
-        // 创建更新信息字典
-        var updateDict =
-            updateResults?.ToDictionary(u => u.PluginId, u => u) ?? new Dictionary<string, UpdateCheckResult>();
-
-        // 转换为视图模型
-        var viewModels =
-            plugins
-                .Select(p =>
-                        {
-                            var vm = new InstalledPluginViewModel {
-                                Id = p.Id,
-                                Name = p.Name,
-                                Version = p.Version,
-                                Description = p.Description,
-                                Author = p.Author,
-                                ReferenceCount = _pluginAssociationManager.GetPluginReferenceCount(p.Id),
-                                ProfilesText = GetProfilesText(p.Id),
-                                HasDescription = !string.IsNullOrWhiteSpace(p.Description)
-                            };
-
-                            // 设置更新信息
-                            if (updateDict.TryGetValue(p.Id, out var updateInfo) && updateInfo.HasUpdate)
-                            {
-                                vm.HasUpdate = true;
-                                vm.AvailableVersion = updateInfo.AvailableVersion;
-                            }
-
-                            return vm;
-                        })
-                .ToList();
-
-        PluginList.ItemsSource = viewModels;
-        PluginCountText.Text = $"共 {viewModels.Count} 个插件";
-        NoPluginsText.Visibility = viewModels.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    /// <summary>
-    /// 添加到Profile按钮点击
-    /// </summary>
-    private void BtnAddToProfile_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is string pluginId)
+        private void InstalledPluginsPage_Loaded(object sender, RoutedEventArgs e)
         {
+            // 委托给 ViewModel 的 LoadedCommand
+            _viewModel.LoadedCommand.Execute(null);
+        }
+
+        /// <summary>
+        /// 刷新插件列表（公共方法）
+        /// </summary>
+        public void RefreshPluginList()
+        {
+            _viewModel.RefreshPluginList();
+        }
+
+        /// <summary>
+        /// 检查更新并刷新插件列表（公共方法）
+        /// </summary>
+        public void CheckAndRefreshPluginList()
+        {
+            _viewModel.CheckAndRefreshPluginList();
+        }
+
+        /// <summary>
+        /// 处理添加到 Profile 请求（UI 逻辑：显示对话框）
+        /// </summary>
+        private void OnAddToProfileRequested(object? sender, string? pluginId)
+        {
+            if (string.IsNullOrWhiteSpace(pluginId))
+                return;
+
             var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
             var dialog = dialogFactory.CreateProfileSelectorDialog(pluginId);
             dialog.Owner = Window.GetWindow(this);
+
             if (dialog.ShowDialog() == true)
             {
                 RefreshPluginList();
             }
         }
-    }
 
-    /// <summary>
-    /// 卸载按钮点击
-    /// </summary>
-    private void BtnUninstall_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is string pluginId)
+        /// <summary>
+        /// 处理卸载请求（UI 逻辑：显示确认对话框）
+        /// </summary>
+        private void OnUninstallRequested(object? sender, string? pluginId)
         {
+            if (string.IsNullOrWhiteSpace(pluginId))
+                return;
+
             // 获取插件名称用于显示
             var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
             var pluginName = pluginInfo?.Name ?? pluginId;
 
-            // 显示卸载确认对话框
             var dialogFactory = App.Services.GetRequiredService<IDialogFactory>();
             var dialog = dialogFactory.CreateUninstallConfirmDialog(pluginId, pluginName);
             dialog.Owner = Window.GetWindow(this);
@@ -196,84 +95,4 @@ public partial class InstalledPluginsPage : UserControl
             }
         }
     }
-
-    /// <summary>
-    /// 更新按钮点击
-    /// </summary>
-    private void BtnUpdate_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is string pluginId)
-        {
-            // 获取插件名称用于显示
-            var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
-            var pluginName = pluginInfo?.Name ?? pluginId;
-
-            // 调用 PluginLibrary.UpdatePlugin
-            var result = _pluginLibrary.UpdatePlugin(pluginId);
-
-            if (result.IsSuccess)
-            {
-                // 显示成功通知
-                _notificationService.Show($"{pluginName} 已更新到 v{result.NewVersion}",
-                                                  NotificationType.Success);
-
-                // 刷新列表
-                RefreshPluginList();
-            }
-            else
-            {
-                // 显示失败通知
-                _notificationService.Show($"更新 {pluginName} 失败: {result.ErrorMessage}",
-                                                  NotificationType.Error);
-            }
-        }
-    }
-}
-
-/// <summary>
-/// 已安装插件视图模型
-/// </summary>
-public class InstalledPluginViewModel
-{
-    public string Id { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string Version { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string? Author { get; set; }
-    public int ReferenceCount { get; set; }
-    public string ProfilesText { get; set; } = "无";
-    public bool HasDescription { get; set; }
-    public Visibility HasDescriptionVisibility => HasDescription ? Visibility.Visible : Visibility.Collapsed;
-
-    // 更新相关属性
-    /// <summary>
-    /// 是否有可用更新
-    /// </summary>
-    public bool HasUpdate { get; set; }
-
-    /// <summary>
-    /// 可用的新版本号
-    /// </summary>
-    public string? AvailableVersion { get; set; }
-
-    /// <summary>
-    /// 更新按钮可见性
-    /// </summary>
-    public Visibility UpdateButtonVisibility => HasUpdate ? Visibility.Visible : Visibility.Collapsed;
-
-    /// <summary>
-    /// 更新按钮文本
-    /// </summary>
-    public string UpdateButtonText => $"更新到 v{AvailableVersion}";
-
-    /// <summary>
-    /// 更新可用标签可见性
-    /// </summary>
-    public Visibility UpdateAvailableTagVisibility => HasUpdate ? Visibility.Visible : Visibility.Collapsed;
-
-    /// <summary>
-    /// 更新可用标签文本
-    /// </summary>
-    public string UpdateAvailableTagText => $"更新可用 v{AvailableVersion}";
-}
 }

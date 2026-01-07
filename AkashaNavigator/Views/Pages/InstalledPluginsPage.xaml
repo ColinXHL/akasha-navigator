@@ -1,6 +1,7 @@
 <UserControl x:Class="AkashaNavigator.Views.Pages.InstalledPluginsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:AkashaNavigator.ViewModels.Pages"
              Background="Transparent"
              Cursor="Arrow">
     
@@ -25,17 +26,17 @@
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="已安装插件" FontSize="18" FontWeight="SemiBold" 
                        Foreground="White" VerticalAlignment="Center"/>
-            <Button x:Name="BtnCheckUpdate" Grid.Column="1" Content="🔄 检查更新" 
+            <Button x:Name="BtnCheckUpdate" Grid.Column="1" Content="🔄 检查更新"
                     Style="{StaticResource ActionButtonStyle}" Margin="0,0,12,0"
-                    Click="BtnCheckUpdate_Click"/>
-            <TextBox x:Name="SearchBox" Grid.Column="2" Width="200" 
+                    Command="{Binding CheckUpdateCommand}"/>
+            <TextBox x:Name="SearchBox" Grid.Column="2" Width="200"
                      Style="{StaticResource SearchBoxStyle}" Tag="搜索插件..."
-                     TextChanged="SearchBox_TextChanged"/>
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid>
 
         <!-- 统计信息 -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
-            <TextBlock x:Name="PluginCountText" Text="共 0 个插件" Foreground="#888" FontSize="12"/>
+            <TextBlock x:Name="PluginCountText" Text="{Binding PluginCountText}" Foreground="#888" FontSize="12"/>
         </StackPanel>
 
         <!-- 插件列表 -->
@@ -43,12 +44,13 @@
                       VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <!-- 无插件提示 -->
-                <TextBlock x:Name="NoPluginsText" Text="没有已安装的插件" 
+                <TextBlock x:Name="NoPluginsText" Text="没有已安装的插件"
                            Foreground="#666" FontSize="13" Margin="0,20,0,0"
-                           HorizontalAlignment="Center" Visibility="Collapsed"/>
+                           HorizontalAlignment="Center"
+                           Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 
                 <!-- 插件列表 -->
-                <ItemsControl x:Name="PluginList">
+                <ItemsControl x:Name="PluginList" ItemsSource="{Binding Plugins}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Style="{StaticResource PluginCardStyle}">
@@ -101,12 +103,15 @@
                                     <!-- 第三行：操作按钮 -->
                                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
                                         <Button Content="{Binding UpdateButtonText}" Style="{StaticResource PrimaryActionButtonStyle}"
-                                                Click="BtnUpdate_Click" Tag="{Binding Id}"
+                                                Command="{Binding DataContext.UpdatePluginCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding Id}"
                                                 Visibility="{Binding UpdateButtonVisibility}" Margin="0,0,8,0"/>
                                         <Button Content="➕ 添加到 Profile" Style="{StaticResource ActionButtonStyle}"
-                                                Click="BtnAddToProfile_Click" Tag="{Binding Id}" Margin="0,0,8,0"/>
+                                                Command="{Binding DataContext.AddToProfileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding Id}" Margin="0,0,8,0"/>
                                         <Button Content="🗑 卸载" Style="{StaticResource DangerActionButtonStyle}"
-                                                Click="BtnUninstall_Click" Tag="{Binding Id}"/>
+                                                Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding Id}"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
