@@ -6,6 +6,7 @@ using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Plugins.Core;
+using AkashaNavigator.ViewModels.Windows;
 
 namespace AkashaNavigator.Core
 {
@@ -48,8 +49,9 @@ namespace AkashaNavigator.Core
             var currentProfileId = profileManager.CurrentProfile?.Id ?? "";
             pluginHost.LoadPluginsForProfile(currentProfileId);
 
-            // 手动创建 ControlBarWindow（依赖 PlayerWindow 和 EventBus）
-            _controlBarWindow = new ControlBarWindow(_playerWindow, _eventBus);
+            // 从 DI 容器创建 ViewModel，手动创建 View
+            var controlBarViewModel = sp.GetRequiredService<ControlBarViewModel>();
+            _controlBarWindow = new ControlBarWindow(controlBarViewModel, _playerWindow);
 
             // 设置窗口关闭事件和菜单事件处理
             SetupEventHandlers();
@@ -75,6 +77,16 @@ namespace AkashaNavigator.Core
             {
                 _controlBarWindow.Close();
             };
+
+            // 订阅 URL 变化事件，同步标题到 ControlBarWindow
+            _eventBus.Subscribe<UrlChangedEvent>(e =>
+            {
+                if (_playerWindow != null && _controlBarWindow != null)
+                {
+                    var title = _playerWindow.CurrentTitle;
+                    _controlBarWindow.UpdateCurrentTitle(title);
+                }
+            });
 
             // 订阅菜单相关 EventBus 事件
             SetupMenuEventHandlers();

@@ -119,7 +119,11 @@ public partial class PluginCenterWindow : AnimatedWindow
         else if (radioButton == NavProfileMarket)
         {
             _profileMarketPage.Visibility = Visibility.Visible;
-            _ = _profileMarketPage.LoadProfilesAsync();
+            var vm = _profileMarketPage.DataContext as ViewModels.Pages.ProfileMarketPageViewModel;
+            if (vm != null)
+            {
+                _ = vm.LoadProfilesAsync();
+            }
         }
     }
 

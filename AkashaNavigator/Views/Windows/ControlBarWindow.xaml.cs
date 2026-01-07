@@ -3,8 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Core.Events;
-using AkashaNavigator.Core.Events.Events;
+using AkashaNavigator.ViewModels.Windows;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
@@ -25,78 +24,15 @@ public enum ControlBarDisplayState
 
 /// <summary>
 /// ControlBarWindow - URL 控制栏窗口
+/// 采用混合架构：Code-Behind 处理 UI 逻辑，ViewModel 处理业务逻辑
 /// </summary>
 public partial class ControlBarWindow : Window
 {
 
-#region Events
-
-    /// <summary>
-    /// 导航请求事件
-    /// </summary>
-    public event EventHandler<string>? NavigateRequested;
-
-    /// <summary>
-    /// 后退请求事件
-    /// </summary>
-    public event EventHandler? BackRequested;
-
-    /// <summary>
-    /// 前进请求事件
-    /// </summary>
-    public event EventHandler? ForwardRequested;
-
-    /// <summary>
-    /// 刷新请求事件
-    /// </summary>
-    public event EventHandler? RefreshRequested;
-
-    /// <summary>
-    /// 收藏请求事件
-    /// </summary>
-    public event EventHandler? BookmarkRequested;
-
-    /// <summary>
-    /// 记录笔记请求事件
-    /// </summary>
-    public event EventHandler? RecordNoteRequested;
-
-    /// <summary>
-    /// 开荒笔记管理请求事件
-    /// </summary>
-    public event EventHandler? PioneerNotesRequested;
-
-    /// <summary>
-    /// 菜单请求事件
-    /// </summary>
-    public event EventHandler? MenuRequested;
-
-    /// <summary>
-    /// 历史记录请求事件
-    /// </summary>
-    public event EventHandler? HistoryRequested;
-
-    /// <summary>
-    /// 收藏夹请求事件
-    /// </summary>
-    public event EventHandler? BookmarksRequested;
-
-    /// <summary>
-    /// 设置请求事件
-    /// </summary>
-    public event EventHandler? SettingsRequested;
-
-    /// <summary>
-    /// 插件中心请求事件
-    /// </summary>
-    public event EventHandler? PluginCenterRequested;
-
-#endregion
-
 #region Fields
 
+    private readonly ControlBarViewModel _viewModel;
     private readonly PlayerWindow _playerWindow;
-    private readonly IEventBus _eventBus;
 
     /// <summary>
     /// 是否正在拖动
@@ -142,12 +78,14 @@ public partial class ControlBarWindow : Window
 
 #region Constructor
 
-    public ControlBarWindow(PlayerWindow playerWindow, IEventBus eventBus)
+    public ControlBarWindow(ControlBarViewModel viewModel, PlayerWindow playerWindow)
     {
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _playerWindow = playerWindow ?? throw new ArgumentNullException(nameof(playerWindow));
-        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
 
         InitializeComponent();
+        DataContext = _viewModel;
+
         InitializeWindowPosition();
         InitializeAutoShowHide();
 
@@ -170,60 +108,39 @@ public partial class ControlBarWindow : Window
         // 窗口关闭时停止定时器
         Closing += (s, e) => StopAutoShowHide();
 
-        // 订阅 EventBus 事件
-        SubscribeToEvents();
+        // 订阅 ViewModel 属性变化事件以更新 UI
+        SubscribeToViewModelChanges();
     }
 
     /// <summary>
-    /// 订阅 EventBus 事件
+    /// 订阅 ViewModel 属性变化事件（更新 UI 状态）
     /// </summary>
-    private void SubscribeToEvents()
+    private void SubscribeToViewModelChanges()
     {
-        // 订阅 URL 变化事件
-        _eventBus.Subscribe<UrlChangedEvent>(OnUrlChanged);
-
-        // 订阅导航状态变化事件
-        _eventBus.Subscribe<NavigationStateChangedEvent>(OnNavigationStateChanged);
-
-        // 订阅收藏状态变化事件
-        _eventBus.Subscribe<BookmarkStateChangedEvent>(OnBookmarkStateChanged);
-    }
-
-    /// <summary>
-    /// 处理 URL 变化事件
-    /// </summary>
-    private void OnUrlChanged(UrlChangedEvent e)
-    {
-        // 在 UI 线程执行
-        Dispatcher.BeginInvoke(() =>
+        _viewModel.PropertyChanged += (s, e) =>
         {
-            CurrentUrl = e.Url;
-        });
+            switch (e.PropertyName)
+            {
+                case nameof(_viewModel.IsBookmarked):
+                    UpdateBookmarkIcon();
+                    break;
+                case nameof(_viewModel.CurrentTitle):
+                    // 标题变化时更新 ViewModel（用于收藏和记录笔记）
+                    break;
+            }
+        };
     }
 
     /// <summary>
-    /// 处理导航状态变化事件
+    /// 更新收藏按钮图标
     /// </summary>
-    private void OnNavigationStateChanged(NavigationStateChangedEvent e)
+    private void UpdateBookmarkIcon()
     {
-        // 在 UI 线程执行
-        Dispatcher.BeginInvoke(() =>
+        var textBlock = BtnBookmark.Content as System.Windows.Controls.TextBlock;
+        if (textBlock != null)
         {
-            UpdateBackButtonState(e.CanGoBack);
-            UpdateForwardButtonState(e.CanGoForward);
-        });
-    }
-
-    /// <summary>
-    /// 处理收藏状态变化事件
-    /// </summary>
-    private void OnBookmarkStateChanged(BookmarkStateChangedEvent e)
-    {
-        // 在 UI 线程执行
-        Dispatcher.BeginInvoke(() =>
-        {
-            UpdateBookmarkState(e.IsBookmarked);
-        });
+            textBlock.Text = _viewModel.IsBookmarked ? "★" : "☆";
+        }
     }
 
 #endregion
@@ -231,7 +148,7 @@ public partial class ControlBarWindow : Window
 #region Properties
 
     /// <summary>
-    /// 获取或设置当前 URL
+    /// 获取或设置当前 URL（桥接到 ViewModel）
     /// </summary>
     public string CurrentUrl
     {
@@ -375,111 +292,20 @@ public partial class ControlBarWindow : Window
     }
 
     /// <summary>
-    /// URL 地址栏按键事件
+    /// URL 地址栏按键事件（UI 逻辑：快捷键处理）
     /// </summary>
     private void UrlTextBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
-            NavigateToCurrentUrl();
+            // 调用 ViewModel 的导航命令
+            _viewModel.NavigateCommand.Execute(_viewModel.CurrentUrl);
+            e.Handled = true;
         }
     }
 
     /// <summary>
-    /// 前往按钮点击
-    /// </summary>
-    private void BtnGo_Click(object sender, RoutedEventArgs e)
-    {
-        NavigateToCurrentUrl();
-    }
-
-    /// <summary>
-    /// 导航到当前 URL 地址栏中的地址
-    /// </summary>
-    private void NavigateToCurrentUrl()
-    {
-        var url = UrlTextBox.Text.Trim();
-
-        if (!string.IsNullOrEmpty(url))
-        {
-            // 自动补全 URL scheme
-            if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                url = "https://" + url;
-            }
-
-            // 发布 EventBus 事件
-            _eventBus.Publish(new NavigationRequestedEvent { Url = url });
-
-            // 保留 C# 事件以保持向后兼容
-            NavigateRequested?.Invoke(this, url);
-        }
-
-        // 移除焦点
-        Keyboard.ClearFocus();
-    }
-
-    /// <summary>
-    /// 后退按钮点击
-    /// </summary>
-    private void BtnBack_Click(object sender, RoutedEventArgs e)
-    {
-        // 发布 EventBus 事件
-        _eventBus.Publish(new NavigationControlEvent { Action = NavigationControlAction.Back });
-        BackRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>
-    /// 前进按钮点击
-    /// </summary>
-    private void BtnForward_Click(object sender, RoutedEventArgs e)
-    {
-        // 发布 EventBus 事件
-        _eventBus.Publish(new NavigationControlEvent { Action = NavigationControlAction.Forward });
-        ForwardRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>
-    /// 刷新按钮点击
-    /// </summary>
-    private void BtnRefresh_Click(object sender, RoutedEventArgs e)
-    {
-        // 发布 EventBus 事件
-        _eventBus.Publish(new NavigationControlEvent { Action = NavigationControlAction.Refresh });
-        RefreshRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>
-    /// 收藏按钮点击
-    /// </summary>
-    private void BtnBookmark_Click(object sender, RoutedEventArgs e)
-    {
-        // 发布 EventBus 事件
-        _eventBus.Publish(new BookmarkRequestedEvent
-        {
-            Url = CurrentUrl,
-            Title = _playerWindow.CurrentTitle
-        });
-        BookmarkRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>
-    /// 记录笔记按钮点击
-    /// </summary>
-    private void BtnRecordNote_Click(object sender, RoutedEventArgs e)
-    {
-        // 发布 EventBus 事件
-        _eventBus.Publish(new RecordNoteRequestedEvent
-        {
-            Url = CurrentUrl,
-            Title = _playerWindow.CurrentTitle
-        });
-        RecordNoteRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>
-    /// 菜单按钮点击
+    /// 菜单按钮点击（UI 逻辑：显示 ContextMenu）
     /// </summary>
     private void BtnMenu_Click(object sender, RoutedEventArgs e)
     {
@@ -490,8 +316,6 @@ public partial class ControlBarWindow : Window
             BtnMenu.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
             BtnMenu.ContextMenu.IsOpen = true;
         }
-        _eventBus.Publish(new MenuRequestedEvent { MenuType = MenuType.History });
-        MenuRequested?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -499,8 +323,7 @@ public partial class ControlBarWindow : Window
     /// </summary>
     private void MenuHistory_Click(object sender, RoutedEventArgs e)
     {
-        _eventBus.Publish(new HistoryRequestedEvent());
-        HistoryRequested?.Invoke(this, EventArgs.Empty);
+        _viewModel.ShowHistoryCommand.Execute(null);
     }
 
     /// <summary>
@@ -508,8 +331,7 @@ public partial class ControlBarWindow : Window
     /// </summary>
     private void MenuBookmarks_Click(object sender, RoutedEventArgs e)
     {
-        _eventBus.Publish(new BookmarksRequestedEvent());
-        BookmarksRequested?.Invoke(this, EventArgs.Empty);
+        _viewModel.ShowBookmarksCommand.Execute(null);
     }
 
     /// <summary>
@@ -517,8 +339,7 @@ public partial class ControlBarWindow : Window
     /// </summary>
     private void MenuPioneerNotes_Click(object sender, RoutedEventArgs e)
     {
-        _eventBus.Publish(new PioneerNotesRequestedEvent());
-        PioneerNotesRequested?.Invoke(this, EventArgs.Empty);
+        _viewModel.ShowPioneerNotesCommand.Execute(null);
     }
 
     /// <summary>
@@ -526,8 +347,7 @@ public partial class ControlBarWindow : Window
     /// </summary>
     private void MenuPluginCenter_Click(object sender, RoutedEventArgs e)
     {
-        _eventBus.Publish(new PluginCenterRequestedEvent());
-        PluginCenterRequested?.Invoke(this, EventArgs.Empty);
+        _viewModel.ShowPluginCenterCommand.Execute(null);
     }
 
     /// <summary>
@@ -535,12 +355,11 @@ public partial class ControlBarWindow : Window
     /// </summary>
     private void MenuSettings_Click(object sender, RoutedEventArgs e)
     {
-        _eventBus.Publish(new SettingsRequestedEvent());
-        SettingsRequested?.Invoke(this, EventArgs.Empty);
+        _viewModel.ShowSettingsCommand.Execute(null);
     }
 
     /// <summary>
-    /// 关于菜单点击
+    /// 关于菜单点击（保留本地处理，因为没有对应的 ViewModel 命令）
     /// </summary>
     private void MenuAbout_Click(object sender, RoutedEventArgs e)
     {
@@ -773,40 +592,15 @@ public partial class ControlBarWindow : Window
 
 #endregion
 
-#region Public Methods
-
-    /// <summary>
-    /// 更新后退按钮状态
-    /// </summary>
-    public void UpdateBackButtonState(bool canGoBack)
-    {
-        BtnBack.IsEnabled = canGoBack;
-    }
-
-    /// <summary>
-    /// 更新前进按钮状态
-    /// </summary>
-    public void UpdateForwardButtonState(bool canGoForward)
-    {
-        BtnForward.IsEnabled = canGoForward;
-    }
-
-    /// <summary>
-    /// 更新收藏按钮状态（是否已收藏）
-    /// </summary>
-    public void UpdateBookmarkState(bool isBookmarked)
-    {
-        // 更新收藏按钮图标
-        var textBlock = BtnBookmark.Content as System.Windows.Controls.TextBlock;
-        if (textBlock != null)
-        {
-            textBlock.Text = isBookmarked ? "★" : "☆";
-        }
-    }
-
-#endregion
-
 #region Public Control Methods
+
+    /// <summary>
+    /// 更新当前标题（从 PlayerWindow 获取，用于收藏和记录笔记）
+    /// </summary>
+    public void UpdateCurrentTitle(string title)
+    {
+        _viewModel.CurrentTitle = title;
+    }
 
     /// <summary>
     /// 启动自动显示/隐藏监听

@@ -15,6 +15,7 @@ using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.ViewModels.Dialogs;
+using AkashaNavigator.ViewModels.Windows;
 using Microsoft.Web.WebView2.Core;
 using Cursors = System.Windows.Input.Cursors;
 using MessageBox = System.Windows.MessageBox;
@@ -23,12 +24,19 @@ namespace AkashaNavigator.Views.Windows
 {
 /// <summary>
 /// PlayerWindow - 播放器主窗口
+///
+/// 混合架构：
+/// - Code-Behind: WebView2 初始化、窗口行为、UI 逻辑、消息解析
+/// - ViewModel: 业务逻辑、状态管理、EventBus 订阅、命令
 /// </summary>
 public partial class PlayerWindow : Window
 {
 #region Fields
 
-    // DI注入的服务
+    // ViewModel
+    private readonly PlayerViewModel _viewModel;
+
+    // DI注入的服务（保留用于 Code-Behind UI 逻辑）
     private readonly IConfigService _configService;
     private readonly IProfileManager _profileManager;
     private readonly IWindowStateService _windowStateService;
@@ -84,6 +92,7 @@ public partial class PlayerWindow : Window
 #region Constructor
 
     public PlayerWindow(
+        PlayerViewModel viewModel,
         IConfigService configService,
         IProfileManager profileManager,
         IWindowStateService windowStateService,
@@ -94,6 +103,7 @@ public partial class PlayerWindow : Window
         ICursorDetectionService cursorDetectionService,
         IEventBus eventBus)
     {
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
         _windowStateService = windowStateService ?? throw new ArgumentNullException(nameof(windowStateService));
@@ -110,6 +120,12 @@ public partial class PlayerWindow : Window
         InitializeWindowBehavior();
         InitializeWebView();
 
+        // 设置 DataContext（用于数据绑定）
+        DataContext = _viewModel;
+
+        // 订阅 ViewModel 的导航请求
+        _viewModel.NavigationRequested += OnViewModelNavigationRequested;
+
         // 订阅 Profile 切换事件
         _profileManager.ProfileChanged += OnProfileChanged;
 
@@ -123,40 +139,17 @@ public partial class PlayerWindow : Window
         Closed += (s, e) =>
         { System.Windows.Application.Current.Shutdown(); };
 
-        // 订阅 EventBus 事件
-        SubscribeToEvents();
+        // 订阅导航控制事件（由 ViewModel 发布，Code-behind 执行 WebView 操作）
+        SubscribeToNavigationControlEvents();
     }
 
     /// <summary>
-    /// 订阅 EventBus 事件
+    /// 订阅导航控制事件（后退、前进、刷新）
+    /// 这些操作需要直接操作 WebView2，保留在 Code-behind
     /// </summary>
-    private void SubscribeToEvents()
+    private void SubscribeToNavigationControlEvents()
     {
-        // 订阅导航请求事件
-        _eventBus.Subscribe<NavigationRequestedEvent>(OnNavigationRequested);
-
-        // 订阅导航控制事件（后退、前进、刷新）
         _eventBus.Subscribe<NavigationControlEvent>(OnNavigationControl);
-
-        // 订阅历史记录项选中事件
-        _eventBus.Subscribe<HistoryItemSelectedEvent>(OnHistoryItemSelected);
-
-        // 订阅收藏夹项选中事件
-        _eventBus.Subscribe<BookmarkItemSelectedEvent>(OnBookmarkItemSelected);
-
-        // 订阅开荒笔记项选中事件
-        _eventBus.Subscribe<PioneerNoteItemSelectedEvent>(OnPioneerNoteItemSelected);
-    }
-
-    /// <summary>
-    /// 处理导航请求事件
-    /// </summary>
-    private void OnNavigationRequested(NavigationRequestedEvent e)
-    {
-        if (!string.IsNullOrEmpty(e.Url))
-        {
-            Navigate(e.Url);
-        }
     }
 
     /// <summary>
@@ -179,36 +172,11 @@ public partial class PlayerWindow : Window
     }
 
     /// <summary>
-    /// 处理历史记录项选中事件
+    /// 处理 ViewModel 的导航请求
     /// </summary>
-    private void OnHistoryItemSelected(HistoryItemSelectedEvent e)
+    private void OnViewModelNavigationRequested(object? sender, string url)
     {
-        if (!string.IsNullOrEmpty(e.Url))
-        {
-            Navigate(e.Url);
-        }
-    }
-
-    /// <summary>
-    /// 处理收藏夹项选中事件
-    /// </summary>
-    private void OnBookmarkItemSelected(BookmarkItemSelectedEvent e)
-    {
-        if (!string.IsNullOrEmpty(e.Url))
-        {
-            Navigate(e.Url);
-        }
-    }
-
-    /// <summary>
-    /// 处理开荒笔记项选中事件
-    /// </summary>
-    private void OnPioneerNoteItemSelected(PioneerNoteItemSelectedEvent e)
-    {
-        if (!string.IsNullOrEmpty(e.Url))
-        {
-            Navigate(e.Url);
-        }
+        Navigate(url);
     }
 
 #endregion
@@ -408,6 +376,9 @@ public partial class PlayerWindow : Window
     /// </summary>
     private void CoreWebView2_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
+        // 通知 ViewModel 导航完成
+        _viewModel.OnNavigationCompleted(e.IsSuccess);
+
         // 发布导航状态变化事件
         _eventBus.Publish(new NavigationStateChangedEvent
         {
@@ -439,6 +410,9 @@ public partial class PlayerWindow : Window
     private void CoreWebView2_SourceChanged(object? sender, CoreWebView2SourceChangedEventArgs e)
     {
         var currentUrl = WebView.CoreWebView2?.Source ?? string.Empty;
+
+        // 通知 ViewModel URL 变化
+        _viewModel.UpdateCurrentUrl(currentUrl);
 
         // 发布 URL 变化事件
         _eventBus.Publish(new UrlChangedEvent { Url = currentUrl });

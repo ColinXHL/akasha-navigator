@@ -8,6 +8,7 @@ using AkashaNavigator.Views.Pages;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.ViewModels.Dialogs;
 using AkashaNavigator.ViewModels.Pages;
+using AkashaNavigator.ViewModels.Windows;
 
 namespace AkashaNavigator.Core
 {
@@ -102,6 +103,16 @@ namespace AkashaNavigator.Core
 
             // OverlayManager（使用现有单例实例，私有构造函数）
             services.AddSingleton<IOverlayManager>(sp => OverlayManager.Instance);
+
+            // ============================================================
+            // ViewModels（Windows）
+            // ============================================================
+
+            // PlayerViewModel（依赖 ProfileManager + EventBus）
+            services.AddTransient<PlayerViewModel>();
+
+            // ControlBarViewModel（依赖 EventBus）
+            services.AddTransient<ControlBarViewModel>();
 
             // ============================================================
             // 窗口（Transient，每次请求创建新实例）
@@ -216,7 +227,8 @@ namespace AkashaNavigator.Core
             services.AddTransient<AvailablePluginsPageViewModel>();
             services.AddTransient<AvailablePluginsPage>();
 
-            // ProfileMarketPage（依赖ProfileMarketplaceService, PluginLibrary, INotificationService）
+            // ProfileMarketPage（依赖ProfileMarketPageViewModel）
+            services.AddTransient<ProfileMarketPageViewModel>();
             services.AddTransient<ProfileMarketPage>();
 
             return services;
