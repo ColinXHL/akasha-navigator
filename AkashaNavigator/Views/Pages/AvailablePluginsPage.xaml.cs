@@ -31,8 +31,8 @@ namespace AkashaNavigator.Views.Pages
 
         private void AvailablePluginsPage_Loaded(object sender, RoutedEventArgs e)
         {
-            // 委托给 ViewModel 的 LoadedCommand
-            _viewModel.LoadedCommand.Execute(null);
+            // 委托给 ViewModel 的 OnLoaded 方法
+            _viewModel.OnLoaded();
         }
 
         /// <summary>

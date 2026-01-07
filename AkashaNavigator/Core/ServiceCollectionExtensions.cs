@@ -100,8 +100,8 @@ namespace AkashaNavigator.Core
             // 其他服务
             // ============================================================
 
-            // OverlayManager（无依赖）
-            services.AddSingleton<IOverlayManager, OverlayManager>();
+            // OverlayManager（使用现有单例实例，私有构造函数）
+            services.AddSingleton<IOverlayManager>(sp => OverlayManager.Instance);
 
             // ============================================================
             // 窗口（Transient，每次请求创建新实例）
@@ -113,7 +113,8 @@ namespace AkashaNavigator.Core
             // SettingsWindow（依赖IConfigService, IProfileManager, INotificationService）
             services.AddTransient<SettingsWindow>();
 
-            // MyProfilesPage（依赖IProfileManager, IPluginAssociationManager, PluginLibrary, IPluginHost, INotificationService）
+            // MyProfilesPage（依赖MyProfilesPageViewModel）
+            services.AddTransient<MyProfilesPageViewModel>();
             services.AddTransient<MyProfilesPage>();
 
             // InstalledPluginsPage（依赖InstalledPluginsPageViewModel）
