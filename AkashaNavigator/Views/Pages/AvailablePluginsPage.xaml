@@ -1,9 +1,10 @@
 <UserControl x:Class="AkashaNavigator.Views.Pages.AvailablePluginsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:AkashaNavigator.ViewModels.Pages"
              Background="Transparent"
              Cursor="Arrow">
-    
+
     <!-- 已移除本地资源定义，使用全局样式：
          - BoolToVisibilityConverter -> 全局 Converters.xaml
          - InverseBoolToVisibilityConverter -> 全局 Converters.xaml
@@ -22,29 +23,30 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="可用插件" FontSize="18" FontWeight="SemiBold" 
+            <TextBlock Grid.Column="0" Text="可用插件" FontSize="18" FontWeight="SemiBold"
                        Foreground="White" VerticalAlignment="Center"/>
-            <TextBox x:Name="SearchBox" Grid.Column="1" Width="200" 
+            <TextBox x:Name="SearchBox" Grid.Column="1" Width="200"
                      Style="{StaticResource SearchBoxStyle}" Tag="搜索插件..."
-                     TextChanged="SearchBox_TextChanged"/>
+                     Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid>
 
         <!-- 统计信息 -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
-            <TextBlock x:Name="PluginCountText" Text="共 0 个可用插件" Foreground="#888" FontSize="12"/>
+            <TextBlock x:Name="PluginCountText" Text="{Binding PluginCountText}" Foreground="#888" FontSize="12"/>
         </StackPanel>
 
         <!-- 插件列表 -->
-        <ScrollViewer Grid.Row="2" Style="{StaticResource DarkScrollViewer}" 
+        <ScrollViewer Grid.Row="2" Style="{StaticResource DarkScrollViewer}"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <!-- 无插件提示 -->
-                <TextBlock x:Name="NoPluginsText" Text="没有可用的插件" 
+                <TextBlock x:Name="NoPluginsText" Text="没有可用的插件"
                            Foreground="#666" FontSize="13" Margin="0,20,0,0"
-                           HorizontalAlignment="Center" Visibility="Collapsed"/>
-                
+                           HorizontalAlignment="Center"
+                           Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
                 <!-- 插件列表 -->
-                <ItemsControl x:Name="PluginList">
+                <ItemsControl x:Name="PluginList" ItemsSource="{Binding Plugins}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Style="{StaticResource PluginCardStyle}">
@@ -61,16 +63,16 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        
+
                                         <StackPanel Grid.Column="0" Orientation="Horizontal">
                                             <TextBlock Text="🔍" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                            <TextBlock Text="{Binding Name}" Foreground="White" 
+                                            <TextBlock Text="{Binding Name}" Foreground="White"
                                                        FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}" 
-                                                       Foreground="#888" FontSize="12" 
+                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}"
+                                                       Foreground="#888" FontSize="12"
                                                        VerticalAlignment="Center" Margin="8,0,0,0"/>
                                         </StackPanel>
-                                        
+
                                         <!-- 可安装标签：未安装时显示 -->
                                         <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
                                                 Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}">
@@ -87,7 +89,7 @@
                                     <StackPanel Grid.Row="1" Margin="0,8,0,0">
                                         <TextBlock Text="{Binding Description}" Foreground="#AAA" FontSize="12"
                                                    TextWrapping="Wrap" Visibility="{Binding HasDescriptionVisibility}"/>
-                                        <TextBlock Text="{Binding Author, StringFormat='作者: {0}'}" 
+                                        <TextBlock Text="{Binding Author, StringFormat='作者: {0}'}"
                                                    Foreground="#666" FontSize="11" Margin="0,4,0,0"
                                                    Visibility="{Binding HasAuthorVisibility}"/>
                                     </StackPanel>
@@ -96,11 +98,13 @@
                                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
                                         <!-- 安装按钮：未安装时显示 -->
                                         <Button Content="📥 安装" Style="{StaticResource PrimaryActionButtonStyle}"
-                                                Click="BtnInstall_Click" Tag="{Binding}"
+                                                Command="{Binding DataContext.InstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
                                                 Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
                                         <!-- 卸载按钮：已安装时显示 -->
                                         <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
-                                                Click="BtnUninstall_Click" Tag="{Binding}"
+                                                Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
                                                 Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                 </Grid>

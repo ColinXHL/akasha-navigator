@@ -211,7 +211,8 @@ namespace AkashaNavigator.Core
             // Pages（Transient，每次请求创建新实例）
             // ============================================================
 
-            // AvailablePluginsPage（依赖PluginLibrary, INotificationService）
+            // AvailablePluginsPage（依赖AvailablePluginsPageViewModel）
+            services.AddTransient<AvailablePluginsPageViewModel>();
             services.AddTransient<AvailablePluginsPage>();
 
             // ProfileMarketPage（依赖ProfileMarketplaceService, PluginLibrary, INotificationService）
