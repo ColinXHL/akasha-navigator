@@ -8,270 +8,311 @@ using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Config;
-using AkashaNavigator.Models.Profile;
-using AkashaNavigator.Services;
+using AkashaNavigator.Models.Settings;
+using AkashaNavigator.ViewModels.Pages.Settings;
 
-namespace AkashaNavigator.ViewModels.Windows
-{
+namespace AkashaNavigator.ViewModels.Windows;
+
 /// <summary>
-/// 设置窗口 ViewModel - MVVM 架构
-/// 快捷键通过 HotkeyTextBox 自定义控件实现双向绑定
+/// 设置窗口 ViewModel - 容器模式
+/// 遵循 MVVM 原则：ViewModel 只依赖 PageViewModel，不直接引用 View
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
+    private readonly GeneralSettingsPageViewModel _generalPageVM;
+    private readonly WindowSettingsPageViewModel _windowPageVM;
+    private readonly HotkeySettingsPageViewModel _hotkeysPageVM;
+    private readonly AdvancedSettingsPageViewModel _advancedPageVM;
     private readonly IConfigService _configService;
     private readonly IProfileManager _profileManager;
     private readonly IEventBus _eventBus;
-    private readonly HotkeyConflictDetector _conflictDetector;
     private AppConfig _config;
 
     /// <summary>
-    /// 可用 Profile 列表
-    /// </summary>
-    public ObservableCollection<GameProfile> Profiles { get; } = new();
-
-    /// <summary>
-    /// 快捷键绑定列表（MVVM 模式）
-    /// </summary>
-    public ObservableCollection<HotkeyBindingViewModel> HotkeyBindings { get; } = new();
-
-    /// <summary>
-    /// 全局控制快捷键
-    /// </summary>
-    public ObservableCollection<HotkeyBindingViewModel> GlobalHotkeys { get; } = new();
-
-    /// <summary>
-    /// 视频控制快捷键
-    /// </summary>
-    public ObservableCollection<HotkeyBindingViewModel> VideoControlHotkeys { get; } = new();
-
-    /// <summary>
-    /// 透明度控制快捷键
-    /// </summary>
-    public ObservableCollection<HotkeyBindingViewModel> OpacityControlHotkeys { get; } = new();
-
-    /// <summary>
-    /// 窗口行为快捷键
-    /// </summary>
-    public ObservableCollection<HotkeyBindingViewModel> WindowBehaviorHotkeys { get; } = new();
-
-    /// <summary>
-    /// 播放速率控制快捷键
-    /// </summary>
-    public ObservableCollection<HotkeyBindingViewModel> PlaybackRateHotkeys { get; } = new();
-
-    /// <summary>
-    /// 窗口控制快捷键
-    /// </summary>
-    public ObservableCollection<HotkeyBindingViewModel> WindowControlHotkeys { get; } = new();
-
-    /// <summary>
-    /// 快进秒数（自动生成属性和通知）
+    /// 当前显示的页面类型（自动生成属性和通知）
     /// </summary>
     [ObservableProperty]
-    private int _seekSeconds;
+    private SettingsPageType _currentPage = SettingsPageType.General;
 
     /// <summary>
-    /// 透明度百分比（自动生成属性和通知）
+    /// 搜索查询文本（自动生成属性和通知，防抖延迟 300ms 在 XAML 中配置）
     /// </summary>
     [ObservableProperty]
-    private int _opacityPercent;
+    private string _searchQuery = string.Empty;
 
     /// <summary>
-    /// 是否启用边缘吸附（自动生成属性和通知）
+    /// 搜索结果集合
     /// </summary>
-    [ObservableProperty]
-    private bool _enableEdgeSnap;
+    public ObservableCollection<SearchResult> SearchResults { get; } = new();
 
     /// <summary>
-    /// 吸附阈值（自动生成属性和通知）
+    /// 是否有搜索结果（用于 UI 显示）
     /// </summary>
-    [ObservableProperty]
-    private int _snapThreshold;
+    public bool HasSearchResults => SearchResults.Count > 0;
 
     /// <summary>
-    /// 是否在退出时提示记录笔记（自动生成属性和通知）
+    /// 是否无搜索结果（用于 UI 显示提示）
     /// </summary>
-    [ObservableProperty]
-    private bool _promptRecordOnExit;
+    public bool HasNoSearchResults => !string.IsNullOrWhiteSpace(SearchQuery) && SearchResults.Count == 0;
 
     /// <summary>
-    /// 是否启用插件更新通知（自动生成属性和通知）
+    /// 是否正在搜索（用于 UI 显示分隔线）
     /// </summary>
-    [ObservableProperty]
-    private bool _enablePluginUpdateNotification;
+    public bool IsSearching => !string.IsNullOrWhiteSpace(SearchQuery);
 
     /// <summary>
-    /// 是否启用调试日志（自动生成属性和通知）
+    /// 通用设置页面 ViewModel
     /// </summary>
-    [ObservableProperty]
-    private bool _enableDebugLog;
+    public GeneralSettingsPageViewModel GeneralPage => _generalPageVM;
 
     /// <summary>
-    /// 当前选中的 Profile（自动生成属性和通知）
+    /// 窗口设置页面 ViewModel
     /// </summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(UnsubscribeProfileCommand))]
-    private GameProfile? _selectedProfile;
+    public WindowSettingsPageViewModel WindowPage => _windowPageVM;
 
-    public SettingsViewModel(IConfigService configService, IProfileManager profileManager, IEventBus eventBus)
+    /// <summary>
+    /// 快捷键设置页面 ViewModel
+    /// </summary>
+    public HotkeySettingsPageViewModel HotkeysPage => _hotkeysPageVM;
+
+    /// <summary>
+    /// 高级设置页面 ViewModel
+    /// </summary>
+    public AdvancedSettingsPageViewModel AdvancedPage => _advancedPageVM;
+
+    public SettingsViewModel(IConfigService configService,
+                            IProfileManager profileManager,
+                            IEventBus eventBus,
+                            GeneralSettingsPageViewModel generalPageVM,
+                            WindowSettingsPageViewModel windowPageVM,
+                            HotkeySettingsPageViewModel hotkeysPageVM,
+                            AdvancedSettingsPageViewModel advancedPageVM)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-        _conflictDetector = new HotkeyConflictDetector();
+        _generalPageVM = generalPageVM ?? throw new ArgumentNullException(nameof(generalPageVM));
+        _windowPageVM = windowPageVM ?? throw new ArgumentNullException(nameof(windowPageVM));
+        _hotkeysPageVM = hotkeysPageVM ?? throw new ArgumentNullException(nameof(hotkeysPageVM));
+        _advancedPageVM = advancedPageVM ?? throw new ArgumentNullException(nameof(advancedPageVM));
 
         _config = _configService.Config;
-        LoadSettings();
-        LoadHotkeys();
+
+        // 从各 PageViewModel 加载设置
+        _windowPageVM.LoadSettings(_config);
+        _hotkeysPageVM.LoadHotkeys(_config);
+        _advancedPageVM.LoadSettings(_config);
 
         // 订阅快捷键变化事件，自动检测冲突
-        foreach (var binding in HotkeyBindings)
+        foreach (var binding in _hotkeysPageVM.HotkeyBindings)
         {
-            binding.BindingChanged += (s, e) => UpdateConflictStatus();
+            binding.BindingChanged += (s, e) => _hotkeysPageVM.UpdateConflictStatus();
         }
+
+        // 初始化搜索索引
+        InitializeSearchIndex();
     }
 
     /// <summary>
-    /// 检测快捷键冲突并更新状态
+    /// 可搜索的设置项索引
     /// </summary>
-    public void UpdateConflictStatus()
+    private readonly List<SearchableSetting> _searchableSettings = new();
+
+    /// <summary>
+    /// 初始化搜索索引（定义所有可搜索的设置项）
+    /// </summary>
+    private void InitializeSearchIndex()
     {
-        // 从 ViewModels 构建绑定列表
-        var bindings = HotkeyBindings.Select(b => b.ToBinding()).ToList();
+        _searchableSettings.Clear();
 
-        // 检测冲突
-        var conflicts = _conflictDetector.DetectConflicts(bindings);
-
-        // 重置所有冲突状态
-        foreach (var binding in HotkeyBindings)
+        // ===== 通用设置 =====
+        _searchableSettings.AddRange(new[]
         {
-            binding.SetConflictStatus(false);
+            new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "快进秒数", "基础设置"),
+            new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "倒退秒数", "基础设置"),
+            new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "默认透明度", "基础设置"),
+            new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "Profile", "配置"),
+            new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "配置文件夹", "配置"),
+            new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "插件中心", "配置"),
+        });
+
+        // ===== 窗口设置 =====
+        _searchableSettings.AddRange(new[]
+        {
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "边缘吸附", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "吸附阈值", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "退出提示", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "记录笔记", "窗口行为"),
+        });
+
+        // ===== 快捷键设置 =====
+        _searchableSettings.AddRange(new[]
+        {
+            // 全局控制
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "禁用快捷键", "全局控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "启用快捷键", "全局控制"),
+            // 视频控制
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "播放暂停", "视频控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "快进", "视频控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "倒退", "视频控制"),
+            // 透明度控制
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "透明度", "透明度控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "增加透明度", "透明度控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "降低透明度", "透明度控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "重置透明度", "透明度控制"),
+            // 窗口行为
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "鼠标穿透", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "点击穿透", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "最大化", "窗口行为"),
+            // 播放速率
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "播放速率", "播放速率"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "增加速率", "播放速率"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "减少速率", "播放速率"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "重置速率", "播放速率"),
+            // 窗口控制
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "显示窗口", "窗口控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "隐藏窗口", "窗口控制"),
+        });
+
+        // ===== 高级设置 =====
+        _searchableSettings.AddRange(new[]
+        {
+            new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "插件更新", "高级设置"),
+            new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "更新提示", "高级设置"),
+            new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "调试日志", "高级设置"),
+            new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "日志", "高级设置"),
+        });
+    }
+
+    /// <summary>
+    /// SearchQuery 属性变化时触发搜索
+    /// </summary>
+    partial void OnSearchQueryChanged(string value)
+    {
+        PerformSearch(value);
+        // 通知相关属性变化
+        OnPropertyChanged(nameof(HasSearchResults));
+        OnPropertyChanged(nameof(HasNoSearchResults));
+        OnPropertyChanged(nameof(IsSearching));
+    }
+
+    /// <summary>
+    /// 执行搜索
+    /// </summary>
+    private void PerformSearch(string query)
+    {
+        SearchResults.Clear();
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return;
         }
 
-        // 更新冲突状态
-        foreach (var conflict in conflicts)
+        var searchTerm = query.Trim().ToLowerInvariant();
+        var results = new List<SearchResult>();
+
+        // 1. 搜索页面名称
+        var pageNames = new Dictionary<SettingsPageType, string>
         {
-            foreach (var binding in conflict.Value)
+            { SettingsPageType.General, "⚙️ 通用" },
+            { SettingsPageType.Window, "🔲 窗口" },
+            { SettingsPageType.Hotkeys, "⌨️ 快捷键" },
+            { SettingsPageType.Advanced, "🔧 高级" }
+        };
+
+        // 匹配页面名称（去除图标后匹配）
+        foreach (var page in pageNames)
+        {
+            var plainName = page.Value.Replace("⚙️ ", "").Replace("🔲 ", "").Replace("⌨️ ", "").Replace("🔧 ", "");
+            if (plainName.Contains(searchTerm))
             {
-                var vm = HotkeyBindings.FirstOrDefault(b => b.ActionName == binding.Action);
-                if (vm != null)
-                {
-                    var otherActions = conflict.Value.Where(b => b.Action != binding.Action)
-                                           .Select(b => GetActionDisplayName(b.Action));
-                    vm.SetConflictStatus(true, $"与 {string.Join(", ", otherActions)} 冲突");
-                }
+                results.Add(SearchResult.CreatePageResult(page.Key, page.Value));
             }
         }
+
+        // 2. 搜索设置项
+        foreach (var setting in _searchableSettings)
+        {
+            // 匹配设置项名称
+            if (setting.SettingName.ToLowerInvariant().Contains(searchTerm))
+            {
+                results.Add(SearchResult.CreateSettingResult(setting.PageType, setting.PageDisplayName,
+                                                             setting.SettingName, setting.GroupName));
+            }
+            // 匹配分组名称
+            else if (!string.IsNullOrEmpty(setting.GroupName) &&
+                     setting.GroupName.ToLowerInvariant().Contains(searchTerm))
+            {
+                results.Add(SearchResult.CreateSettingResult(setting.PageType, setting.PageDisplayName,
+                                                             setting.SettingName, setting.GroupName));
+            }
+        }
+
+        // 去重并排序（页面优先，然后按名称排序）
+        var uniqueResults = results
+            .GroupBy(r => new { r.PageType, r.SettingDisplayName })
+            .Select(g => g.First())
+            .OrderBy(r => r.ResultType == SearchResultType.Page ? 0 : 1)
+            .ThenBy(r => r.PageType)
+            .ThenBy(r => r.SettingDisplayName)
+            .ToList();
+
+        foreach (var result in uniqueResults)
+        {
+            SearchResults.Add(result);
+        }
     }
 
     /// <summary>
-    /// 获取动作的显示名称
+    /// 导航到通用设置页面（自动生成 NavigateToGeneralCommand）
     /// </summary>
-    private static string GetActionDisplayName(string actionName)
+    [RelayCommand]
+    private void NavigateToGeneral()
     {
-        return actionName switch { "SeekBackward" => "视频倒退",
-                                   "SeekForward" => "视频快进",
-                                   "TogglePlay" => "播放/暂停",
-                                   "DecreaseOpacity" => "降低透明度",
-                                   "IncreaseOpacity" => "增加透明度",
-                                   "ResetOpacity" => "重置透明度",
-                                   "ToggleClickThrough" => "鼠标穿透",
-                                   "DecreasePlaybackRate" => "减少播放速率",
-                                   "IncreasePlaybackRate" => "增加播放速率",
-                                   "ResetPlaybackRate" => "重置播放速率",
-                                   "ToggleWindowVisibility" => "隐藏/显示窗口",
-                                   "SuspendHotkeys" => "禁用/启用快捷键",
-                                   "ToggleMaximize" => "切换最大化",
-                                   _ => actionName };
+        CurrentPage = SettingsPageType.General;
     }
 
     /// <summary>
-    /// 加载设置
+    /// 导航到窗口设置页面（自动生成 NavigateToWindowCommand）
     /// </summary>
-    private void LoadSettings()
+    [RelayCommand]
+    private void NavigateToWindow()
     {
-        SeekSeconds = _config.SeekSeconds;
-        OpacityPercent = (int)(_config.DefaultOpacity * 100);
-        EnableEdgeSnap = _config.EnableEdgeSnap;
-        SnapThreshold = _config.SnapThreshold;
-        PromptRecordOnExit = _config.PromptRecordOnExit;
-        EnablePluginUpdateNotification = _config.EnablePluginUpdateNotification;
-        EnableDebugLog = _config.EnableDebugLog;
+        CurrentPage = SettingsPageType.Window;
     }
 
     /// <summary>
-    /// 加载快捷键
+    /// 导航到快捷键设置页面（自动生成 NavigateToHotkeysCommand）
     /// </summary>
-    private void LoadHotkeys()
+    [RelayCommand]
+    private void NavigateToHotkeys()
     {
-        HotkeyBindings.Clear();
-        GlobalHotkeys.Clear();
-        VideoControlHotkeys.Clear();
-        OpacityControlHotkeys.Clear();
-        WindowBehaviorHotkeys.Clear();
-        PlaybackRateHotkeys.Clear();
-        WindowControlHotkeys.Clear();
-
-        // 全局控制
-        AddHotkeyBinding("SuspendHotkeys", "禁用/启用快捷键", _config.HotkeySuspendHotkeys,
-                         _config.HotkeySuspendHotkeysMod, GlobalHotkeys);
-
-        // 视频控制
-        AddHotkeyBinding("SeekBackward", "视频倒退", _config.HotkeySeekBackward, _config.HotkeySeekBackwardMod,
-                         VideoControlHotkeys);
-        AddHotkeyBinding("SeekForward", "视频快进", _config.HotkeySeekForward, _config.HotkeySeekForwardMod,
-                         VideoControlHotkeys);
-        AddHotkeyBinding("TogglePlay", "播放/暂停", _config.HotkeyTogglePlay, _config.HotkeyTogglePlayMod,
-                         VideoControlHotkeys);
-
-        // 透明度控制
-        AddHotkeyBinding("DecreaseOpacity", "降低透明度", _config.HotkeyDecreaseOpacity,
-                         _config.HotkeyDecreaseOpacityMod, OpacityControlHotkeys);
-        AddHotkeyBinding("IncreaseOpacity", "增加透明度", _config.HotkeyIncreaseOpacity,
-                         _config.HotkeyIncreaseOpacityMod, OpacityControlHotkeys);
-        AddHotkeyBinding("ResetOpacity", "重置透明度", _config.HotkeyResetOpacity, _config.HotkeyResetOpacityMod,
-                         OpacityControlHotkeys);
-
-        // 窗口行为
-        AddHotkeyBinding("ToggleClickThrough", "鼠标穿透", _config.HotkeyToggleClickThrough,
-                         _config.HotkeyToggleClickThroughMod, WindowBehaviorHotkeys);
-        AddHotkeyBinding("ToggleMaximize", "切换最大化", _config.HotkeyToggleMaximize, _config.HotkeyToggleMaximizeMod,
-                         WindowBehaviorHotkeys);
-
-        // 播放速率控制
-        AddHotkeyBinding("DecreasePlaybackRate", "减少播放速率", _config.HotkeyDecreasePlaybackRate,
-                         _config.HotkeyDecreasePlaybackRateMod, PlaybackRateHotkeys);
-        AddHotkeyBinding("IncreasePlaybackRate", "增加播放速率", _config.HotkeyIncreasePlaybackRate,
-                         _config.HotkeyIncreasePlaybackRateMod, PlaybackRateHotkeys);
-        AddHotkeyBinding("ResetPlaybackRate", "重置播放速率", _config.HotkeyResetPlaybackRate,
-                         _config.HotkeyResetPlaybackRateMod, PlaybackRateHotkeys);
-
-        // 窗口控制
-        AddHotkeyBinding("ToggleWindowVisibility", "隐藏/显示窗口", _config.HotkeyToggleWindowVisibility,
-                         _config.HotkeyToggleWindowVisibilityMod, WindowControlHotkeys);
+        CurrentPage = SettingsPageType.Hotkeys;
     }
 
     /// <summary>
-    /// 添加快捷键绑定
+    /// 导航到高级设置页面（自动生成 NavigateToAdvancedCommand）
     /// </summary>
-    private void AddHotkeyBinding(string action, string displayName, uint key, ModifierKeys modifiers,
-                                  ObservableCollection<HotkeyBindingViewModel>? targetCollection = null)
+    [RelayCommand]
+    private void NavigateToAdvanced()
     {
-        var vm = new HotkeyBindingViewModel(action, displayName);
-        vm.LoadFromConfig(key, modifiers);
-        HotkeyBindings.Add(vm);
-        targetCollection?.Add(vm);
+        CurrentPage = SettingsPageType.Advanced;
     }
 
     /// <summary>
-    /// 添加快捷键绑定
+    /// 导航到搜索结果（自动生成 NavigateToSearchResultCommand）
+    /// 点击搜索结果后跳转到对应页面
     /// </summary>
-    private void AddHotkeyBinding(string action, string displayName, uint key, ModifierKeys modifiers)
+    [RelayCommand]
+    private void NavigateToSearchResult(SearchResult? result)
     {
-        var vm = new HotkeyBindingViewModel(action, displayName);
-        vm.LoadFromConfig(key, modifiers);
-        HotkeyBindings.Add(vm);
+        if (result == null) return;
+
+        // 跳转到目标页面
+        CurrentPage = result.NavigationTarget;
+
+        // 清空搜索框（可选，提升用户体验）
+        SearchQuery = string.Empty;
     }
 
     /// <summary>
@@ -280,73 +321,11 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
-        _config.SeekSeconds = SeekSeconds;
-        _config.DefaultOpacity = OpacityPercent / 100.0;
-        _config.EnableEdgeSnap = EnableEdgeSnap;
-        _config.SnapThreshold = SnapThreshold;
-        _config.PromptRecordOnExit = PromptRecordOnExit;
-        _config.EnablePluginUpdateNotification = EnablePluginUpdateNotification;
-        _config.EnableDebugLog = EnableDebugLog;
-
-        // 保存快捷键（从 ViewModels 读取）
-        foreach (var binding in HotkeyBindings)
-        {
-            switch (binding.ActionName)
-            {
-            case "SeekBackward":
-                _config.HotkeySeekBackward = binding.Key;
-                _config.HotkeySeekBackwardMod = binding.Modifiers;
-                break;
-            case "SeekForward":
-                _config.HotkeySeekForward = binding.Key;
-                _config.HotkeySeekForwardMod = binding.Modifiers;
-                break;
-            case "TogglePlay":
-                _config.HotkeyTogglePlay = binding.Key;
-                _config.HotkeyTogglePlayMod = binding.Modifiers;
-                break;
-            case "DecreaseOpacity":
-                _config.HotkeyDecreaseOpacity = binding.Key;
-                _config.HotkeyDecreaseOpacityMod = binding.Modifiers;
-                break;
-            case "IncreaseOpacity":
-                _config.HotkeyIncreaseOpacity = binding.Key;
-                _config.HotkeyIncreaseOpacityMod = binding.Modifiers;
-                break;
-            case "ResetOpacity":
-                _config.HotkeyResetOpacity = binding.Key;
-                _config.HotkeyResetOpacityMod = binding.Modifiers;
-                break;
-            case "ToggleClickThrough":
-                _config.HotkeyToggleClickThrough = binding.Key;
-                _config.HotkeyToggleClickThroughMod = binding.Modifiers;
-                break;
-            case "ToggleMaximize":
-                _config.HotkeyToggleMaximize = binding.Key;
-                _config.HotkeyToggleMaximizeMod = binding.Modifiers;
-                break;
-            case "DecreasePlaybackRate":
-                _config.HotkeyDecreasePlaybackRate = binding.Key;
-                _config.HotkeyDecreasePlaybackRateMod = binding.Modifiers;
-                break;
-            case "IncreasePlaybackRate":
-                _config.HotkeyIncreasePlaybackRate = binding.Key;
-                _config.HotkeyIncreasePlaybackRateMod = binding.Modifiers;
-                break;
-            case "ResetPlaybackRate":
-                _config.HotkeyResetPlaybackRate = binding.Key;
-                _config.HotkeyResetPlaybackRateMod = binding.Modifiers;
-                break;
-            case "ToggleWindowVisibility":
-                _config.HotkeyToggleWindowVisibility = binding.Key;
-                _config.HotkeyToggleWindowVisibilityMod = binding.Modifiers;
-                break;
-            case "SuspendHotkeys":
-                _config.HotkeySuspendHotkeys = binding.Key;
-                _config.HotkeySuspendHotkeysMod = binding.Modifiers;
-                break;
-            }
-        }
+        // 从各 PageViewModel 收集数据
+        _generalPageVM.SaveSettings(_config);
+        _windowPageVM.SaveSettings(_config);
+        _hotkeysPageVM.SaveSettings(_config);
+        _advancedPageVM.SaveSettings(_config);
 
         _configService.UpdateConfig(_config);
     }
@@ -362,65 +341,15 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 从配置加载设置
+    /// 从配置对象重置设置
     /// </summary>
     private void LoadFromConfig(AppConfig config)
     {
-        // 重置基础设置
-        SeekSeconds = config.SeekSeconds;
-        OpacityPercent = (int)(config.DefaultOpacity * 100);
-        EnableEdgeSnap = config.EnableEdgeSnap;
-        SnapThreshold = config.SnapThreshold;
-        PromptRecordOnExit = config.PromptRecordOnExit;
-        EnablePluginUpdateNotification = config.EnablePluginUpdateNotification;
-        EnableDebugLog = config.EnableDebugLog;
-
-        // 重置快捷键（更新现有 ViewModel 的值）
-        foreach (var binding in HotkeyBindings)
-        {
-            switch (binding.ActionName)
-            {
-            case "SeekBackward":
-                binding.LoadFromConfig(config.HotkeySeekBackward, config.HotkeySeekBackwardMod);
-                break;
-            case "SeekForward":
-                binding.LoadFromConfig(config.HotkeySeekForward, config.HotkeySeekForwardMod);
-                break;
-            case "TogglePlay":
-                binding.LoadFromConfig(config.HotkeyTogglePlay, config.HotkeyTogglePlayMod);
-                break;
-            case "DecreaseOpacity":
-                binding.LoadFromConfig(config.HotkeyDecreaseOpacity, config.HotkeyDecreaseOpacityMod);
-                break;
-            case "IncreaseOpacity":
-                binding.LoadFromConfig(config.HotkeyIncreaseOpacity, config.HotkeyIncreaseOpacityMod);
-                break;
-            case "ResetOpacity":
-                binding.LoadFromConfig(config.HotkeyResetOpacity, config.HotkeyResetOpacityMod);
-                break;
-            case "ToggleClickThrough":
-                binding.LoadFromConfig(config.HotkeyToggleClickThrough, config.HotkeyToggleClickThroughMod);
-                break;
-            case "ToggleMaximize":
-                binding.LoadFromConfig(config.HotkeyToggleMaximize, config.HotkeyToggleMaximizeMod);
-                break;
-            case "DecreasePlaybackRate":
-                binding.LoadFromConfig(config.HotkeyDecreasePlaybackRate, config.HotkeyDecreasePlaybackRateMod);
-                break;
-            case "IncreasePlaybackRate":
-                binding.LoadFromConfig(config.HotkeyIncreasePlaybackRate, config.HotkeyIncreasePlaybackRateMod);
-                break;
-            case "ResetPlaybackRate":
-                binding.LoadFromConfig(config.HotkeyResetPlaybackRate, config.HotkeyResetPlaybackRateMod);
-                break;
-            case "ToggleWindowVisibility":
-                binding.LoadFromConfig(config.HotkeyToggleWindowVisibility, config.HotkeyToggleWindowVisibilityMod);
-                break;
-            case "SuspendHotkeys":
-                binding.LoadFromConfig(config.HotkeySuspendHotkeys, config.HotkeySuspendHotkeysMod);
-                break;
-            }
-        }
+        // 重置各 PageViewModel
+        _generalPageVM.ResetSettings(config);
+        _windowPageVM.ResetSettings(config);
+        _hotkeysPageVM.ResetSettings(config);
+        _advancedPageVM.ResetSettings(config);
     }
 
     /// <summary>
@@ -432,70 +361,6 @@ public partial class SettingsViewModel : ObservableObject
         // 通过 EventBus 发布请求（解耦 PluginCenterWindow）
         _eventBus.Publish(new PluginCenterRequestedEvent());
     }
-
-    /// <summary>
-    /// 加载 Profile 列表
-    /// </summary>
-    public void LoadProfileList()
-    {
-        var profiles = _profileManager.InstalledProfiles;
-        Profiles.Clear();
-        foreach (var profile in profiles)
-        {
-            Profiles.Add(profile);
-        }
-
-        // 选中当前 Profile
-        var currentProfile = _profileManager.CurrentProfile;
-        for (int i = 0; i < Profiles.Count; i++)
-        {
-            if (Profiles[i].Id.Equals(currentProfile.Id, StringComparison.OrdinalIgnoreCase))
-            {
-                SelectedProfile = Profiles[i];
-                break;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Profile 选择变化（自动生成的方法）
-    /// </summary>
-    partial void OnSelectedProfileChanged(GameProfile? value)
-    {
-        if (value != null)
-        {
-            var currentProfile = _profileManager.CurrentProfile;
-            if (!value.Id.Equals(currentProfile.Id, StringComparison.OrdinalIgnoreCase))
-            {
-                _profileManager.SwitchProfile(value.Id);
-            }
-        }
-    }
-
-    /// <summary>
-    /// 取消订阅 Profile（自动生成 UnsubscribeProfileCommand）
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanUnsubscribeProfile))]
-    private void UnsubscribeProfile()
-    {
-        if (SelectedProfile == null)
-            return;
-
-        if (SelectedProfile.Id.Equals("default", StringComparison.OrdinalIgnoreCase))
-            return; // 不能删除默认 Profile
-
-        var result = _profileManager.UnsubscribeProfile(SelectedProfile.Id);
-        if (result.IsSuccess)
-        {
-            LoadProfileList();
-        }
-    }
-
-    /// <summary>
-    /// 是否可以取消订阅
-    /// </summary>
-    private bool CanUnsubscribeProfile() => SelectedProfile != null &&
-                                            !SelectedProfile.Id.Equals("default", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// 打开配置文件夹（自动生成 OpenConfigFolderCommand）
@@ -518,8 +383,19 @@ public partial class SettingsViewModel : ObservableObject
     /// </summary>
     public void RefreshProfileList()
     {
-        _profileManager.ReloadProfiles();
-        LoadProfileList();
+        _generalPageVM.RefreshProfileList();
     }
 }
-}
+
+/// <summary>
+/// 可搜索的设置项记录
+/// </summary>
+/// <param name="PageType">页面类型</param>
+/// <param name="PageDisplayName">页面显示名称</param>
+/// <param name="SettingName">设置项名称</param>
+/// <param name="GroupName">分组名称</param>
+internal record SearchableSetting(
+    SettingsPageType PageType,
+    string PageDisplayName,
+    string SettingName,
+    string? GroupName);

@@ -1,0 +1,148 @@
+<UserControl x:Class="AkashaNavigator.Views.Pages.HotkeySettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:AkashaNavigator.Controls"
+             xmlns:vm="clr-namespace:AkashaNavigator.ViewModels.Windows"
+             Background="Transparent"
+             Cursor="Arrow">
+
+    <StackPanel>
+            <!-- 标题 -->
+            <TextBlock Text="快捷键设置" FontSize="18" FontWeight="SemiBold"
+                       Foreground="White" Margin="0,0,0,8"/>
+            <TextBlock Text="点击输入框后按下新快捷键即可修改"
+                       Foreground="#666" FontSize="11" Margin="0,0,0,16"/>
+
+            <!-- 快捷键全局控制 -->
+            <TextBlock Text="快捷键全局控制" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <ItemsControl ItemsSource="{Binding DataContext.HotkeysPage.GlobalHotkeys, RelativeSource={RelativeSource AncestorType=Window}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HotkeyBindingViewModel">
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Style="{StaticResource SettingsLabelStyle}"/>
+                            <controls:HotkeyTextBox Grid.Column="2"
+                                                   HotkeyValue="{Binding Key, Mode=TwoWay}"
+                                                   Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   ToolTip="{Binding ConflictTooltip}"
+                                                   Style="{StaticResource HotkeyTextBoxStyle}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 视频控制 -->
+            <TextBlock Text="视频控制" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <ItemsControl ItemsSource="{Binding DataContext.HotkeysPage.VideoControlHotkeys, RelativeSource={RelativeSource AncestorType=Window}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HotkeyBindingViewModel">
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Style="{StaticResource SettingsLabelStyle}"/>
+                            <controls:HotkeyTextBox Grid.Column="2"
+                                                   HotkeyValue="{Binding Key, Mode=TwoWay}"
+                                                   Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   ToolTip="{Binding ConflictTooltip}"
+                                                   Style="{StaticResource HotkeyTextBoxStyle}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 透明度控制 -->
+            <TextBlock Text="透明度控制" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <ItemsControl ItemsSource="{Binding DataContext.HotkeysPage.OpacityControlHotkeys, RelativeSource={RelativeSource AncestorType=Window}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HotkeyBindingViewModel">
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Style="{StaticResource SettingsLabelStyle}"/>
+                            <controls:HotkeyTextBox Grid.Column="2"
+                                                   HotkeyValue="{Binding Key, Mode=TwoWay}"
+                                                   Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   ToolTip="{Binding ConflictTooltip}"
+                                                   Style="{StaticResource HotkeyTextBoxStyle}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 窗口行为 -->
+            <TextBlock Text="窗口行为" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <ItemsControl ItemsSource="{Binding DataContext.HotkeysPage.WindowBehaviorHotkeys, RelativeSource={RelativeSource AncestorType=Window}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HotkeyBindingViewModel">
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Style="{StaticResource SettingsLabelStyle}"/>
+                            <controls:HotkeyTextBox Grid.Column="2"
+                                                   HotkeyValue="{Binding Key, Mode=TwoWay}"
+                                                   Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   ToolTip="{Binding ConflictTooltip}"
+                                                   Style="{StaticResource HotkeyTextBoxStyle}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 播放速率控制 -->
+            <TextBlock Text="播放速率控制" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <ItemsControl ItemsSource="{Binding DataContext.HotkeysPage.PlaybackRateHotkeys, RelativeSource={RelativeSource AncestorType=Window}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HotkeyBindingViewModel">
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Style="{StaticResource SettingsLabelStyle}"/>
+                            <controls:HotkeyTextBox Grid.Column="2"
+                                                   HotkeyValue="{Binding Key, Mode=TwoWay}"
+                                                   Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   ToolTip="{Binding ConflictTooltip}"
+                                                   Style="{StaticResource HotkeyTextBoxStyle}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 窗口控制 -->
+            <TextBlock Text="窗口控制" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <ItemsControl ItemsSource="{Binding DataContext.HotkeysPage.WindowControlHotkeys, RelativeSource={RelativeSource AncestorType=Window}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HotkeyBindingViewModel">
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="140"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayName}" Style="{StaticResource SettingsLabelStyle}"/>
+                            <controls:HotkeyTextBox Grid.Column="2"
+                                                   HotkeyValue="{Binding Key, Mode=TwoWay}"
+                                                   Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   ToolTip="{Binding ConflictTooltip}"
+                                                   Style="{StaticResource HotkeyTextBoxStyle}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+    </StackPanel>
+</UserControl>

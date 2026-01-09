@@ -1,0 +1,28 @@
+<UserControl x:Class="AkashaNavigator.Views.Pages.AdvancedSettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent"
+             Cursor="Arrow">
+
+    <StackPanel>
+        <!-- 标题 -->
+        <TextBlock Text="高级设置" FontSize="18" FontWeight="SemiBold"
+                   Foreground="White" Margin="0,0,0,16"/>
+
+        <!-- 插件更新 -->
+        <TextBlock Text="插件更新" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+        <CheckBox x:Name="EnablePluginUpdateNotificationCheckBox" Content="启动时提示插件更新"
+                  Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,4"
+                  IsChecked="{Binding EnablePluginUpdateNotification}"/>
+        <TextBlock Text="开启后，启动时如有插件可更新会弹窗提示"
+                   Foreground="#666" FontSize="11" Margin="0,0,0,16"/>
+
+        <!-- 调试日志 -->
+        <TextBlock Text="调试" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+        <CheckBox x:Name="EnableDebugLogCheckBox" Content="启用调试日志"
+                  Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,4"
+                  IsChecked="{Binding EnableDebugLog}"/>
+        <TextBlock Text="开启后日志文件将包含详细的调试信息，用于排查问题"
+                   Foreground="#666" FontSize="11" Margin="0,0,0,0"/>
+    </StackPanel>
+</UserControl>

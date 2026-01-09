@@ -1,11 +1,13 @@
 using System;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.ViewModels.Windows;
+using AkashaNavigator.ViewModels.Pages.Settings;
+using AkashaNavigator.Views.Pages;
 using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.Views.Windows
@@ -16,20 +18,26 @@ namespace AkashaNavigator.Views.Windows
 /// </summary>
 public partial class SettingsWindow : AnimatedWindow
 {
-#region Fields
-
     private readonly SettingsViewModel _viewModel;
     private readonly INotificationService _notificationService;
-    private bool _isInitializing = true;
+    private readonly GeneralSettingsPage _generalPage;
+    private readonly WindowSettingsPage _windowPage;
+    private readonly HotkeySettingsPage _hotkeysPage;
+    private readonly AdvancedSettingsPage _advancedPage;
 
-#endregion
-
-#region Constructor
-
-    public SettingsWindow(SettingsViewModel viewModel, INotificationService notificationService)
+    public SettingsWindow(SettingsViewModel viewModel,
+                          INotificationService notificationService,
+                          GeneralSettingsPage generalPage,
+                          WindowSettingsPage windowPage,
+                          HotkeySettingsPage hotkeysPage,
+                          AdvancedSettingsPage advancedPage)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _generalPage = generalPage ?? throw new ArgumentNullException(nameof(generalPage));
+        _windowPage = windowPage ?? throw new ArgumentNullException(nameof(windowPage));
+        _hotkeysPage = hotkeysPage ?? throw new ArgumentNullException(nameof(hotkeysPage));
+        _advancedPage = advancedPage ?? throw new ArgumentNullException(nameof(advancedPage));
 
         InitializeComponent();
         DataContext = _viewModel;
@@ -37,15 +45,91 @@ public partial class SettingsWindow : AnimatedWindow
         // 订阅 ViewModel 事件
         _viewModel.OpenConfigFolderRequested += OnOpenConfigFolder;
 
-        // 加载 Profile 列表
-        _viewModel.LoadProfileList();
+        // 加载页面
+        LoadPages();
+        UpdatePageVisibility(_viewModel.CurrentPage);
 
-        _isInitializing = false;
+        // 订阅 ViewModel 的 PropertyChanged 事件，处理页面显示切换
+        _viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(_viewModel.CurrentPage))
+            {
+                UpdatePageVisibility(_viewModel.CurrentPage);
+            }
+        };
+
+        // 订阅搜索结果变化
+        _viewModel.SearchResults.CollectionChanged += SearchResults_CollectionChanged;
+
+        // 加载 Profile 列表（通过 GeneralPage）
+        _viewModel.RefreshProfileList();
     }
 
-#endregion
+    /// <summary>
+    /// 搜索结果集合变化时更新 Popup 显示
+    /// </summary>
+    private void SearchResults_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // 在 UI 线程上执行
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (_viewModel.SearchResults.Count > 0 && SearchBox.IsFocused)
+            {
+                SearchResultsPopup.IsOpen = true;
+                NoResultsPopup.IsOpen = false;
+            }
+            else if (_viewModel.SearchResults.Count == 0 && !string.IsNullOrWhiteSpace(_viewModel.SearchQuery))
+            {
+                SearchResultsPopup.IsOpen = false;
+                NoResultsPopup.IsOpen = true;
+            }
+            else
+            {
+                SearchResultsPopup.IsOpen = false;
+                NoResultsPopup.IsOpen = false;
+            }
+        });
+    }
 
-#region Private Methods
+    /// <summary>
+    /// 搜索框获得焦点时如果有文字则显示对应 Popup
+    /// </summary>
+    private void SearchBox_GotFocus(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(_viewModel.SearchQuery))
+        {
+            if (_viewModel.SearchResults.Count > 0)
+            {
+                SearchResultsPopup.IsOpen = true;
+            }
+            else
+            {
+                NoResultsPopup.IsOpen = true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 加载所有 Pages
+    /// </summary>
+    private void LoadPages()
+    {
+        ContentArea.Children.Add(_generalPage);
+        ContentArea.Children.Add(_windowPage);
+        ContentArea.Children.Add(_hotkeysPage);
+        ContentArea.Children.Add(_advancedPage);
+    }
+
+    /// <summary>
+    /// UI 逻辑：页面显示切换
+    /// </summary>
+    private void UpdatePageVisibility(SettingsPageType currentPage)
+    {
+        _generalPage.Visibility = currentPage == SettingsPageType.General ? Visibility.Visible : Visibility.Collapsed;
+        _windowPage.Visibility = currentPage == SettingsPageType.Window ? Visibility.Visible : Visibility.Collapsed;
+        _hotkeysPage.Visibility = currentPage == SettingsPageType.Hotkeys ? Visibility.Visible : Visibility.Collapsed;
+        _advancedPage.Visibility = currentPage == SettingsPageType.Advanced ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     /// <summary>
     /// 打开配置文件夹
@@ -58,54 +142,19 @@ public partial class SettingsWindow : AnimatedWindow
         }
     }
 
-#endregion
-
-#region Event Handlers
-
     /// <summary>
     /// 标题栏拖动
     /// </summary>
     private new void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        base.TitleBar_MouseLeftButtonDown(sender, e);
-    }
-
-    /// <summary>
-    /// 快进秒数滑块值变化
-    /// </summary>
-    private void SeekSecondsSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_isInitializing)
-            return;
-        SeekSecondsValue.Text = $"{(int)e.NewValue}s";
-    }
-
-    /// <summary>
-    /// 透明度滑块值变化
-    /// </summary>
-    private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_isInitializing)
-            return;
-        OpacityValue.Text = $"{(int)e.NewValue}%";
-    }
-
-    /// <summary>
-    /// 吸附阈值滑块值变化
-    /// </summary>
-    private void SnapThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_isInitializing)
-            return;
-        SnapThresholdValue.Text = $"{(int)e.NewValue}px";
-    }
-
-    /// <summary>
-    /// 打开配置文件夹按钮点击
-    /// </summary>
-    private void BtnOpenConfigFolder_Click(object sender, RoutedEventArgs e)
-    {
-        _viewModel.OpenConfigFolderCommand.Execute(null);
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        }
+        else
+        {
+            base.TitleBar_MouseLeftButtonDown(sender, e);
+        }
     }
 
     /// <summary>
@@ -124,18 +173,5 @@ public partial class SettingsWindow : AnimatedWindow
         _viewModel.SaveCommand.Execute(null);
         CloseWithAnimation();
     }
-
-    /// <summary>
-    /// Profile 选择变化
-    /// </summary>
-    private void ProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isInitializing)
-            return;
-
-        // 绑定已处理 Profile 切换，此方法保留用于扩展
-    }
-
-#endregion
 }
 }

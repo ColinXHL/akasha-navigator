@@ -8,6 +8,7 @@ using AkashaNavigator.Views.Pages;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.ViewModels.Dialogs;
 using AkashaNavigator.ViewModels.Pages;
+using AkashaNavigator.ViewModels.Pages.Settings;
 using AkashaNavigator.ViewModels.Windows;
 
 namespace AkashaNavigator.Core
@@ -131,6 +132,23 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ProfileMarketPageViewModel>();
 
         // ============================================================
+        // ViewModels（Pages - Settings）
+        // 必须在 SettingsViewModel 之前注册（依赖链：SettingsViewModel → PageViewModels）
+        // ============================================================
+
+        // GeneralSettingsPageViewModel（依赖 ConfigService + ProfileManager）
+        services.AddTransient<GeneralSettingsPageViewModel>();
+
+        // WindowSettingsPageViewModel（无依赖）
+        services.AddTransient<WindowSettingsPageViewModel>();
+
+        // HotkeySettingsPageViewModel（无依赖，内部创建 HotkeyConflictDetector）
+        services.AddTransient<HotkeySettingsPageViewModel>();
+
+        // AdvancedSettingsPageViewModel（无依赖）
+        services.AddTransient<AdvancedSettingsPageViewModel>();
+
+        // ============================================================
         // ViewModels（Windows）
         // ============================================================
 
@@ -143,7 +161,9 @@ public static class ServiceCollectionExtensions
         // HistoryWindowViewModel（依赖 DataService）
         services.AddTransient<HistoryWindowViewModel>();
 
-        // SettingsViewModel（依赖 ConfigService + ProfileManager + EventBus）
+        // SettingsViewModel（依赖 ConfigService + ProfileManager + EventBus + 4 个 PageViewModels）
+        // 依赖链：SettingsViewModel → (GeneralSettingsPageViewModel, WindowSettingsPageViewModel,
+        //         HotkeySettingsPageViewModel, AdvancedSettingsPageViewModel)
         services.AddTransient<SettingsViewModel>();
 
         // PluginCenterViewModel（依赖 4 个 PageViewModel）
@@ -176,6 +196,22 @@ public static class ServiceCollectionExtensions
         // ProfileMarketPage（依赖 ProfileMarketPageViewModel + IDialogFactory +
         //                   Func<MarketplaceProfileDetailDialogViewModel>）
         services.AddTransient<ProfileMarketPage>();
+
+        // ============================================================
+        // Pages（Settings）
+        // ============================================================
+
+        // GeneralSettingsPage（依赖 GeneralSettingsPageViewModel）
+        services.AddTransient<GeneralSettingsPage>();
+
+        // WindowSettingsPage（依赖 WindowSettingsPageViewModel）
+        services.AddTransient<WindowSettingsPage>();
+
+        // HotkeySettingsPage（依赖 HotkeySettingsPageViewModel）
+        services.AddTransient<HotkeySettingsPage>();
+
+        // AdvancedSettingsPage（依赖 AdvancedSettingsPageViewModel）
+        services.AddTransient<AdvancedSettingsPage>();
 
         // ============================================================
         // 窗口（Transient，每次请求创建新实例）

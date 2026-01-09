@@ -165,15 +165,15 @@
                             <TextBlock Grid.Column="0" Text="🔍" Foreground="#666" FontSize="14"
                                        VerticalAlignment="Center" Margin="10,0,6,0"/>
                             <Grid Grid.Column="1" Margin="0,0,8,0">
-                                <ScrollViewer x:Name="PART_ContentHost" 
+                                <ScrollViewer x:Name="PART_ContentHost"
                                               VerticalAlignment="Center"
                                               Focusable="False"
                                               HorizontalScrollBarVisibility="Hidden"
                                               VerticalScrollBarVisibility="Hidden"/>
                                 <TextBlock x:Name="Placeholder"
-                                           Text="{TemplateBinding Tag}" 
+                                           Text="{TemplateBinding Tag}"
                                            Foreground="#888" FontSize="14"
-                                           VerticalAlignment="Center" 
+                                           VerticalAlignment="Center"
                                            IsHitTestVisible="False"
                                            Visibility="Collapsed"/>
                             </Grid>
@@ -199,6 +199,34 @@
                             </MultiTrigger.Conditions>
                             <Setter TargetName="border" Property="BorderBrush" Value="#1A8FE8"/>
                         </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 搜索结果按钮样式 -->
+    <Style x:Key="SearchResultButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#CCC"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border" Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="#333"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

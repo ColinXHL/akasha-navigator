@@ -1,0 +1,78 @@
+<UserControl x:Class="AkashaNavigator.Views.Pages.GeneralSettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:AkashaNavigator.Models.Profile;assembly=AkashaNavigator"
+             Background="Transparent"
+             Cursor="Arrow">
+
+    <StackPanel>
+        <!-- 标题 -->
+        <TextBlock Text="通用设置" FontSize="18" FontWeight="SemiBold"
+                   Foreground="White" Margin="0,0,0,16"/>
+
+        <!-- 配置 (Profile) -->
+        <TextBlock Text="配置" Style="{StaticResource SettingsGroupHeaderStyle}" Margin="0,0,0,8"/>
+        <Grid Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="ProfileComboBox" Grid.Column="0"
+                      Style="{StaticResource DarkComboBoxStyle}"
+                      ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                      ItemsSource="{Binding Profiles}"
+                      SelectedItem="{Binding SelectedProfile}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Foreground="White">
+                            <Run Text="{Binding Icon}"/>
+                            <Run Text=" "/>
+                            <Run Text="{Binding Name}"/>
+                        </TextBlock>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </Grid>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+            <Button Content="📂 打开配置文件夹" Style="{StaticResource ActionButtonStyle}"
+                    HorizontalAlignment="Left" Margin="0,0,8,0" Command="{Binding DataContext.OpenConfigFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+            <Button Content="🔌 打开插件中心" Style="{StaticResource PrimaryButtonStyle}"
+                    HorizontalAlignment="Left" Command="{Binding DataContext.OpenPluginCenterCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+        </StackPanel>
+
+        <!-- 基础设置 -->
+        <TextBlock Text="基础设置" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+
+        <!-- 快进/倒退秒数 -->
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="100"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="45"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="快进/倒退" Style="{StaticResource SettingsLabelStyle}"/>
+            <Slider x:Name="SeekSecondsSlider" Grid.Column="1"
+                    Style="{StaticResource DarkSliderStyle}"
+                    Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True"
+                    Value="{Binding SeekSeconds, Mode=TwoWay}"/>
+            <TextBlock Grid.Column="2" Text="{Binding SeekSeconds, StringFormat={}{0}s}"
+                       Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
+        </Grid>
+
+        <!-- 默认透明度 -->
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="100"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="45"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="默认透明度" Style="{StaticResource SettingsLabelStyle}"/>
+            <Slider x:Name="OpacitySlider" Grid.Column="1"
+                    Style="{StaticResource DarkSliderStyle}"
+                    Minimum="20" Maximum="100" TickFrequency="10" IsSnapToTickEnabled="True"
+                    Value="{Binding OpacityPercent, Mode=TwoWay}"/>
+            <TextBlock Grid.Column="2" Text="{Binding OpacityPercent, StringFormat={}{0}%}"
+                       Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
+        </Grid>
+    </StackPanel>
+</UserControl>

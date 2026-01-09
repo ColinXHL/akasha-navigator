@@ -8,7 +8,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
-                    <Border Background="#555" CornerRadius="3" Margin="2"/>
+                    <Border Background="#666" CornerRadius="1.5" Margin="0"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -16,19 +16,23 @@
 
     <!-- 深色滚动条 -->
     <Style x:Key="DarkScrollBar" TargetType="ScrollBar">
-        <Setter Property="Width" Value="8"/>
+        <Setter Property="Width" Value="3"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollBar">
-                    <Grid>
-                        <Border Background="#2A2A2A" CornerRadius="4"/>
-                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                    <Grid x:Name="RootGrid" Width="3" Margin="0">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Margin="0">
                             <Track.Thumb>
                                 <Thumb Style="{StaticResource DarkScrollBarThumb}"/>
                             </Track.Thumb>
                         </Track>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Width" Value="6" TargetName="RootGrid"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -45,7 +49,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <ScrollContentPresenter Grid.Column="0"/>
+                        <ScrollContentPresenter Grid.Column="0" Margin="0,0,6,0"/>
                         <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="1"
                                    Style="{StaticResource DarkScrollBar}"
                                    Value="{TemplateBinding VerticalOffset}"
