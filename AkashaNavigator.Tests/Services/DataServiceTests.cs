@@ -53,7 +53,7 @@ public class DataServiceTests : IDisposable
         }
     }
 
-    #region History Tests - 1.1.1
+#region History Tests - 1.1.1
 
     [Fact]
     public void GetHistory_WhenEmpty_ReturnsEmptyList()
@@ -263,9 +263,9 @@ public class DataServiceTests : IDisposable
         Assert.Single(results);
     }
 
-    #endregion
+#endregion
 
-    #region Bookmark Tests - 1.1.2
+#region Bookmark Tests - 1.1.2
 
     [Fact]
     public void GetBookmarks_WhenEmpty_ReturnsEmptyList()
@@ -544,9 +544,9 @@ public class DataServiceTests : IDisposable
         Assert.Equal(2, results.Count);
     }
 
-    #endregion
+#endregion
 
-    #region Concurrency Tests - 1.1.3
+#region Concurrency Tests - 1.1.3
 
     /// <summary>
     /// 并发测试已知问题： DataService 不是线程安全的
@@ -566,16 +566,16 @@ public class DataServiceTests : IDisposable
         {
             var index = i;
             tasks[i] = Task.Run(() =>
-            {
-                try
-                {
-                    _dataService.AddHistory($"url{index}", $"Title {index}");
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-            });
+                                {
+                                    try
+                                    {
+                                        _dataService.AddHistory($"url{index}", $"Title {index}");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        exceptions.Add(ex);
+                                    }
+                                });
         }
         await Task.WhenAll(tasks);
 
@@ -599,16 +599,16 @@ public class DataServiceTests : IDisposable
         {
             var index = i;
             tasks[i] = Task.Run(() =>
-            {
-                try
-                {
-                    _dataService.AddBookmark($"url{index}", $"Title {index}");
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-            });
+                                {
+                                    try
+                                    {
+                                        _dataService.AddBookmark($"url{index}", $"Title {index}");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        exceptions.Add(ex);
+                                    }
+                                });
         }
         await Task.WhenAll(tasks);
 
@@ -631,33 +631,33 @@ public class DataServiceTests : IDisposable
         for (int i = 0; i < tasks.Length; i++)
         {
             tasks[i] = Task.Run(() =>
-            {
-                try
-                {
-                    switch (random.Next(5))
-                    {
-                        case 0:
-                            _dataService.AddHistory($"url_{Guid.NewGuid()}", "Title");
-                            break;
-                        case 1:
-                            _dataService.GetHistory();
-                            break;
-                        case 2:
-                            _dataService.AddBookmark($"url_{Guid.NewGuid()}", "Title");
-                            break;
-                        case 3:
-                            _dataService.GetBookmarks();
-                            break;
-                        case 4:
-                            _dataService.SearchBookmarks("Title");
-                            break;
-                    }
-                }
-                catch
-                {
-                    // 忽略并发异常
-                }
-            });
+                                {
+                                    try
+                                    {
+                                        switch (random.Next(5))
+                                        {
+                                        case 0:
+                                            _dataService.AddHistory($"url_{Guid.NewGuid()}", "Title");
+                                            break;
+                                        case 1:
+                                            _dataService.GetHistory();
+                                            break;
+                                        case 2:
+                                            _dataService.AddBookmark($"url_{Guid.NewGuid()}", "Title");
+                                            break;
+                                        case 3:
+                                            _dataService.GetBookmarks();
+                                            break;
+                                        case 4:
+                                            _dataService.SearchBookmarks("Title");
+                                            break;
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        // 忽略并发异常
+                                    }
+                                });
         }
 
         // Act
@@ -667,9 +667,9 @@ public class DataServiceTests : IDisposable
         Assert.True(_dataService.GetHistory().Count >= 2);
     }
 
-    #endregion
+#endregion
 
-    #region Persistence Tests - 1.1.4
+#region Persistence Tests - 1.1.4
 
     [Fact]
     public void History_PersistsToFile_RetainsData()
@@ -765,9 +765,9 @@ public class DataServiceTests : IDisposable
         Assert.Empty(bookmarks);
     }
 
-    #endregion
+#endregion
 
-    #region Mock Profile Manager
+#region Mock Profile Manager
 
     /// <summary>
     /// 简单的 Mock ProfileManager，用于测试
@@ -779,15 +779,12 @@ public class DataServiceTests : IDisposable
         public MockProfileManager(string profileDirectory)
         {
             _profileDirectory = profileDirectory;
-            CurrentProfile = new GameProfile
-            {
-                Id = "test",
-                Name = "Test Profile",
-                Icon = "test.png"
-            };
+            CurrentProfile = new GameProfile { Id = "test", Name = "Test Profile", Icon = "test.png" };
         }
 
+#pragma warning disable CS0067 // 事件从未使用（接口要求实现）
         public event EventHandler<GameProfile>? ProfileChanged;
+#pragma warning restore CS0067
 
         public GameProfile CurrentProfile { get; }
 
@@ -807,9 +804,13 @@ public class DataServiceTests : IDisposable
 
         public string GetProfileDirectory(string profileId) => _profileDirectory;
 
-        public void SaveCurrentProfile() { }
+        public void SaveCurrentProfile()
+        {
+        }
 
-        public void SaveProfile(GameProfile profile) { }
+        public void SaveProfile(GameProfile profile)
+        {
+        }
 
         public Result DeleteProfile(string id) => Result.Success();
 
@@ -819,12 +820,14 @@ public class DataServiceTests : IDisposable
 
         public string GenerateProfileId(string name) => name.ToLower().Replace(" ", "_");
 
-        public Result<string> CreateProfile(string? id, string name, string icon, List<string>? pluginIds)
-            => Result<string>.Success("test");
+        public Result<string> CreateProfile(string? id, string name, string icon,
+                                            List<string>? pluginIds) => Result<string>.Success("test");
 
         public bool UpdateProfile(string id, string newName, string newIcon) => true;
 
-        public void ReloadProfiles() { }
+        public void ReloadProfiles()
+        {
+        }
 
         public bool SubscribeProfile(string profileId) => true;
 
@@ -836,14 +839,13 @@ public class DataServiceTests : IDisposable
 
         public bool ExportProfileToFile(string profileId, string filePath) => true;
 
-        public ProfileImportResult ImportProfile(ProfileExportData data, bool overwrite = false)
-            => ProfileImportResult.Success("test");
+        public ProfileImportResult ImportProfile(ProfileExportData data,
+                                                 bool overwrite = false) => ProfileImportResult.Success("test");
 
-        public ProfileImportResult ImportProfileFromFile(string filePath, bool overwrite = false)
-            => ProfileImportResult.Success("test");
+        public ProfileImportResult ImportProfileFromFile(string filePath,
+                                                         bool overwrite = false) => ProfileImportResult.Success("test");
 
-        public ProfileImportResult PreviewImport(ProfileExportData data)
-            => ProfileImportResult.Success("test");
+        public ProfileImportResult PreviewImport(ProfileExportData data) => ProfileImportResult.Success("test");
 
         public List<PluginReference> GetPluginReferences(string profileId) => new();
 
@@ -860,6 +862,6 @@ public class DataServiceTests : IDisposable
         public Dictionary<string, Dictionary<string, object>> GetAllPluginConfigs(string profileId) => new();
     }
 
-    #endregion
+#endregion
 }
 }
