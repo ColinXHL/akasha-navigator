@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -87,6 +88,31 @@ public partial class PlayerWindow : Window
     /// 视频时间同步定时器
     /// </summary>
     private DispatcherTimer? _videoTimeSyncTimer;
+
+    /// <summary>
+    /// 当前播放速率
+    /// </summary>
+    private double _currentPlaybackRate = 1.0;
+
+    /// <summary>
+    /// 播放速率最小值
+    /// </summary>
+    private const double MinPlaybackRate = 0.25;
+
+    /// <summary>
+    /// 播放速率最大值
+    /// </summary>
+    private const double MaxPlaybackRate = 4.0;
+
+    /// <summary>
+    /// 播放速率步进值
+    /// </summary>
+    private const double PlaybackRateStep = 0.25;
+
+    /// <summary>
+    /// 窗口是否隐藏
+    /// </summary>
+    private bool _isHidden;
 
 #endregion
 
@@ -686,6 +712,99 @@ public partial class PlayerWindow : Window
         _config = config;
         _windowBehavior.UpdateConfig(config);
     }
+
+    /// <summary>
+    /// 重置透明度到 100%
+    /// </summary>
+    public void ResetOpacity()
+    {
+        _windowBehavior.SetOpacity(1.0);
+    }
+
+    /// <summary>
+    /// 获取当前播放速率
+    /// </summary>
+    public double CurrentPlaybackRate => _currentPlaybackRate;
+
+    /// <summary>
+    /// 设置视频播放速率
+    /// </summary>
+    /// <param name="rate">播放速率 (0.25-4.0)</param>
+    public async Task SetPlaybackRateAsync(double rate)
+    {
+        if (WebView.CoreWebView2 == null)
+            return;
+
+        // 限制在有效范围内
+        rate = Math.Clamp(rate, MinPlaybackRate, MaxPlaybackRate);
+        _currentPlaybackRate = rate;
+
+        string script = $@"
+            (function() {{
+                var video = document.querySelector('video');
+                if (video) {{
+                    video.playbackRate = {rate.ToString(System.Globalization.CultureInfo.InvariantCulture)};
+                    return video.playbackRate;
+                }}
+                return -1;
+            }})();
+        ";
+
+        try
+        {
+            await WebView.CoreWebView2.ExecuteScriptAsync(script);
+        }
+        catch
+        {
+            // 忽略脚本执行错误
+        }
+    }
+
+    /// <summary>
+    /// 增加播放速率 (+0.25)
+    /// </summary>
+    public async Task IncreasePlaybackRateAsync()
+    {
+        await SetPlaybackRateAsync(_currentPlaybackRate + PlaybackRateStep);
+    }
+
+    /// <summary>
+    /// 减少播放速率 (-0.25)
+    /// </summary>
+    public async Task DecreasePlaybackRateAsync()
+    {
+        await SetPlaybackRateAsync(_currentPlaybackRate - PlaybackRateStep);
+    }
+
+    /// <summary>
+    /// 重置播放速率到 1.0x
+    /// </summary>
+    public async Task ResetPlaybackRateAsync()
+    {
+        await SetPlaybackRateAsync(1.0);
+    }
+
+    /// <summary>
+    /// 切换窗口可见性
+    /// </summary>
+    public void ToggleVisibility()
+    {
+        if (_isHidden)
+        {
+            Show();
+            _isHidden = false;
+        }
+        else
+        {
+            Hide();
+            _isHidden = true;
+        }
+    }
+
+    /// <summary>
+    /// 窗口是否隐藏
+    /// </summary>
+    public bool IsHidden => _isHidden;
 
 #endregion
 

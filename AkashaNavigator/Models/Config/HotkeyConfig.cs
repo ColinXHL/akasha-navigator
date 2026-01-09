@@ -87,9 +87,27 @@ public class HotkeyConfig
                                                          // 8 键 - 增加透明度
                                                          new HotkeyBinding { Key = 0x38, Modifiers = ModifierKeys.None,
                                                                              Action = "IncreaseOpacity" },
+                                                         // 9 键 - 切换窗口可见性
+                                                         new HotkeyBinding { Key = 0x39, Modifiers = ModifierKeys.None,
+                                                                             Action = "ToggleWindowVisibility" },
                                                          // 0 键 - 切换鼠标穿透
                                                          new HotkeyBinding { Key = 0x30, Modifiers = ModifierKeys.None,
                                                                              Action = "ToggleClickThrough" },
+                                                         // - 键 - 减少播放速率
+                                                         new HotkeyBinding { Key = 0xBD, Modifiers = ModifierKeys.None,
+                                                                             Action = "DecreasePlaybackRate" },
+                                                         // = 键 - 增加播放速率
+                                                         new HotkeyBinding { Key = 0xBB, Modifiers = ModifierKeys.None,
+                                                                             Action = "IncreasePlaybackRate" },
+                                                         // 重置透明度 - 无默认快捷键
+                                                         new HotkeyBinding { Key = 0, Modifiers = ModifierKeys.None,
+                                                                             Action = "ResetOpacity" },
+                                                         // 重置播放速率 - 无默认快捷键
+                                                         new HotkeyBinding { Key = 0, Modifiers = ModifierKeys.None,
+                                                                             Action = "ResetPlaybackRate" },
+                                                         // Ctrl+` - 暂停/恢复热键
+                                                         new HotkeyBinding { Key = 0xC0, Modifiers = ModifierKeys.Ctrl,
+                                                                             Action = "SuspendHotkeys" },
                                                          // Alt+Enter - 切换最大化
                                                          new HotkeyBinding { Key = 0x0D, Modifiers = ModifierKeys.Alt,
                                                                              Action = "ToggleMaximize" }

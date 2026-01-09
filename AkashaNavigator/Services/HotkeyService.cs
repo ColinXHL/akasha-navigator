@@ -93,6 +93,48 @@ public class HotkeyService : IDisposable
         remove => _dispatcher.ToggleMaximize -= value;
     }
 
+    /// <summary>重置透明度事件</summary>
+    public event EventHandler? ResetOpacity
+    {
+        add => _dispatcher.ResetOpacity += value;
+        remove => _dispatcher.ResetOpacity -= value;
+    }
+
+    /// <summary>增加播放速率事件</summary>
+    public event EventHandler? IncreasePlaybackRate
+    {
+        add => _dispatcher.IncreasePlaybackRate += value;
+        remove => _dispatcher.IncreasePlaybackRate -= value;
+    }
+
+    /// <summary>减少播放速率事件</summary>
+    public event EventHandler? DecreasePlaybackRate
+    {
+        add => _dispatcher.DecreasePlaybackRate += value;
+        remove => _dispatcher.DecreasePlaybackRate -= value;
+    }
+
+    /// <summary>重置播放速率事件</summary>
+    public event EventHandler? ResetPlaybackRate
+    {
+        add => _dispatcher.ResetPlaybackRate += value;
+        remove => _dispatcher.ResetPlaybackRate -= value;
+    }
+
+    /// <summary>切换窗口可见性事件</summary>
+    public event EventHandler? ToggleWindowVisibility
+    {
+        add => _dispatcher.ToggleWindowVisibility += value;
+        remove => _dispatcher.ToggleWindowVisibility -= value;
+    }
+
+    /// <summary>暂停/恢复热键事件</summary>
+    public event EventHandler? SuspendHotkeys
+    {
+        add => _dispatcher.SuspendHotkeys += value;
+        remove => _dispatcher.SuspendHotkeys -= value;
+    }
+
 #endregion
 
 #region Constructor

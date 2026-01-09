@@ -128,6 +128,63 @@ public class HotkeyManager
             var msg = _playerWindow?.IsMaximized == true ? "窗口: 最大化" : "窗口: 还原";
             ShowOsd(msg, "🔲");
         };
+
+        _hotkeyService.ResetOpacity += (s, e) =>
+        {
+            Logger.Debug("ResetOpacity event received, _playerWindow is null: {IsNull}", _playerWindow == null);
+            _playerWindow?.ResetOpacity();
+            ShowOsd("透明度: 100%", "🔆");
+        };
+
+        _hotkeyService.IncreasePlaybackRate += async (s, e) =>
+        {
+            Logger.Debug("IncreasePlaybackRate event received, _playerWindow is null: {IsNull}", _playerWindow == null);
+            if (_playerWindow != null)
+            {
+                await _playerWindow.IncreasePlaybackRateAsync();
+                ShowOsd($"播放速率: {_playerWindow.CurrentPlaybackRate:F2}x", "⏩");
+            }
+        };
+
+        _hotkeyService.DecreasePlaybackRate += async (s, e) =>
+        {
+            Logger.Debug("DecreasePlaybackRate event received, _playerWindow is null: {IsNull}", _playerWindow == null);
+            if (_playerWindow != null)
+            {
+                await _playerWindow.DecreasePlaybackRateAsync();
+                ShowOsd($"播放速率: {_playerWindow.CurrentPlaybackRate:F2}x", "⏪");
+            }
+        };
+
+        _hotkeyService.ResetPlaybackRate += async (s, e) =>
+        {
+            Logger.Debug("ResetPlaybackRate event received, _playerWindow is null: {IsNull}", _playerWindow == null);
+            if (_playerWindow != null)
+            {
+                await _playerWindow.ResetPlaybackRateAsync();
+                ShowOsd("播放速率: 1.0x", "🔄");
+            }
+        };
+
+        _hotkeyService.ToggleWindowVisibility += (s, e) =>
+        {
+            Logger.Debug("ToggleWindowVisibility event received, _playerWindow is null: {IsNull}", _playerWindow == null);
+            _playerWindow?.ToggleVisibility();
+            var msg = _playerWindow?.IsHidden == true ? "窗口已隐藏" : "窗口已显示";
+            ShowOsd(msg, "👁");
+        };
+
+        _hotkeyService.SuspendHotkeys += (s, e) =>
+        {
+            Logger.Debug("SuspendHotkeys event received");
+            if (_hotkeyService != null)
+            {
+                _hotkeyService.ToggleSuspend();
+                var isSuspended = _hotkeyService.IsSuspended;
+                var msg = isSuspended ? "热键已暂停" : "热键已恢复";
+                ShowOsd(msg, isSuspended ? "⏸" : "▶");
+            }
+        };
     }
 
     /// <summary>

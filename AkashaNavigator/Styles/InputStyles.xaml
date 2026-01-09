@@ -73,14 +73,16 @@
         <Setter Property="Padding" Value="8,6"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontFamily" Value="Consolas"/>
-        <Setter Property="IsReadOnly" Value="True"/>
         <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="CaretBrush" Value="Transparent"/>
+        <Setter Property="ToolTipService.IsEnabled" Value="False"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <Border x:Name="border" Background="{TemplateBinding Background}" 
-                            BorderBrush="{TemplateBinding BorderBrush}" 
-                            BorderThickness="{TemplateBinding BorderThickness}" 
+                    <Border x:Name="border" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="4">
                         <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
                     </Border>
@@ -90,7 +92,44 @@
                             <Setter TargetName="border" Property="Background" Value="#3A3A3A"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="BorderBrush" Value="#666"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="#3399FF"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 带冲突指示的快捷键输入框样式 -->
+    <Style x:Key="ConflictHotkeyTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource HotkeyTextBoxStyle}">
+        <Setter Property="BorderBrush" Value="#E53935"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="ToolTip" Value="此快捷键与其他动作冲突"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid>
+                        <Border x:Name="border" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="4">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                            </Grid>
+                        </Border>
+                        <!-- 冲突警告图标 -->
+                        <TextBlock x:Name="warningIcon" Text="⚠" Foreground="#E53935" FontSize="12"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center" 
+                                   Margin="0,0,6,0" FontWeight="Bold"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="#FF5252"/>
+                            <Setter TargetName="border" Property="Background" Value="#3A3A3A"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="#FF7043"/>
                             <Setter Property="Cursor" Value="Hand"/>
                         </Trigger>
                     </ControlTemplate.Triggers>

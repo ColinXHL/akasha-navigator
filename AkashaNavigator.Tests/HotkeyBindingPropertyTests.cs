@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using FsCheck;
 using FsCheck.Xunit;
@@ -64,6 +65,47 @@ public class HotkeyBindingPropertyTests
     }
 
     /// <summary>
+    /// **Feature: hotkey-expansion, Property 14: Empty binding displays empty text**
+    /// **Validates: Requirements 8.3**
+    ///
+    /// *For any* HotkeyBinding with Key=0, the display text SHALL be an empty string,
+    /// regardless of the modifier keys.
+    /// </summary>
+    [Property(MaxTest = 100)]
+    public Property EmptyBinding_DisplaysEmptyText(ModifierKeys modifiers)
+    {
+        // Arrange - Key=0 represents an empty binding
+        uint emptyKey = 0;
+
+        // Act
+        var displayText = Win32Helper.GetHotkeyDisplayName(emptyKey, modifiers);
+
+        // Assert - Empty binding should always display empty string
+        return (displayText == string.Empty).ToProperty();
+    }
+
+    /// <summary>
+    /// **Feature: hotkey-expansion, Property 14: Empty binding displays empty text**
+    /// **Validates: Requirements 8.3**
+    ///
+    /// Additional test: Non-empty bindings should NOT display empty text
+    /// </summary>
+    [Property(MaxTest = 100)]
+    public Property NonEmptyBinding_DisplaysNonEmptyText(byte keyByte, ModifierKeys modifiers)
+    {
+        // Skip key=0 as that's the empty binding case
+        uint key = keyByte;
+        if (key == 0)
+            return true.ToProperty(); // Skip this case
+
+        // Act
+        var displayText = Win32Helper.GetHotkeyDisplayName(key, modifiers);
+
+        // Assert - Non-empty binding should display non-empty text
+        return (!string.IsNullOrEmpty(displayText)).ToProperty();
+    }
+
+    /// <summary>
     /// 验证 Mouse InputType 特别能正确序列化
     /// </summary>
     [Fact]
@@ -103,6 +145,40 @@ public class HotkeyBindingPropertyTests
         Assert.Equal(MouseButtonCodes.XButton2, deserialized.Key);
         Assert.Equal(ModifierKeys.Ctrl, deserialized.Modifiers);
         Assert.False(deserialized.IsEnabled);
+    }
+
+    /// <summary>
+    /// 验证空绑定显示空字符串
+    /// </summary>
+    [Fact]
+    public void EmptyBinding_WithNoModifiers_DisplaysEmptyString()
+    {
+        // Arrange
+        uint emptyKey = 0;
+        var modifiers = ModifierKeys.None;
+
+        // Act
+        var displayText = Win32Helper.GetHotkeyDisplayName(emptyKey, modifiers);
+
+        // Assert
+        Assert.Equal(string.Empty, displayText);
+    }
+
+    /// <summary>
+    /// 验证空绑定即使有修饰键也显示空字符串
+    /// </summary>
+    [Fact]
+    public void EmptyBinding_WithModifiers_DisplaysEmptyString()
+    {
+        // Arrange
+        uint emptyKey = 0;
+        var modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt | ModifierKeys.Shift;
+
+        // Act
+        var displayText = Win32Helper.GetHotkeyDisplayName(emptyKey, modifiers);
+
+        // Assert
+        Assert.Equal(string.Empty, displayText);
     }
 }
 }

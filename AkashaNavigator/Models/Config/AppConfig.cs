@@ -56,6 +56,30 @@ public class AppConfig
     public uint HotkeyToggleMaximize { get; set; } = 0x0D; // VK_RETURN (Enter)
     public ModifierKeys HotkeyToggleMaximizeMod { get; set; } = ModifierKeys.Alt;
 
+    // 重置透明度键
+    public uint HotkeyResetOpacity { get; set; } = 0; // 默认为空
+    public ModifierKeys HotkeyResetOpacityMod { get; set; } = ModifierKeys.None;
+
+    // 减少播放速率键
+    public uint HotkeyDecreasePlaybackRate { get; set; } = 0xBD; // VK_OEM_MINUS (- 键)
+    public ModifierKeys HotkeyDecreasePlaybackRateMod { get; set; } = ModifierKeys.None;
+
+    // 增加播放速率键
+    public uint HotkeyIncreasePlaybackRate { get; set; } = 0xBB; // VK_OEM_PLUS (= 键)
+    public ModifierKeys HotkeyIncreasePlaybackRateMod { get; set; } = ModifierKeys.None;
+
+    // 重置播放速率键
+    public uint HotkeyResetPlaybackRate { get; set; } = 0; // 默认为空
+    public ModifierKeys HotkeyResetPlaybackRateMod { get; set; } = ModifierKeys.None;
+
+    // 切换窗口可见性键
+    public uint HotkeyToggleWindowVisibility { get; set; } = 0x39; // VK_9 (9 键)
+    public ModifierKeys HotkeyToggleWindowVisibilityMod { get; set; } = ModifierKeys.None;
+
+    // 暂停/恢复热键 (Ctrl+`)
+    public uint HotkeySuspendHotkeys { get; set; } = 0xC0; // VK_OEM_3 (` 波浪键)
+    public ModifierKeys HotkeySuspendHotkeysMod { get; set; } = ModifierKeys.Ctrl;
+
 #endregion
 
 #region Profile
@@ -130,7 +154,7 @@ public class AppConfig
     /// <summary>
     /// 创建快捷键绑定列表
     /// </summary>
-    /// <returns>包含所有 7 个快捷键绑定的列表</returns>
+    /// <returns>包含所有快捷键绑定的列表</returns>
     private List<HotkeyBinding> CreateHotkeyBindings()
     {
         return new List<HotkeyBinding> {
@@ -141,8 +165,20 @@ public class AppConfig
                                 Action = "DecreaseOpacity" },
             new HotkeyBinding { Key = HotkeyIncreaseOpacity, Modifiers = HotkeyIncreaseOpacityMod,
                                 Action = "IncreaseOpacity" },
+            new HotkeyBinding { Key = HotkeyResetOpacity, Modifiers = HotkeyResetOpacityMod,
+                                Action = "ResetOpacity" },
             new HotkeyBinding { Key = HotkeyToggleClickThrough, Modifiers = HotkeyToggleClickThroughMod,
                                 Action = "ToggleClickThrough" },
+            new HotkeyBinding { Key = HotkeyDecreasePlaybackRate, Modifiers = HotkeyDecreasePlaybackRateMod,
+                                Action = "DecreasePlaybackRate" },
+            new HotkeyBinding { Key = HotkeyIncreasePlaybackRate, Modifiers = HotkeyIncreasePlaybackRateMod,
+                                Action = "IncreasePlaybackRate" },
+            new HotkeyBinding { Key = HotkeyResetPlaybackRate, Modifiers = HotkeyResetPlaybackRateMod,
+                                Action = "ResetPlaybackRate" },
+            new HotkeyBinding { Key = HotkeyToggleWindowVisibility, Modifiers = HotkeyToggleWindowVisibilityMod,
+                                Action = "ToggleWindowVisibility" },
+            new HotkeyBinding { Key = HotkeySuspendHotkeys, Modifiers = HotkeySuspendHotkeysMod,
+                                Action = "SuspendHotkeys" },
             new HotkeyBinding { Key = HotkeyToggleMaximize, Modifiers = HotkeyToggleMaximizeMod,
                                 Action = "ToggleMaximize" }
         };

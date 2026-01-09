@@ -342,6 +342,10 @@ public static class Win32Helper
     /// </summary>
     public static string GetHotkeyDisplayName(uint vkCode, ModifierKeys modifiers)
     {
+        // 空绑定（Key=0）返回空字符串
+        if (vkCode == 0)
+            return string.Empty;
+
         var parts = new System.Collections.Generic.List<string>();
 
         if (modifiers.HasFlag(ModifierKeys.Ctrl))

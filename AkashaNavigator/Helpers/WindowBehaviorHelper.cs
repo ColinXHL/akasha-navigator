@@ -150,6 +150,27 @@ public class WindowBehaviorHelper
         }
     }
 
+    /// <summary>
+    /// 设置透明度到指定值
+    /// </summary>
+    /// <param name="opacity">透明度值 (0.0-1.0)</param>
+    public void SetOpacity(double opacity)
+    {
+        opacity = Math.Clamp(opacity, AppConstants.MinOpacity, AppConstants.MaxOpacity);
+
+        if (_isClickThrough)
+        {
+            // 穿透模式下：修改保存的透明度设置
+            _opacityBeforeClickThrough = opacity;
+        }
+        else
+        {
+            // 非穿透模式：直接修改当前透明度
+            _windowOpacity = opacity;
+            Win32Helper.SetWindowOpacity(_window, _windowOpacity);
+        }
+    }
+
 #endregion
 
 #region Public Methods - Click Through

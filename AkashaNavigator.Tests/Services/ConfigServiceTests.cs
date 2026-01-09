@@ -49,7 +49,7 @@ public class ConfigServiceTests : IDisposable
         }
     }
 
-    #region Load / Save Tests - 1.2.1
+#region Load / Save Tests - 1.2.1
 
     [Fact]
     public void Load_WhenFileDoesNotExist_ReturnsDefaultConfig()
@@ -80,18 +80,10 @@ public class ConfigServiceTests : IDisposable
     public void Load_WithValidConfigFile_ReturnsCorrectConfig()
     {
         // Arrange - 创建配置文件
-        var expectedConfig = new AppConfig
-        {
-            SeekSeconds = 10,
-            DefaultOpacity = 0.8,
-            CurrentProfileId = "custom_profile",
-            IsFirstLaunch = false,
-            EnableDebugLog = true,
-            EnablePluginUpdateNotification = false,
-            EnableEdgeSnap = false,
-            SnapThreshold = 20,
-            PromptRecordOnExit = true
-        };
+        var expectedConfig =
+            new AppConfig { SeekSeconds = 10,       DefaultOpacity = 0.8,  CurrentProfileId = "custom_profile",
+                            IsFirstLaunch = false,  EnableDebugLog = true, EnablePluginUpdateNotification = false,
+                            EnableEdgeSnap = false, SnapThreshold = 20,    PromptRecordOnExit = true };
         var json = JsonSerializer.Serialize(expectedConfig, JsonHelper.WriteOptions);
         File.WriteAllText(_configFilePath, json);
 
@@ -196,9 +188,9 @@ public class ConfigServiceTests : IDisposable
         Assert.Contains("currentProfileId", json);
     }
 
-    #endregion
+#endregion
 
-    #region Default Values Tests - 1.2.2
+#region Default Values Tests - 1.2.2
 
     [Fact]
     public void Constructor_WithNoFile_LoadsDefaultConfig()
@@ -295,8 +287,7 @@ public class ConfigServiceTests : IDisposable
         _configService.Config.SeekSeconds = 10;
         _configService.Config.DefaultOpacity = 0.8;
 
-        var newConfig = new AppConfig
-        {
+        var newConfig = new AppConfig {
             SeekSeconds = 20,
             DefaultOpacity = 0.8 // 保持原值
         };
@@ -309,9 +300,9 @@ public class ConfigServiceTests : IDisposable
         Assert.Equal(0.8, _configService.Config.DefaultOpacity);
     }
 
-    #endregion
+#endregion
 
-    #region Migration Compatibility Tests - 1.2.3
+#region Migration Compatibility Tests - 1.2.3
 
     [Fact]
     public void Load_WithPascalCaseProperties_DeserializesCorrectly()
@@ -402,13 +393,13 @@ public class ConfigServiceTests : IDisposable
         Assert.Equal((uint)68, config.HotkeyIncreaseOpacity);
         Assert.Equal((uint)69, config.HotkeyDecreaseOpacity);
         Assert.Equal((uint)70, config.HotkeyToggleClickThrough);
-        Assert.Equal((uint)13, config.HotkeyToggleMaximize); // VK_RETURN
+        Assert.Equal((uint)13, config.HotkeyToggleMaximize);            // VK_RETURN
         Assert.Equal(ModifierKeys.Alt, config.HotkeyToggleMaximizeMod); // 1 = Alt
     }
 
-    #endregion
+#endregion
 
-    #region Invalid File Handling Tests - 1.2.4
+#region Invalid File Handling Tests - 1.2.4
 
     [Fact]
     public void Load_WithInvalidJson_ReturnsDefaultConfig()
@@ -484,8 +475,7 @@ public class ConfigServiceTests : IDisposable
     public void Load_ToHotkeyConfig_ConvertsCorrectly()
     {
         // Arrange
-        var config = new AppConfig
-        {
+        var config = new AppConfig {
             HotkeySeekForward = Helpers.Win32Helper.VK_6,
             HotkeySeekForwardMod = ModifierKeys.None,
             HotkeySeekBackward = Helpers.Win32Helper.VK_5,
@@ -502,7 +492,10 @@ public class ConfigServiceTests : IDisposable
         Assert.Single(hotkeyConfig.Profiles);
         Assert.Equal("Default", hotkeyConfig.Profiles[0].Name);
         Assert.NotNull(hotkeyConfig.Profiles[0].Bindings);
-        Assert.Equal(7, hotkeyConfig.Profiles[0].Bindings.Count);
+        // 13 bindings: SeekBackward, SeekForward, TogglePlay, DecreaseOpacity, IncreaseOpacity,
+        // ResetOpacity, ToggleClickThrough, DecreasePlaybackRate, IncreasePlaybackRate,
+        // ResetPlaybackRate, ToggleWindowVisibility, SuspendHotkeys, ToggleMaximize
+        Assert.Equal(13, hotkeyConfig.Profiles[0].Bindings.Count);
     }
 
     [Fact]
@@ -544,9 +537,9 @@ public class ConfigServiceTests : IDisposable
         Assert.Equal(AppConstants.DefaultSeekSeconds, receivedConfig.SeekSeconds);
     }
 
-    #endregion
+#endregion
 
-    #region Testable ConfigService
+#region Testable ConfigService
 
     /// <summary>
     /// 可测试的 ConfigService 版本，允许指定配置文件路径
@@ -590,7 +583,7 @@ public class ConfigServiceTests : IDisposable
             }
 
             _logService.Warn(nameof(ConfigService), "加载配置失败，将使用默认配置: {ErrorMessage}",
-                result.Error?.Message ?? "未知错误");
+                             result.Error?.Message ?? "未知错误");
             var defaultConfig = new AppConfig();
             SetConfig(defaultConfig);
             return defaultConfig;
@@ -602,7 +595,7 @@ public class ConfigServiceTests : IDisposable
             if (result.IsFailure)
             {
                 _logService.Debug(nameof(ConfigService), "保存配置失败: {ErrorMessage}",
-                    result.Error?.Message ?? "未知错误");
+                                  result.Error?.Message ?? "未知错误");
             }
         }
 
@@ -614,6 +607,6 @@ public class ConfigServiceTests : IDisposable
         }
     }
 
-    #endregion
+#endregion
 }
 }
