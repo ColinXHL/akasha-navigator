@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using AkashaNavigator.Models.Config;
+using Serilog;
 
 namespace AkashaNavigator.Helpers
 {
@@ -13,6 +14,7 @@ namespace AkashaNavigator.Helpers
 /// </summary>
 public class WindowBehaviorHelper
 {
+    private static readonly ILogger Logger = Log.ForContext("SourceContext", "WindowBehaviorHelper");
 #region Fields
 
     private readonly Window _window;
@@ -111,6 +113,8 @@ public class WindowBehaviorHelper
 
         // 非穿透模式：直接修改当前透明度
         _windowOpacity = Math.Max(AppConstants.MinOpacity, _windowOpacity - AppConstants.OpacityStep);
+        System.Diagnostics.Debug.WriteLine(
+            $"[WindowBehaviorHelper] DecreaseOpacity: setting opacity to {_windowOpacity}");
         Win32Helper.SetWindowOpacity(_window, _windowOpacity);
         return _windowOpacity;
     }
@@ -157,6 +161,7 @@ public class WindowBehaviorHelper
     public bool ToggleClickThrough()
     {
         _isClickThrough = !_isClickThrough;
+        Logger.Debug("ToggleClickThrough: _isClickThrough={IsClickThrough}", _isClickThrough);
 
         if (_isClickThrough)
         {
@@ -173,9 +178,11 @@ public class WindowBehaviorHelper
 
             // 恢复之前的透明度
             _windowOpacity = _opacityBeforeClickThrough;
+            Logger.Debug("ToggleClickThrough: restoring opacity to {Opacity}", _windowOpacity);
             Win32Helper.SetWindowOpacity(_window, _windowOpacity);
         }
 
+        Logger.Debug("ToggleClickThrough: calling SetClickThrough with enable={Enable}", _isClickThrough);
         Win32Helper.SetClickThrough(_window, _isClickThrough);
         return _isClickThrough;
     }

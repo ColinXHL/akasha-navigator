@@ -182,7 +182,7 @@ public static class ServiceCollectionExtensions
         // ============================================================
 
         // PlayerWindow（依赖所有服务 + IDialogFactory + PioneerNoteWindow 工厂）
-        services.AddTransient<PlayerWindow>();
+        services.AddSingleton<PlayerWindow>();
 
         // PioneerNoteWindow 工厂方法（用于 PlayerWindow 延迟创建）
         services.AddSingleton<Func<PioneerNoteWindow>>(sp => () => sp.GetRequiredService<PioneerNoteWindow>());

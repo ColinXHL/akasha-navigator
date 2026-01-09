@@ -657,7 +657,13 @@ public partial class PlayerWindow : Window
     /// <returns>是否处于穿透模式</returns>
     public bool ToggleClickThrough()
     {
-        return _windowBehavior.ToggleClickThrough();
+        var result = _windowBehavior.ToggleClickThrough();
+
+        // 注意：不再隐藏 WebView2，因为这会导致窗口句柄问题
+        // WebView2 的穿透需要通过其他方式处理
+        // WebView.Visibility = result ? Visibility.Hidden : Visibility.Visible;
+
+        return result;
     }
 
     /// <summary>

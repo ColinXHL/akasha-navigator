@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using AkashaNavigator.Models.Config;
+using Serilog;
 
 namespace AkashaNavigator.Helpers
 {
@@ -12,6 +13,8 @@ namespace AkashaNavigator.Helpers
 /// </summary>
 public static class Win32Helper
 {
+    private static readonly ILogger Logger = Log.ForContext("SourceContext", "Win32Helper");
+
 #region Win32 API - Window
 
     [DllImport("user32.dll")]
@@ -20,11 +23,45 @@ public static class Win32Helper
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
 
-    [DllImport("user32.dll")]
-    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
 
-    [DllImport("user32.dll")]
-    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+    private static extern IntPtr GetWindowLongPtr32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
+    private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
+    private static extern IntPtr SetWindowLongPtr32(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    /// <summary>
+    /// 跨平台 GetWindowLongPtr（兼容 32/64 位）
+    /// </summary>
+    private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
+    {
+        return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : GetWindowLongPtr32(hWnd, nIndex);
+    }
+
+    /// <summary>
+    /// 跨平台 SetWindowLongPtr（兼容 32/64 位）
+    /// </summary>
+    private static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+    {
+        return IntPtr.Size == 8 ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong)
+                                : SetWindowLongPtr32(hWnd, nIndex, dwNewLong);
+    }
+
+    // 兼容旧代码的包装方法
+    private static int GetWindowLong(IntPtr hWnd, int nIndex)
+    {
+        return (int)GetWindowLongPtr(hWnd, nIndex);
+    }
+
+    private static int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong)
+    {
+        return (int)SetWindowLongPtr(hWnd, nIndex, new IntPtr(dwNewLong));
+    }
 
     [DllImport("user32.dll")]
     [return:MarshalAs(UnmanagedType.Bool)]
@@ -239,7 +276,11 @@ public static class Win32Helper
     /// </summary>
     public static string GetKeyName(uint vkCode)
     {
-        return vkCode switch {// 数字键
+        return vkCode switch {                     // 鼠标侧键
+                              0x05 => "鼠标侧键1", // XButton1
+                              0x06 => "鼠标侧键2", // XButton2
+
+                              // 数字键
                               >= 0x30 and <=
                                   0x39 => ((char)vkCode).ToString(),
 
@@ -424,8 +465,16 @@ public static class Win32Helper
     public static void SetClickThrough(Window window, bool enable)
     {
         var hwnd = new WindowInteropHelper(window).Handle;
-        int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        if (hwnd == IntPtr.Zero)
+        {
+            Logger.Warning("SetClickThrough: hwnd is Zero!");
+            return;
+        }
 
+        int exStyleBefore = GetWindowLong(hwnd, GWL_EXSTYLE);
+        Logger.Debug("SetClickThrough: enable={Enable}, exStyleBefore=0x{ExStyleBefore:X8}", enable, exStyleBefore);
+
+        int exStyle = exStyleBefore;
         if (enable)
         {
             // 添加 WS_EX_TRANSPARENT 和 WS_EX_LAYERED
@@ -438,6 +487,10 @@ public static class Win32Helper
         }
 
         SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+
+        int exStyleAfter = GetWindowLong(hwnd, GWL_EXSTYLE);
+        Logger.Debug("SetClickThrough: exStyleAfter=0x{ExStyleAfter:X8}, expected=0x{Expected:X8}, success={Success}",
+                     exStyleAfter, exStyle, exStyleAfter == exStyle);
     }
 
     /// <summary>

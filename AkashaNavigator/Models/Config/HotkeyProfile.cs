@@ -48,7 +48,7 @@ public class HotkeyProfile
     }
 
     /// <summary>
-    /// 查找匹配的快捷键绑定
+    /// 查找匹配的快捷键绑定（键盘）
     /// </summary>
     /// <param name="vkCode">虚拟键码</param>
     /// <param name="modifiers">修饰键状态</param>
@@ -62,6 +62,27 @@ public class HotkeyProfile
                 continue;
 
             if (binding.MatchesKey(vkCode, modifiers) && binding.MatchesProcess(processName))
+                return binding;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 查找匹配的鼠标按钮绑定
+    /// </summary>
+    /// <param name="mouseButton">鼠标按钮值</param>
+    /// <param name="modifiers">修饰键状态</param>
+    /// <param name="processName">当前前台进程名</param>
+    /// <returns>匹配的绑定，未找到返回 null</returns>
+    public HotkeyBinding? FindMatchingMouseBinding(uint mouseButton, ModifierKeys modifiers, string? processName)
+    {
+        foreach (var binding in Bindings)
+        {
+            if (!binding.IsEnabled)
+                continue;
+
+            if (binding.MatchesMouseButton(mouseButton, modifiers) && binding.MatchesProcess(processName))
                 return binding;
         }
 

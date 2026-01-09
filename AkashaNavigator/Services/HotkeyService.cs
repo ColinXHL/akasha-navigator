@@ -1,17 +1,18 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
+using Gma.System.MouseKeyHook;
 
 namespace AkashaNavigator.Services
 {
 /// <summary>
-/// 全局快捷键服务，使用低级键盘钩子实现
+/// 全局快捷键服务，使用 MouseKeyHook 库实现
 /// 支持配置驱动的快捷键绑定、组合键检测、进程过滤
+/// 支持键盘和鼠标侧键作为快捷键触发器
 /// 按键不会被拦截，既能触发快捷键功能，又能正常输入
 /// 当焦点在输入控件时不触发快捷键
 /// </summary>
@@ -19,13 +20,25 @@ public class HotkeyService : IDisposable
 {
 #region Fields
 
-    private IntPtr _hookId = IntPtr.Zero;
-    private Win32Helper.LowLevelKeyboardProc? _hookProc;
+    private IKeyboardMouseEvents? _globalHook;
     private bool _isStarted;
     private bool _disposed;
+    private bool _isSuspended;
 
     private HotkeyConfig _config;
     private readonly ActionDispatcher _dispatcher;
+
+    /// <summary>暂停热键的动作名称</summary>
+    public const string ActionSuspendHotkeys = "SuspendHotkeys";
+
+#endregion
+
+#region Properties
+
+    /// <summary>
+    /// 热键是否处于暂停状态
+    /// </summary>
+    public bool IsSuspended => _isSuspended;
 
 #endregion
 
@@ -114,8 +127,11 @@ public class HotkeyService : IDisposable
         if (_isStarted)
             return;
 
-        _hookProc = HookCallback;
-        _hookId = Win32Helper.SetKeyboardHook(_hookProc);
+        _globalHook = Hook.GlobalEvents();
+        _globalHook.KeyDown += OnKeyDown;
+        _globalHook.KeyUp += OnKeyUp;
+        _globalHook.MouseDownExt += OnMouseDown;
+        _globalHook.MouseUpExt += OnMouseUp;
         _isStarted = true;
     }
 
@@ -127,13 +143,16 @@ public class HotkeyService : IDisposable
         if (!_isStarted)
             return;
 
-        if (_hookId != IntPtr.Zero)
+        if (_globalHook != null)
         {
-            Win32Helper.RemoveKeyboardHook(_hookId);
-            _hookId = IntPtr.Zero;
+            _globalHook.KeyDown -= OnKeyDown;
+            _globalHook.KeyUp -= OnKeyUp;
+            _globalHook.MouseDownExt -= OnMouseDown;
+            _globalHook.MouseUpExt -= OnMouseUp;
+            _globalHook.Dispose();
+            _globalHook = null;
         }
 
-        _hookProc = null;
         _isStarted = false;
     }
 
@@ -158,55 +177,135 @@ public class HotkeyService : IDisposable
     /// <returns>动作分发器</returns>
     public ActionDispatcher GetDispatcher() => _dispatcher;
 
+    /// <summary>
+    /// 切换热键暂停状态
+    /// </summary>
+    public void ToggleSuspend()
+    {
+        _isSuspended = !_isSuspended;
+    }
+
+#endregion
+
+#region Event Handlers
+
+    /// <summary>
+    /// 键盘按下事件处理
+    /// </summary>
+    private void OnKeyDown(object? sender, System.Windows.Forms.KeyEventArgs e)
+    {
+        // 不设置 Handled，让事件继续传递
+        // e.Handled = false; // 默认就是 false
+
+        var vkCode = (uint)e.KeyCode;
+
+        // 获取当前修饰键状态
+        var modifiers = Win32Helper.GetCurrentModifiers();
+
+        // 获取前台进程名
+        var processName = Win32Helper.GetForegroundWindowProcessName();
+
+        // 查找匹配的绑定
+        var profile = _config.FindProfileForProcess(processName);
+        var binding = profile?.FindMatchingBinding(vkCode, modifiers, processName);
+
+        if (binding != null)
+        {
+            // 检查是否暂停（SuspendHotkeys 动作始终可用）
+            if (_isSuspended &&
+                !string.Equals(binding.Action, ActionSuspendHotkeys, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // 在 UI 线程上执行动作
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+                                                                       {
+                                                                           // 输入模式检测：焦点在输入控件时不触发快捷键
+                                                                           if (IsInputMode())
+                                                                               return;
+
+                                                                           _dispatcher.Dispatch(binding.Action);
+                                                                       });
+        }
+    }
+
+    /// <summary>
+    /// 键盘释放事件处理
+    /// </summary>
+    private void OnKeyUp(object? sender, System.Windows.Forms.KeyEventArgs e)
+    {
+        // 不设置 Handled，让事件继续传递
+        // 目前不需要处理 KeyUp 事件
+    }
+
+    /// <summary>
+    /// 鼠标按下事件处理（扩展版，支持侧键）
+    /// </summary>
+    private void OnMouseDown(object? sender, MouseEventExtArgs e)
+    {
+        // 不设置 Handled，让事件继续传递
+        // e.Handled = false; // 默认就是 false
+
+        // 仅处理鼠标侧键 (XButton1, XButton2)
+        uint mouseButton = 0;
+        if (e.Button == System.Windows.Forms.MouseButtons.XButton1)
+        {
+            mouseButton = MouseButtonCodes.XButton1;
+        }
+        else if (e.Button == System.Windows.Forms.MouseButtons.XButton2)
+        {
+            mouseButton = MouseButtonCodes.XButton2;
+        }
+        else
+        {
+            // 不处理其他鼠标按钮
+            return;
+        }
+
+        // 获取当前修饰键状态
+        var modifiers = Win32Helper.GetCurrentModifiers();
+
+        // 获取前台进程名
+        var processName = Win32Helper.GetForegroundWindowProcessName();
+
+        // 查找匹配的鼠标绑定
+        var profile = _config.FindProfileForProcess(processName);
+        var binding = profile?.FindMatchingMouseBinding(mouseButton, modifiers, processName);
+
+        if (binding != null)
+        {
+            // 检查是否暂停（SuspendHotkeys 动作始终可用）
+            if (_isSuspended &&
+                !string.Equals(binding.Action, ActionSuspendHotkeys, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // 在 UI 线程上执行动作
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+                                                                       {
+                                                                           // 输入模式检测：焦点在输入控件时不触发快捷键
+                                                                           if (IsInputMode())
+                                                                               return;
+
+                                                                           _dispatcher.Dispatch(binding.Action);
+                                                                       });
+        }
+    }
+
+    /// <summary>
+    /// 鼠标释放事件处理
+    /// </summary>
+    private void OnMouseUp(object? sender, MouseEventExtArgs e)
+    {
+        // 不设置 Handled，让事件继续传递
+        // 目前不需要处理 MouseUp 事件
+    }
+
 #endregion
 
 #region Private Methods
-
-    /// <summary>
-    /// 键盘钩子回调
-    /// </summary>
-    private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-    {
-        // WM_KEYDOWN: 普通按键; WM_SYSKEYDOWN: Alt 组合键
-        if (nCode >= 0 && (wParam == (IntPtr)Win32Helper.WM_KEYDOWN || wParam == (IntPtr)Win32Helper.WM_SYSKEYDOWN))
-        {
-            var hookStruct = Marshal.PtrToStructure<Win32Helper.KBDLLHOOKSTRUCT>(lParam);
-            var vkCode = hookStruct.vkCode;
-
-            // 获取当前修饰键状态
-            var modifiers = Win32Helper.GetCurrentModifiers();
-
-            // 获取前台进程名（失败时返回 null，FindProfileForProcess 会处理）
-            var processName = Win32Helper.GetForegroundWindowProcessName();
-
-            // 同步检测是否匹配快捷键（用于决定是否拦截 Alt 组合键）
-            var profile = _config.FindProfileForProcess(processName);
-            var binding = profile?.FindMatchingBinding(vkCode, modifiers, processName);
-            bool shouldBlock = binding != null && modifiers.HasFlag(Models.Config.ModifierKeys.Alt);
-
-            // 在 UI 线程上执行动作
-            if (binding != null)
-            {
-                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
-                                                                           {
-                                                                               // 输入模式检测：焦点在输入控件时不触发快捷键
-                                                                               if (IsInputMode())
-                                                                                   return;
-
-                                                                               _dispatcher.Dispatch(binding.Action);
-                                                                           });
-            }
-
-            // Alt 组合键匹配时拦截消息，避免 Windows 警告声
-            if (shouldBlock)
-            {
-                return (IntPtr)1;
-            }
-        }
-
-        // 普通按键继续传递，不拦截
-        return Win32Helper.CallNextHook(_hookId, nCode, wParam, lParam);
-    }
 
     /// <summary>
     /// 检测当前是否处于输入模式（焦点在输入控件上）
