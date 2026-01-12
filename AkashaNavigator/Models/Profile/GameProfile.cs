@@ -155,22 +155,33 @@ public class ExternalTool
 
 /// <summary>
 /// 鼠标检测配置
+/// 支持继承全局配置（null 值表示使用全局设置）
 /// </summary>
 public class CursorDetectionConfig
 {
     /// <summary>
-    /// 是否启用鼠标检测
+    /// 是否启用鼠标检测（null = 继承全局设置）
     /// </summary>
-    public bool Enabled { get; set; } = false;
+    public bool? Enabled { get; set; } = null;
 
     /// <summary>
-    /// 鼠标显示时的最低透明度（0.0-1.0）
+    /// Profile 级别的进程白名单（null 或空 = 使用全局白名单）
     /// </summary>
-    public double MinOpacity { get; set; } = 0.3;
+    public List<string>? ProcessWhitelist { get; set; }
 
     /// <summary>
-    /// 检测间隔（毫秒）
+    /// UI 模式下的最低透明度（null = 使用全局设置）
     /// </summary>
-    public int CheckIntervalMs { get; set; } = 200;
+    public double? MinOpacity { get; set; } = null;
+
+    /// <summary>
+    /// 检测间隔（毫秒，null = 使用全局设置）
+    /// </summary>
+    public int? CheckIntervalMs { get; set; } = null;
+
+    /// <summary>
+    /// 是否启用调试日志
+    /// </summary>
+    public bool EnableDebugLog { get; set; } = false;
 }
 }

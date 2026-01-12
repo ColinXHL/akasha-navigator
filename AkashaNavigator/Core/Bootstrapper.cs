@@ -49,9 +49,8 @@ public class Bootstrapper
         var currentProfileId = profileManager.CurrentProfile?.Id ?? "";
         pluginHost.LoadPluginsForProfile(currentProfileId);
 
-        // 从 DI 容器创建 ViewModel，手动创建 View
-        var controlBarViewModel = sp.GetRequiredService<ControlBarViewModel>();
-        _controlBarWindow = new ControlBarWindow(controlBarViewModel, _playerWindow);
+        // 从 DI 容器获取控制栏窗口
+        _controlBarWindow = sp.GetRequiredService<ControlBarWindow>();
 
         // 设置窗口关闭事件和菜单事件处理
         SetupEventHandlers();

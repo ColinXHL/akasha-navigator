@@ -17,6 +17,11 @@
     <!-- 用法: Visibility="{Binding Count, Converter={StaticResource ZeroToVisibleConverter}}" -->
     <helpers:ZeroToVisibleConverter x:Key="ZeroToVisibleConverter"/>
 
+    <!-- 非零值到 Visible 转换器 -->
+    <!-- 当值不为 0 时显示，否则隐藏，用于列表非空时显示操作按钮 -->
+    <!-- 用法: Visibility="{Binding Count, Converter={StaticResource NonZeroToVisibleConverter}}" -->
+    <helpers:NonZeroToVisibleConverter x:Key="NonZeroToVisibleConverter"/>
+
     <!-- 枚举到布尔转换器 -->
     <!-- 用于将枚举值与 RadioButton 的 IsChecked 绑定 -->
     <!-- 用法: IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=x:Static local:MyEnum.Value}" -->

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace AkashaNavigator.Core.Interfaces
 {
@@ -34,11 +35,25 @@ namespace AkashaNavigator.Core.Interfaces
         string? TargetProcessName { get; }
 
         /// <summary>
+        /// 是否启用调试日志
+        /// </summary>
+        bool EnableDebugLog { get; set; }
+
+        /// <summary>
         /// 启动鼠标检测
         /// </summary>
         /// <param name="targetProcessName">目标进程名（不含扩展名），仅当此进程在前台时检测</param>
         /// <param name="intervalMs">检测间隔（毫秒），默认 200ms</param>
-        void Start(string? targetProcessName = null, int intervalMs = 200);
+        /// <param name="enableDebugLog">是否启用调试日志，默认 false</param>
+        void Start(string? targetProcessName = null, int intervalMs = 200, bool enableDebugLog = false);
+
+        /// <summary>
+        /// 启动鼠标检测（使用白名单）
+        /// </summary>
+        /// <param name="whitelist">进程白名单，仅当这些进程在前台时检测</param>
+        /// <param name="intervalMs">检测间隔（毫秒），默认 200ms</param>
+        /// <param name="enableDebugLog">是否启用调试日志，默认 false</param>
+        void StartWithWhitelist(HashSet<string> whitelist, int intervalMs = 200, bool enableDebugLog = false);
 
         /// <summary>
         /// 停止鼠标检测

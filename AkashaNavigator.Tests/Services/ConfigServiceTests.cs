@@ -210,17 +210,17 @@ public class ConfigServiceTests : IDisposable
         Assert.Equal(AppConstants.MaxOpacity, config.DefaultOpacity);
 
         // 热键默认值
-        Assert.Equal(Helpers.Win32Helper.VK_6, config.HotkeySeekForward);
+        Assert.Equal(Win32Helper.VK_6, config.HotkeySeekForward);
         Assert.Equal(ModifierKeys.None, config.HotkeySeekForwardMod);
-        Assert.Equal(Helpers.Win32Helper.VK_5, config.HotkeySeekBackward);
+        Assert.Equal(Win32Helper.VK_5, config.HotkeySeekBackward);
         Assert.Equal(ModifierKeys.None, config.HotkeySeekBackwardMod);
-        Assert.Equal(Helpers.Win32Helper.VK_OEM_3, config.HotkeyTogglePlay);
+        Assert.Equal(Win32Helper.VK_OEM_3, config.HotkeyTogglePlay);
         Assert.Equal(ModifierKeys.None, config.HotkeyTogglePlayMod);
-        Assert.Equal(Helpers.Win32Helper.VK_8, config.HotkeyIncreaseOpacity);
+        Assert.Equal(Win32Helper.VK_8, config.HotkeyIncreaseOpacity);
         Assert.Equal(ModifierKeys.None, config.HotkeyIncreaseOpacityMod);
-        Assert.Equal(Helpers.Win32Helper.VK_7, config.HotkeyDecreaseOpacity);
+        Assert.Equal(Win32Helper.VK_7, config.HotkeyDecreaseOpacity);
         Assert.Equal(ModifierKeys.None, config.HotkeyDecreaseOpacityMod);
-        Assert.Equal(Helpers.Win32Helper.VK_0, config.HotkeyToggleClickThrough);
+        Assert.Equal(Win32Helper.VK_0, config.HotkeyToggleClickThrough);
         Assert.Equal(ModifierKeys.None, config.HotkeyToggleClickThroughMod);
         Assert.Equal((uint)0x0D, config.HotkeyToggleMaximize); // VK_RETURN
         Assert.Equal(ModifierKeys.Alt, config.HotkeyToggleMaximizeMod);
@@ -476,9 +476,9 @@ public class ConfigServiceTests : IDisposable
     {
         // Arrange
         var config = new AppConfig {
-            HotkeySeekForward = Helpers.Win32Helper.VK_6,
+            HotkeySeekForward = Win32Helper.VK_6,
             HotkeySeekForwardMod = ModifierKeys.None,
-            HotkeySeekBackward = Helpers.Win32Helper.VK_5,
+            HotkeySeekBackward = Win32Helper.VK_5,
             HotkeySeekBackwardMod = ModifierKeys.None,
         };
 

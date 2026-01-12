@@ -57,6 +57,25 @@ namespace AkashaNavigator.Helpers
     }
 
     /// <summary>
+    /// 非零值到 Visible 转换器（用于白名单列表）
+    /// 当值不为 0 时显示，否则隐藏
+    /// </summary>
+    public class NonZeroToVisibleConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int intValue)
+                return intValue != 0 ? Visibility.Visible : Visibility.Collapsed;
+            return Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
     /// 枚举到布尔转换器
     /// 用于将枚举值与 RadioButton 的 IsChecked 绑定
     /// </summary>

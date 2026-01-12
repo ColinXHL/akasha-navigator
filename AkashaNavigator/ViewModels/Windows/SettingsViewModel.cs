@@ -26,7 +26,6 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IConfigService _configService;
     private readonly IProfileManager _profileManager;
     private readonly IEventBus _eventBus;
-    private AppConfig _config;
 
     /// <summary>
     /// 当前显示的页面类型（自动生成属性和通知）
@@ -96,12 +95,19 @@ public partial class SettingsViewModel : ObservableObject
         _hotkeysPageVM = hotkeysPageVM ?? throw new ArgumentNullException(nameof(hotkeysPageVM));
         _advancedPageVM = advancedPageVM ?? throw new ArgumentNullException(nameof(advancedPageVM));
 
-        _config = _configService.Config;
+        var config = _configService.Config;
+
+        // 调试日志
+        System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Constructor: Config.CursorDetection is null = {config.CursorDetection == null}");
+        if (config.CursorDetection != null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Constructor: CursorDetection.Enabled = {config.CursorDetection.Enabled}");
+        }
 
         // 从各 PageViewModel 加载设置
-        _windowPageVM.LoadSettings(_config);
-        _hotkeysPageVM.LoadHotkeys(_config);
-        _advancedPageVM.LoadSettings(_config);
+        _windowPageVM.LoadSettings(config);
+        _hotkeysPageVM.LoadHotkeys(config);
+        _advancedPageVM.LoadSettings(config);
 
         // 订阅快捷键变化事件，自动检测冲突
         foreach (var binding in _hotkeysPageVM.HotkeyBindings)
@@ -321,13 +327,16 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
-        // 从各 PageViewModel 收集数据
-        _generalPageVM.SaveSettings(_config);
-        _windowPageVM.SaveSettings(_config);
-        _hotkeysPageVM.SaveSettings(_config);
-        _advancedPageVM.SaveSettings(_config);
+        // 每次保存时获取最新的 Config 对象，避免使用过时的引用
+        var config = _configService.Config;
 
-        _configService.UpdateConfig(_config);
+        // 从各 PageViewModel 收集数据
+        _generalPageVM.SaveSettings(config);
+        _windowPageVM.SaveSettings(config);
+        _hotkeysPageVM.SaveSettings(config);
+        _advancedPageVM.SaveSettings(config);
+
+        _configService.UpdateConfig(config);
     }
 
     /// <summary>

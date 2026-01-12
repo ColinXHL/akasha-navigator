@@ -197,9 +197,10 @@ public void CursorDetectionConfig_WithDefaultValues_HasCorrectDefaults()
 var config = new CursorDetectionConfig();
 
 // Assert
-Assert.False(config.Enabled);
-Assert.Equal(0.3, config.MinOpacity);
-Assert.Equal(200, config.CheckIntervalMs);
+// Enabled 是 bool? 类型，null 表示继承全局设置
+Assert.Null(config.Enabled);
+Assert.Null(config.MinOpacity);    // null 表示继承全局
+Assert.Null(config.CheckIntervalMs); // null 表示继承全局
 }
 
 [Fact]
@@ -655,33 +656,259 @@ Assert.False(tool.RunAsAdmin);
 }
 
 [Fact]
-public void CursorDetectionConfig_DefaultEnabled_IsFalse()
+public void CursorDetectionConfig_DefaultEnabled_IsNull()
 {
 // Act
 var config = new CursorDetectionConfig();
 
 // Assert
-Assert.False(config.Enabled);
+// Enabled 是 bool? 类型，null 表示继承全局设置
+Assert.Null(config.Enabled);
 }
 
 [Fact]
-public void CursorDetectionConfig_DefaultMinOpacity_IsZeroPointThree()
+public void CursorDetectionConfig_DefaultMinOpacity_IsNull()
 {
 // Act
 var config = new CursorDetectionConfig();
 
 // Assert
-Assert.Equal(0.3, config.MinOpacity);
+// MinOpacity 是 double? 类型，null 表示继承全局设置
+Assert.Null(config.MinOpacity);
 }
 
 [Fact]
-public void CursorDetectionConfig_DefaultCheckIntervalMs_IsTwoHundred()
+public void CursorDetectionConfig_DefaultCheckIntervalMs_IsNull()
 {
 // Act
 var config = new CursorDetectionConfig();
 
 // Assert
-Assert.Equal(200, config.CheckIntervalMs);
+// CheckIntervalMs 是 int? 类型，null 表示继承全局设置
+Assert.Null(config.CheckIntervalMs);
+}
+
+#endregion
+
+#region CursorDetection Whitelist Tests - 6.3.1
+
+[Fact]
+public void CursorDetectionConfig_ProcessWhitelist_WithDefaults_IsNull()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig();
+
+// Assert
+Assert.Null(config.ProcessWhitelist);  // 继承全局
+}
+
+[Fact]
+public void CursorDetectionConfig_ProcessWhitelist_WithCustomValues_StoresCorrectly()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+ProcessWhitelist = new List<string> { "game1", "game2", "game3" }
+};
+
+// Assert
+Assert.NotNull(config.ProcessWhitelist);
+Assert.Equal(3, config.ProcessWhitelist.Count);
+Assert.Contains("game1", config.ProcessWhitelist);
+Assert.Contains("game2", config.ProcessWhitelist);
+Assert.Contains("game3", config.ProcessWhitelist);
+}
+
+[Fact]
+public void CursorDetectionConfig_ProcessWhitelist_WithEmptyList_AllowsEmpty()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+ProcessWhitelist = new List<string>()
+};
+
+// Assert
+Assert.NotNull(config.ProcessWhitelist);
+Assert.Empty(config.ProcessWhitelist);
+}
+
+[Fact]
+public void CursorDetectionConfig_Enabled_WithNull_InheritsGlobal()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+Enabled = null,  // 继承全局
+MinOpacity = 0.5
+};
+
+// Assert
+Assert.Null(config.Enabled);
+Assert.Equal(0.5, config.MinOpacity);
+}
+
+[Fact]
+public void CursorDetectionConfig_Enabled_WithTrue_OverridesGlobal()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+Enabled = true  // 覆盖全局设置
+};
+
+// Assert
+Assert.True(config.Enabled);
+}
+
+[Fact]
+public void CursorDetectionConfig_MinOpacity_WithNull_InheritsGlobal()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+MinOpacity = null  // 继承全局
+};
+
+// Assert
+Assert.Null(config.MinOpacity);
+}
+
+[Fact]
+public void CursorDetectionConfig_MinOpacity_WithValue_OverridesGlobal()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+MinOpacity = 0.7  // 覆盖全局设置
+};
+
+// Assert
+Assert.Equal(0.7, config.MinOpacity);
+}
+
+[Fact]
+public void CursorDetectionConfig_CheckIntervalMs_WithNull_InheritsGlobal()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+CheckIntervalMs = null  // 继承全局
+};
+
+// Assert
+Assert.Null(config.CheckIntervalMs);
+}
+
+[Fact]
+public void CursorDetectionConfig_CheckIntervalMs_WithValue_OverridesGlobal()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+CheckIntervalMs = 300  // 覆盖全局设置
+};
+
+// Assert
+Assert.Equal(300, config.CheckIntervalMs);
+}
+
+[Fact]
+public void CursorDetectionConfig_EnableDebugLog_WithFalse_IsDefault()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig();
+
+// Assert
+Assert.False(config.EnableDebugLog);
+}
+
+[Fact]
+public void CursorDetectionConfig_EnableDebugLog_WithTrue_WorksCorrectly()
+{
+// Arrange & Act
+var config = new CursorDetectionConfig
+{
+EnableDebugLog = true
+};
+
+// Assert
+Assert.True(config.EnableDebugLog);
+}
+
+[Fact]
+public void GameProfile_Serialize_WithWhitelist_ProducesCorrectJson()
+{
+// Arrange
+var profile = new GameProfile
+{
+Id = "test",
+Name = "Test",
+CursorDetection = new CursorDetectionConfig
+{
+Enabled = true,
+ProcessWhitelist = new List<string> { "eldenring" },
+MinOpacity = 0.4
+}
+};
+
+// Act
+var json = JsonSerializer.Serialize(profile, JsonHelper.WriteOptions);
+
+// Assert
+Assert.Contains("processWhitelist", json);  // JSON 使用 camelCase
+Assert.Contains("eldenring", json);
+}
+
+[Fact]
+public void GameProfile_Deserialize_WithWhitelist_ProducesCorrectConfig()
+{
+// Arrange
+var json = @"{
+""id"": ""whitelist_test"",
+""name"": ""Whitelist Test"",
+""cursorDetection"": {
+    ""enabled"": true,
+    ""processWhitelist"": [""game1"", ""game2""],
+    ""minOpacity"": 0.6,
+    ""checkIntervalMs"": 250,
+    ""enableDebugLog"": true
+}
+}";
+
+// Act
+var profile = JsonSerializer.Deserialize<GameProfile>(json, JsonHelper.ReadOptions);
+
+// Assert
+Assert.NotNull(profile);
+Assert.NotNull(profile.CursorDetection);
+Assert.True(profile.CursorDetection.Enabled);
+Assert.NotNull(profile.CursorDetection.ProcessWhitelist);
+Assert.Equal(2, profile.CursorDetection.ProcessWhitelist.Count);
+Assert.Contains("game1", profile.CursorDetection.ProcessWhitelist);
+Assert.Contains("game2", profile.CursorDetection.ProcessWhitelist);
+Assert.Equal(0.6, profile.CursorDetection.MinOpacity);
+Assert.Equal(250, profile.CursorDetection.CheckIntervalMs);
+Assert.True(profile.CursorDetection.EnableDebugLog);
+}
+
+[Fact]
+public void CursorDetectionConfig_NullValues_SerializeCorrectly()
+{
+// Arrange
+var config = new CursorDetectionConfig
+{
+Enabled = null,
+ProcessWhitelist = null,
+MinOpacity = null,
+CheckIntervalMs = null
+};
+
+// Act
+var json = JsonSerializer.Serialize(config, JsonHelper.WriteOptions);
+
+// Assert - null 值应被序列化为 null
+Assert.NotNull(json);
 }
 
 #endregion

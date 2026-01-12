@@ -25,12 +25,9 @@ public partial class SettingsWindow : AnimatedWindow
     private readonly HotkeySettingsPage _hotkeysPage;
     private readonly AdvancedSettingsPage _advancedPage;
 
-    public SettingsWindow(SettingsViewModel viewModel,
-                          INotificationService notificationService,
-                          GeneralSettingsPage generalPage,
-                          WindowSettingsPage windowPage,
-                          HotkeySettingsPage hotkeysPage,
-                          AdvancedSettingsPage advancedPage)
+    public SettingsWindow(SettingsViewModel viewModel, INotificationService notificationService,
+                          GeneralSettingsPage generalPage, WindowSettingsPage windowPage,
+                          HotkeySettingsPage hotkeysPage, AdvancedSettingsPage advancedPage)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
@@ -72,23 +69,24 @@ public partial class SettingsWindow : AnimatedWindow
     {
         // 在 UI 线程上执行
         Dispatcher.InvokeAsync(() =>
-        {
-            if (_viewModel.SearchResults.Count > 0 && SearchBox.IsFocused)
-            {
-                SearchResultsPopup.IsOpen = true;
-                NoResultsPopup.IsOpen = false;
-            }
-            else if (_viewModel.SearchResults.Count == 0 && !string.IsNullOrWhiteSpace(_viewModel.SearchQuery))
-            {
-                SearchResultsPopup.IsOpen = false;
-                NoResultsPopup.IsOpen = true;
-            }
-            else
-            {
-                SearchResultsPopup.IsOpen = false;
-                NoResultsPopup.IsOpen = false;
-            }
-        });
+                               {
+                                   if (_viewModel.SearchResults.Count > 0 && SearchBox.IsFocused)
+                                   {
+                                       SearchResultsPopup.IsOpen = true;
+                                       NoResultsPopup.IsOpen = false;
+                                   }
+                                   else if (_viewModel.SearchResults.Count == 0 &&
+                                            !string.IsNullOrWhiteSpace(_viewModel.SearchQuery))
+                                   {
+                                       SearchResultsPopup.IsOpen = false;
+                                       NoResultsPopup.IsOpen = true;
+                                   }
+                                   else
+                                   {
+                                       SearchResultsPopup.IsOpen = false;
+                                       NoResultsPopup.IsOpen = false;
+                                   }
+                               });
     }
 
     /// <summary>
@@ -114,6 +112,13 @@ public partial class SettingsWindow : AnimatedWindow
     /// </summary>
     private void LoadPages()
     {
+        // 设置各 Page 的 DataContext 为 SettingsViewModel 中对应的 PageViewModel
+        // 确保 Page 和 SettingsViewModel 使用同一个 PageViewModel 实例
+        _generalPage.DataContext = _viewModel.GeneralPage;
+        _windowPage.DataContext = _viewModel.WindowPage;
+        _hotkeysPage.DataContext = _viewModel.HotkeysPage;
+        _advancedPage.DataContext = _viewModel.AdvancedPage;
+
         ContentArea.Children.Add(_generalPage);
         ContentArea.Children.Add(_windowPage);
         ContentArea.Children.Add(_hotkeysPage);

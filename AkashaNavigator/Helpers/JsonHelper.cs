@@ -27,7 +27,9 @@ namespace AkashaNavigator.Helpers
         public static JsonSerializerOptions WriteOptions { get; } = new JsonSerializerOptions
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            // 包含默认值，确保 false/0 等默认值也能正确序列化
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never
         };
 
         /// <summary>
@@ -119,6 +121,11 @@ namespace AkashaNavigator.Helpers
 
                 // 序列化并写入文件
                 var json = Serialize(obj);
+
+                // 调试日志
+                System.Diagnostics.Debug.WriteLine($"[JsonHelper] Saving to: {filePath}");
+                System.Diagnostics.Debug.WriteLine($"[JsonHelper] JSON preview (first 500 chars): {json.Substring(0, Math.Min(500, json.Length))}");
+
                 File.WriteAllText(filePath, json);
                 return Result.Success();
             }

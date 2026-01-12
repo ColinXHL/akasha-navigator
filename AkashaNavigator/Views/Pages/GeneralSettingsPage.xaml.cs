@@ -8,10 +8,13 @@ namespace AkashaNavigator.Views.Pages
 /// </summary>
 public partial class GeneralSettingsPage : UserControl
 {
-    public GeneralSettingsPage(GeneralSettingsPageViewModel viewModel)
+    /// <summary>
+    /// 无参构造函数，DataContext 由父容器设置
+    /// </summary>
+    public GeneralSettingsPage()
     {
         InitializeComponent();
-        DataContext = viewModel ?? throw new System.ArgumentNullException(nameof(viewModel));
+        // DataContext 将由 SettingsWindow 设置为 SettingsViewModel.GeneralPage
     }
 }
 }

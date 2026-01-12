@@ -1,37 +1,156 @@
 <UserControl x:Class="AkashaNavigator.Views.Pages.WindowSettingsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              Background="Transparent"
              Cursor="Arrow">
 
     <StackPanel>
-        <!-- 标题 -->
-        <TextBlock Text="窗口设置" FontSize="18" FontWeight="SemiBold"
-                   Foreground="White" Margin="0,0,0,16"/>
+            <!-- 标题 -->
+            <TextBlock Text="窗口设置" FontSize="18" FontWeight="SemiBold"
+                       Foreground="White" Margin="0,0,0,16"/>
 
-        <!-- 窗口行为 -->
-        <TextBlock Text="窗口行为" Style="{StaticResource SettingsGroupHeaderStyle}"/>
-        <CheckBox x:Name="EdgeSnapCheckBox" Content="启用边缘吸附"
-                  Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
-                  IsChecked="{Binding EnableEdgeSnap}"/>
-        <Grid Margin="0,0,0,12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="100"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="45"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="吸附阈值" Style="{StaticResource SettingsLabelStyle}"/>
-            <Slider x:Name="SnapThresholdSlider" Grid.Column="1"
-                    Style="{StaticResource DarkSliderStyle}"
-                    Minimum="5" Maximum="30" TickFrequency="5" IsSnapToTickEnabled="True"
-                    Value="{Binding SnapThreshold}"/>
-            <TextBlock Grid.Column="2" Text="{Binding SnapThreshold, StringFormat={}{0}px}"
-                       Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
-        </Grid>
-        <CheckBox x:Name="PromptRecordOnExitCheckBox" Content="退出时提示记录"
-                  Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
-                  IsChecked="{Binding PromptRecordOnExit}"/>
-        <TextBlock Text="关闭窗口时提示记录当前游戏进度笔记"
-                   Foreground="#666" FontSize="11" Margin="0,0,0,0"/>
-    </StackPanel>
+            <!-- 窗口行为 -->
+            <TextBlock Text="窗口行为" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <CheckBox x:Name="EdgeSnapCheckBox" Content="启用边缘吸附"
+                      Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
+                      IsChecked="{Binding EnableEdgeSnap, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="45"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="吸附阈值" Style="{StaticResource SettingsLabelStyle}"/>
+                <Slider x:Name="SnapThresholdSlider" Grid.Column="1"
+                        Style="{StaticResource DarkSliderStyle}"
+                        Minimum="5" Maximum="30" TickFrequency="5" IsSnapToTickEnabled="True"
+                        Value="{Binding SnapThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Grid.Column="2" Text="{Binding SnapThreshold, StringFormat={}{0}px}"
+                           Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
+            </Grid>
+            <CheckBox x:Name="PromptRecordOnExitCheckBox" Content="退出时提示记录"
+                      Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
+                      IsChecked="{Binding PromptRecordOnExit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="关闭窗口时提示记录当前游戏进度笔记"
+                       Foreground="#666" FontSize="11" Margin="0,0,0,24"/>
+
+            <!-- 鼠标检测透明度自动调整 -->
+            <TextBlock Text="鼠标检测透明度自动调整" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <TextBlock Text="当游戏 UI 打开（如地图）时自动降低播放器透明度，使用 ClipCursor API 检测"
+                       Foreground="#666" FontSize="11" Margin="0,0,0,12"/>
+
+            <CheckBox x:Name="CursorDetectionEnabledCheckBox" Content="启用全局鼠标检测"
+                      Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
+                      IsChecked="{Binding CursorDetectionEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <!-- 最低透明度滑块 -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="45"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="最低透明度" Style="{StaticResource SettingsLabelStyle}"/>
+                <Slider x:Name="CursorDetectionMinOpacitySlider" Grid.Column="1"
+                        Style="{StaticResource DarkSliderStyle}"
+                        Minimum="0.1" Maximum="0.8" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                        Value="{Binding CursorDetectionMinOpacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Grid.Column="2" Text="{Binding CursorDetectionMinOpacity, StringFormat={}{0:F1}}"
+                           Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
+            </Grid>
+
+            <!-- 检测间隔滑块 -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="55"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="检测间隔" Style="{StaticResource SettingsLabelStyle}"/>
+                <Slider x:Name="CursorDetectionCheckIntervalMsSlider" Grid.Column="1"
+                        Style="{StaticResource DarkSliderStyle}"
+                        Minimum="50" Maximum="500" TickFrequency="50" IsSnapToTickEnabled="True"
+                        Value="{Binding CursorDetectionCheckIntervalMs, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Grid.Column="2" Text="{Binding CursorDetectionCheckIntervalMs, StringFormat={}{0}ms}"
+                           Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
+            </Grid>
+
+            <CheckBox x:Name="CursorDetectionEnableDebugLogCheckBox" Content="启用调试日志"
+                      Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
+                      IsChecked="{Binding CursorDetectionEnableDebugLog, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <!-- 进程白名单 -->
+            <TextBlock Text="进程白名单" Style="{StaticResource SettingsLabelStyle}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <TextBlock Text="选择需要启用鼠标检测的游戏进程"
+                       Foreground="#666" FontSize="11" Margin="0,0,0,8"/>
+
+            <!-- 进程选择下拉框 -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox Grid.Column="0"
+                          Style="{StaticResource DarkComboBoxStyle}"
+                          ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                          ItemsSource="{Binding RunningProcesses}"
+                          SelectedItem="{Binding SelectedProcess}"
+                          DisplayMemberPath="DisplayName"/>
+                <Button Grid.Column="1" Content="🔄" Style="{StaticResource ActionButtonStyle}"
+                        Command="{Binding RefreshProcessListCommand}"
+                        ToolTip="刷新进程列表"
+                        Margin="4,0,0,0" Padding="8,6" FontSize="12"/>
+            </Grid>
+
+            <!-- 已添加的白名单（Tag 样式） -->
+            <ItemsControl ItemsSource="{Binding ProcessWhitelist}" Margin="0,0,0,8">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="sys:String">
+                        <Border Background="#333" CornerRadius="4" Padding="8,4" Margin="0,0,6,6">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding}" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
+                                <Button Content="✕" 
+                                        Command="{Binding DataContext.RemoveProcessCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        Background="Transparent" Foreground="#888" BorderThickness="0"
+                                        Padding="4,0,0,0" FontSize="10" Cursor="Hand"
+                                        VerticalAlignment="Center">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <TextBlock Text="{TemplateBinding Content}" 
+                                                                   Foreground="{TemplateBinding Foreground}"
+                                                                   FontSize="{TemplateBinding FontSize}"
+                                                                   Padding="{TemplateBinding Padding}"
+                                                                   VerticalAlignment="Center"/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Foreground" Value="#FF6B6B"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 空白名单提示 -->
+            <TextBlock Text="尚未添加任何进程，请从下拉列表中选择"
+                       Foreground="#666" FontSize="11" Margin="0,0,0,0"
+                       Visibility="{Binding ProcessWhitelist.Count, Converter={StaticResource ZeroToVisibleConverter}}"/>
+        </StackPanel>
 </UserControl>

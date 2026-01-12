@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Windows.Threading;
-using AkashaNavigator.Helpers;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Helpers;
 
 namespace AkashaNavigator.Services
 {
@@ -51,11 +52,13 @@ namespace AkashaNavigator.Services
 
         private DispatcherTimer? _timer;
         private string? _targetProcessName;
+        private HashSet<string>? _processWhitelist;
         private bool _lastCursorVisible = true;
         private bool _isRunning;
+        private readonly Core.Interfaces.ILogService? _logService;
+        private bool _enableDebugLog;
 
         #endregion
-
 
         #region Properties
 
@@ -74,6 +77,15 @@ namespace AkashaNavigator.Services
         /// </summary>
         public string? TargetProcessName => _targetProcessName;
 
+        /// <summary>
+        /// 是否启用调试日志
+        /// </summary>
+        public bool EnableDebugLog
+        {
+            get => _enableDebugLog;
+            set => _enableDebugLog = value;
+        }
+
         #endregion
 
         #region Constructor
@@ -81,8 +93,10 @@ namespace AkashaNavigator.Services
         /// <summary>
         /// DI容器使用的构造函数
         /// </summary>
-        public CursorDetectionService()
+        /// <param name="logService">日志服务（可选）</param>
+        public CursorDetectionService(Core.Interfaces.ILogService? logService = null)
         {
+            _logService = logService;
         }
 
         #endregion
@@ -94,7 +108,8 @@ namespace AkashaNavigator.Services
         /// </summary>
         /// <param name="targetProcessName">目标进程名（不含扩展名），仅当此进程在前台时检测</param>
         /// <param name="intervalMs">检测间隔（毫秒），默认 200ms</param>
-        public void Start(string? targetProcessName = null, int intervalMs = 200)
+        /// <param name="enableDebugLog">是否启用调试日志</param>
+        public void Start(string? targetProcessName = null, int intervalMs = 200, bool enableDebugLog = false)
         {
             if (_isRunning)
             {
@@ -102,6 +117,8 @@ namespace AkashaNavigator.Services
             }
 
             _targetProcessName = targetProcessName;
+            _processWhitelist = null;
+            _enableDebugLog = enableDebugLog;
             _lastCursorVisible = true; // 重置状态
 
             _timer = new DispatcherTimer
@@ -111,6 +128,39 @@ namespace AkashaNavigator.Services
             _timer.Tick += Timer_Tick;
             _timer.Start();
             _isRunning = true;
+
+            LogDebug(nameof(CursorDetectionService), "CursorDetectionService started: TargetProcess={TargetProcess}, Interval={Interval}ms, DebugLog={DebugLog}",
+                targetProcessName ?? "null", intervalMs, enableDebugLog);
+        }
+
+        /// <summary>
+        /// 启动鼠标检测（使用白名单）
+        /// </summary>
+        /// <param name="whitelist">进程白名单，仅当这些进程在前台时检测</param>
+        /// <param name="intervalMs">检测间隔（毫秒），默认 200ms</param>
+        /// <param name="enableDebugLog">是否启用调试日志</param>
+        public void StartWithWhitelist(HashSet<string> whitelist, int intervalMs = 200, bool enableDebugLog = false)
+        {
+            if (_isRunning)
+            {
+                Stop();
+            }
+
+            _targetProcessName = null;
+            _processWhitelist = whitelist;
+            _enableDebugLog = enableDebugLog;
+            _lastCursorVisible = true; // 重置状态
+
+            _timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(Math.Max(50, intervalMs))
+            };
+            _timer.Tick += Timer_Tick;
+            _timer.Start();
+            _isRunning = true;
+
+            LogDebug(nameof(CursorDetectionService), "CursorDetectionService started with whitelist: Count={Count}, Interval={Interval}ms, DebugLog={DebugLog}",
+                whitelist.Count, intervalMs, enableDebugLog);
         }
 
         /// <summary>
@@ -126,6 +176,9 @@ namespace AkashaNavigator.Services
             }
             _isRunning = false;
             _targetProcessName = null;
+            _processWhitelist = null;
+
+            LogDebug(nameof(CursorDetectionService), "CursorDetectionService stopped");
         }
 
         /// <summary>
@@ -135,6 +188,7 @@ namespace AkashaNavigator.Services
         public void SetTargetProcess(string? processName)
         {
             _targetProcessName = processName;
+            LogDebug(nameof(CursorDetectionService), "TargetProcess updated to {ProcessName}", processName ?? "null");
         }
 
         /// <summary>
@@ -146,11 +200,11 @@ namespace AkashaNavigator.Services
             if (_timer != null)
             {
                 _timer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, intervalMs));
+                LogDebug(nameof(CursorDetectionService), "CheckInterval updated to {Interval}ms", intervalMs);
             }
         }
 
         #endregion
-
 
         #region Private Methods
 
@@ -159,26 +213,28 @@ namespace AkashaNavigator.Services
         /// </summary>
         private void Timer_Tick(object? sender, EventArgs e)
         {
-            // 如果指定了目标进程，检查是否在前台
-            if (!string.IsNullOrEmpty(_targetProcessName))
+            // 检查前台进程是否匹配
+            bool shouldDetect = CheckForegroundProcess();
+            if (!shouldDetect)
             {
-                var foregroundProcess = Win32Helper.GetForegroundWindowProcessName();
-
-                // 如果获取失败或目标进程不在前台，不检测
-                if (foregroundProcess == null ||
-                    !string.Equals(foregroundProcess, _targetProcessName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                return;
             }
 
-            // 检测鼠标是否可见
-            bool cursorVisible = Win32Helper.IsCursorVisible();
+            // 使用 ClipCursor 检测光标状态
+            // 光标被限制 = 游戏模式（鼠标隐藏）
+            // 光标自由 = UI 模式（鼠标可见）
+            bool isClipped = Win32Helper.IsCursorClippedToCenter();
+            bool cursorVisible = !isClipped;
+
+            LogDebug(nameof(CursorDetectionService), "Cursor detection: IsClipped={IsClipped}, CursorVisible={CursorVisible}",
+                isClipped, cursorVisible);
 
             // 状态变化时触发事件
             if (cursorVisible != _lastCursorVisible)
             {
                 _lastCursorVisible = cursorVisible;
+
+                LogDebug(nameof(CursorDetectionService), "Cursor state changed: {State}", cursorVisible ? "VISIBLE" : "HIDDEN");
 
                 if (cursorVisible)
                 {
@@ -188,6 +244,49 @@ namespace AkashaNavigator.Services
                 {
                     CursorHidden?.Invoke(this, EventArgs.Empty);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 检查前台进程是否匹配目标进程或白名单
+        /// </summary>
+        private bool CheckForegroundProcess()
+        {
+            // 如果没有指定任何进程限制，始终检测
+            if (string.IsNullOrEmpty(_targetProcessName) && _processWhitelist == null)
+            {
+                return true;
+            }
+
+            var foregroundProcess = Win32Helper.GetForegroundWindowProcessName();
+            if (string.IsNullOrEmpty(foregroundProcess))
+            {
+                return false;
+            }
+
+            // 检查单个目标进程
+            if (!string.IsNullOrEmpty(_targetProcessName))
+            {
+                return string.Equals(foregroundProcess, _targetProcessName, StringComparison.OrdinalIgnoreCase);
+            }
+
+            // 检查白名单
+            if (_processWhitelist != null && _processWhitelist.Count > 0)
+            {
+                return _processWhitelist.Contains(foregroundProcess);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 输出调试日志（仅在启用时）
+        /// </summary>
+        private void LogDebug(string source, string message, params object[] args)
+        {
+            if (_enableDebugLog && _logService != null)
+            {
+                _logService.Debug(source, message, args);
             }
         }
 

@@ -85,6 +85,11 @@ public partial class PlayerWindow : Window
     private bool _isOpacityReducedByCursorDetection;
 
     /// <summary>
+    /// 鼠标检测白名单（进程名集合）
+    /// </summary>
+    private HashSet<string>? _cursorDetectionWhitelist;
+
+    /// <summary>
     /// 视频时间同步定时器
     /// </summary>
     private DispatcherTimer? _videoTimeSyncTimer;
@@ -995,44 +1000,82 @@ public partial class PlayerWindow : Window
 #region Cursor Detection
 
     /// <summary>
+    /// 解析鼠标检测配置（合并全局 + Profile）
+    /// 只检查配置是否启用，不检查前台进程（由检测服务内部持续检查）
+    /// </summary>
+    /// <returns>元组：是否启用、最低透明度、检测间隔、调试日志、白名单</returns>
+    private (bool enabled, double minOpacity, int intervalMs, bool debugLog, HashSet<string> whitelist) ResolveCursorDetectionConfig()
+    {
+        var profile = _profileManager.CurrentProfile;
+        var globalConfig = _configService.Config.CursorDetection;
+        var profileConfig = profile?.CursorDetection;
+
+        // 合并白名单（Profile + 全局）
+        var whitelist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (globalConfig?.ProcessWhitelist != null)
+        {
+            foreach (var p in globalConfig.ProcessWhitelist)
+                whitelist.Add(p);
+        }
+        if (profileConfig?.ProcessWhitelist != null)
+        {
+            foreach (var p in profileConfig.ProcessWhitelist)
+                whitelist.Add(p);
+        }
+
+        // 确定是否启用（只要全局或 Profile 任一启用且白名单非空）
+        bool enabled = false;
+        if (whitelist.Count > 0)
+        {
+            // 有白名单，检查是否启用
+            if (profileConfig?.ProcessWhitelist != null && profileConfig.ProcessWhitelist.Count > 0)
+            {
+                // Profile 有白名单，使用 Profile 的 Enabled
+                enabled = profileConfig?.Enabled ?? globalConfig?.Enabled ?? false;
+            }
+            else
+            {
+                // 仅全局白名单，使用全局的 Enabled
+                enabled = globalConfig?.Enabled ?? false;
+            }
+        }
+
+        // 合并其他配置（Profile 优先，全局兜底）
+        double minOpacity = profileConfig?.MinOpacity ?? globalConfig?.MinOpacity ?? 0.3;
+        int intervalMs = profileConfig?.CheckIntervalMs ?? globalConfig?.CheckIntervalMs ?? 200;
+        bool debugLog = profileConfig?.EnableDebugLog ?? globalConfig?.EnableDebugLog ?? false;
+
+        return (enabled, minOpacity, intervalMs, debugLog, whitelist);
+    }
+
+    /// <summary>
     /// 初始化鼠标检测
     /// </summary>
     private void InitializeCursorDetection()
     {
-        var profile = _profileManager.CurrentProfile;
-        var config = profile.CursorDetection;
+        var (enabled, minOpacity, intervalMs, debugLog, whitelist) = ResolveCursorDetectionConfig();
 
-        if (config?.Enabled == true)
+        if (enabled && whitelist.Count > 0)
         {
-            StartCursorDetection(profile);
+            StartCursorDetection(minOpacity, intervalMs, debugLog, whitelist);
         }
     }
 
     /// <summary>
     /// 启动鼠标检测
     /// </summary>
-    private void StartCursorDetection(GameProfile profile)
+    private void StartCursorDetection(double minOpacity, int intervalMs, bool debugLog, HashSet<string> whitelist)
     {
-        var config = profile.CursorDetection;
-        if (config == null || !config.Enabled)
-            return;
-
         // 保存配置
-        _cursorDetectionMinOpacity = config.MinOpacity;
-
-        // 获取目标进程名（从 Activation.Processes 获取第一个）
-        string? targetProcess = null;
-        if (profile.Activation?.Processes?.Count > 0)
-        {
-            targetProcess = profile.Activation.Processes[0];
-        }
+        _cursorDetectionMinOpacity = minOpacity;
+        _cursorDetectionWhitelist = whitelist;
 
         // 订阅事件
         _cursorDetectionService.CursorShown += OnCursorShown;
         _cursorDetectionService.CursorHidden += OnCursorHidden;
 
-        // 启动检测
-        _cursorDetectionService.Start(targetProcess, config.CheckIntervalMs);
+        // 启动检测（传入白名单，由检测服务内部判断前台进程）
+        _cursorDetectionService.StartWithWhitelist(whitelist, intervalMs, debugLog);
     }
 
     /// <summary>
@@ -1061,10 +1104,11 @@ public partial class PlayerWindow : Window
         // 停止当前鼠标检测
         StopCursorDetection();
 
-        // 如果新 Profile 启用了鼠标检测，启动它
-        if (profile.CursorDetection?.Enabled == true)
+        // 重新解析配置并启动（如果启用）
+        var (enabled, minOpacity, intervalMs, debugLog, whitelist) = ResolveCursorDetectionConfig();
+        if (enabled && whitelist.Count > 0)
         {
-            StartCursorDetection(profile);
+            StartCursorDetection(minOpacity, intervalMs, debugLog, whitelist);
         }
     }
 

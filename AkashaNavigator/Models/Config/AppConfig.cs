@@ -137,6 +137,15 @@ public class AppConfig
 
 #endregion
 
+#region Cursor Detection
+
+    /// <summary>
+    /// 全局鼠标检测透明度自动调整配置
+    /// </summary>
+    public GlobalCursorDetectionConfig? CursorDetection { get; set; }
+
+#endregion
+
 #region Conversion Methods
 
     /// <summary>

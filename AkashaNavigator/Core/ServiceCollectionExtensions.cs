@@ -201,16 +201,16 @@ public static class ServiceCollectionExtensions
         // Pages（Settings）
         // ============================================================
 
-        // GeneralSettingsPage（依赖 GeneralSettingsPageViewModel）
+        // GeneralSettingsPage（DataContext 由 SettingsWindow 设置）
         services.AddTransient<GeneralSettingsPage>();
 
-        // WindowSettingsPage（依赖 WindowSettingsPageViewModel）
+        // WindowSettingsPage（DataContext 由 SettingsWindow 设置）
         services.AddTransient<WindowSettingsPage>();
 
-        // HotkeySettingsPage（依赖 HotkeySettingsPageViewModel）
+        // HotkeySettingsPage（DataContext 由 SettingsWindow 设置）
         services.AddTransient<HotkeySettingsPage>();
 
-        // AdvancedSettingsPage（依赖 AdvancedSettingsPageViewModel）
+        // AdvancedSettingsPage（DataContext 由 SettingsWindow 设置）
         services.AddTransient<AdvancedSettingsPage>();
 
         // ============================================================
@@ -219,6 +219,9 @@ public static class ServiceCollectionExtensions
 
         // PlayerWindow（依赖所有服务 + IDialogFactory + PioneerNoteWindow 工厂）
         services.AddSingleton<PlayerWindow>();
+
+        // ControlBarWindow（依赖 ControlBarViewModel + PlayerWindow）
+        services.AddSingleton<ControlBarWindow>();
 
         // PioneerNoteWindow 工厂方法（用于 PlayerWindow 延迟创建）
         services.AddSingleton<Func<PioneerNoteWindow>>(sp => () => sp.GetRequiredService<PioneerNoteWindow>());

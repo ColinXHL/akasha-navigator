@@ -81,6 +81,10 @@ public static class Win32Helper
 
     [DllImport("user32.dll")]
     [return:MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClipCursor(out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    [return:MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
     [DllImport("user32.dll")]
@@ -614,6 +618,37 @@ public static class Win32Helper
 
         // 如果获取失败，默认返回 true（假设可见）
         return true;
+    }
+
+    /// <summary>
+    /// 检测光标是否被限制在中心区域（游戏模式）
+    /// </summary>
+    /// <remarks>
+    /// 游戏在隐藏鼠标时通常会使用 ClipCursor 将光标限制在窗口中心的小区域。
+    /// 当打开游戏 UI（如地图、菜单）时，会取消裁剪，光标可以自由移动。
+    /// </remarks>
+    /// <returns>true = 游戏模式（光标被限制），false = UI 模式（光标自由）</returns>
+    public static bool IsCursorClippedToCenter()
+    {
+        if (!GetClipCursor(out RECT clip))
+            return false;  // API 调用失败，假设 UI 模式
+
+        int clipWidth = clip.Right - clip.Left;
+        int clipHeight = clip.Bottom - clip.Top;
+
+        // 获取主显示器尺寸
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+        if (screenWidth <= 0 || screenHeight <= 0)
+            return false;
+
+        // 如果裁剪区域小于屏幕尺寸的 95%，说明游戏限制了光标（游戏模式）
+        bool isClipped =
+            clipWidth < screenWidth * 0.95 ||
+            clipHeight < screenHeight * 0.95;
+
+        return isClipped;
     }
 
 #endregion
