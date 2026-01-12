@@ -107,6 +107,17 @@ public partial class WindowSettingsPageViewModel : ObservableObject
     [ObservableProperty]
     private RunningProcess? _selectedProcess;
 
+    /// <summary>
+    /// 手动输入的进程名
+    /// </summary>
+    [ObservableProperty]
+    private string _newProcessName = string.Empty;
+
+    /// <summary>
+    /// Popup 关闭请求事件（用于 View 关闭 Popup）
+    /// </summary>
+    public event EventHandler? ClosePopupRequested;
+
 #endregion
 
     public WindowSettingsPageViewModel()
@@ -231,6 +242,43 @@ public partial class WindowSettingsPageViewModel : ObservableObject
     }
 
 #region 白名单操作命令
+
+    /// <summary>
+    /// 手动添加进程到白名单
+    /// </summary>
+    [RelayCommand]
+    private void AddProcess()
+    {
+        var processName = NewProcessName?.Trim();
+        if (string.IsNullOrEmpty(processName))
+            return;
+
+        // 检查是否已存在（不区分大小写）
+        if (ProcessWhitelist.Any(p => p.Equals(processName, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        ProcessWhitelist.Add(processName);
+        NewProcessName = string.Empty;
+    }
+
+    /// <summary>
+    /// 从 Popup 选择进程添加到白名单
+    /// </summary>
+    [RelayCommand]
+    private void SelectProcessFromPopup(RunningProcess? process)
+    {
+        if (process == null)
+            return;
+
+        // 添加到白名单（如果不存在）
+        if (!ProcessWhitelist.Any(p => p.Equals(process.ProcessName, StringComparison.OrdinalIgnoreCase)))
+        {
+            ProcessWhitelist.Add(process.ProcessName);
+        }
+
+        // 关闭 Popup
+        ClosePopupRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>
     /// 刷新运行中的窗口进程列表

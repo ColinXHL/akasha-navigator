@@ -167,6 +167,55 @@ public class WindowSettingsPageViewModelTests
     }
 
     [Fact]
+    public void AddProcess_WithValidName_AddsToWhitelist()
+    {
+        // Arrange
+        var viewModel = new WindowSettingsPageViewModel();
+        viewModel.NewProcessName = "testprocess";
+
+        // Act
+        viewModel.AddProcessCommand.Execute(null);
+
+        // Assert
+        Assert.Single(viewModel.ProcessWhitelist);
+        Assert.Contains("testprocess", viewModel.ProcessWhitelist);
+        Assert.Empty(viewModel.NewProcessName);
+    }
+
+    [Fact]
+    public void AddProcess_WithDuplicate_DoesNotAdd()
+    {
+        // Arrange
+        var viewModel = new WindowSettingsPageViewModel();
+        viewModel.ProcessWhitelist.Add("existing");
+        viewModel.NewProcessName = "existing";
+
+        // Act
+        viewModel.AddProcessCommand.Execute(null);
+
+        // Assert
+        Assert.Single(viewModel.ProcessWhitelist);
+    }
+
+    [Fact]
+    public void SelectProcessFromPopup_AddsToWhitelistAndClosesPopup()
+    {
+        // Arrange
+        var viewModel = new WindowSettingsPageViewModel();
+        var process = new RunningProcess { ProcessName = "gameprocess", WindowTitle = "Game" };
+        var popupClosed = false;
+        viewModel.ClosePopupRequested += (s, e) => popupClosed = true;
+
+        // Act
+        viewModel.SelectProcessFromPopupCommand.Execute(process);
+
+        // Assert
+        Assert.Single(viewModel.ProcessWhitelist);
+        Assert.Contains("gameprocess", viewModel.ProcessWhitelist);
+        Assert.True(popupClosed);
+    }
+
+    [Fact]
     public void RemoveProcess_WithValidName_RemovesFromWhitelist()
     {
         // Arrange

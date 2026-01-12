@@ -82,25 +82,76 @@
 
             <!-- 进程白名单 -->
             <TextBlock Text="进程白名单" Style="{StaticResource SettingsLabelStyle}" FontWeight="SemiBold" Margin="0,0,0,8"/>
-            <TextBlock Text="选择需要启用鼠标检测的游戏进程"
+            <TextBlock Text="添加需要启用鼠标检测的游戏进程"
                        Foreground="#666" FontSize="11" Margin="0,0,0,8"/>
 
-            <!-- 进程选择下拉框 -->
+            <!-- 添加进程：手动输入 + 选取窗口按钮 -->
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <ComboBox Grid.Column="0"
-                          Style="{StaticResource DarkComboBoxStyle}"
-                          ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
-                          ItemsSource="{Binding RunningProcesses}"
-                          SelectedItem="{Binding SelectedProcess}"
-                          DisplayMemberPath="DisplayName"/>
-                <Button Grid.Column="1" Content="🔄" Style="{StaticResource ActionButtonStyle}"
-                        Command="{Binding RefreshProcessListCommand}"
-                        ToolTip="刷新进程列表"
-                        Margin="4,0,0,0" Padding="8,6" FontSize="12"/>
+                <TextBox Grid.Column="0"
+                         Style="{StaticResource DarkTextBoxStyle}"
+                         Text="{Binding NewProcessName, UpdateSourceTrigger=PropertyChanged}"
+                         Tag="输入进程名（不含 .exe）"/>
+                <Button Grid.Column="1" Content="添加" Style="{StaticResource PrimaryActionButtonStyle}"
+                        Command="{Binding AddProcessCommand}"
+                        Margin="4,0,0,0" Padding="12,6"/>
+                <Button x:Name="SelectWindowButton" Grid.Column="2" Content="📋 选取窗口" 
+                        Style="{StaticResource ActionButtonStyle}"
+                        Click="SelectWindowButton_Click"
+                        Margin="4,0,0,0" Padding="10,6"/>
+                
+                <!-- 窗口选择 Popup -->
+                <Popup x:Name="ProcessSelectorPopup"
+                       PlacementTarget="{Binding ElementName=SelectWindowButton}"
+                       Placement="Bottom"
+                       StaysOpen="False"
+                       AllowsTransparency="True"
+                       PopupAnimation="Slide">
+                    <Border Background="#2A2A2A" BorderBrush="#444" BorderThickness="1"
+                            CornerRadius="4" Padding="4" MinWidth="280" MaxHeight="300">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- 标题和刷新按钮 -->
+                            <Grid Grid.Row="0" Margin="8,4,8,8">
+                                <TextBlock Text="运行中的窗口" Foreground="#AAA" FontSize="11"/>
+                                <Button Content="🔄" Style="{StaticResource ActionButtonStyle}"
+                                        Command="{Binding RefreshProcessListCommand}"
+                                        HorizontalAlignment="Right"
+                                        Padding="4,2" FontSize="10" ToolTip="刷新"/>
+                            </Grid>
+                            
+                            <!-- 进程列表 -->
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="250">
+                                <ItemsControl ItemsSource="{Binding RunningProcesses}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource SearchResultButtonStyle}"
+                                                    Command="{Binding DataContext.SelectProcessFromPopupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    HorizontalContentAlignment="Left"
+                                                    Padding="8,6">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding ProcessName}" Foreground="White" FontWeight="SemiBold"/>
+                                                    <TextBlock Text=" - " Foreground="#666"/>
+                                                    <TextBlock Text="{Binding WindowTitle}" Foreground="#888" 
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="180"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Popup>
             </Grid>
 
             <!-- 已添加的白名单（Tag 样式） -->
@@ -149,7 +200,7 @@
             </ItemsControl>
 
             <!-- 空白名单提示 -->
-            <TextBlock Text="尚未添加任何进程，请从下拉列表中选择"
+            <TextBlock Text="尚未添加任何进程"
                        Foreground="#666" FontSize="11" Margin="0,0,0,0"
                        Visibility="{Binding ProcessWhitelist.Count, Converter={StaticResource ZeroToVisibleConverter}}"/>
         </StackPanel>
