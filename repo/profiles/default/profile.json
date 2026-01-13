@@ -9,8 +9,6 @@
     "autoSwitch": false
   },
   "defaults": {
-    "url": "https://www.bilibili.com",
-    "opacity": 0.9,
-    "seekSeconds": 5
+    "url": "https://www.bilibili.com"
   }
 }

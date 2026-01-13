@@ -9,8 +9,10 @@
     "autoSwitch": true
   },
   "defaults": {
-    "url": "https://www.bilibili.com",
-    "opacity": 0.8,
-    "seekSeconds": 5
+    "url": "https://www.bilibili.com"
+  },
+  "cursorDetection": {
+    "enabled": true,
+    "processWhitelist": ["GenshinImpact", "YuanShen"]
   }
 }
