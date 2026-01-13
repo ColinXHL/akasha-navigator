@@ -429,45 +429,55 @@ public class PioneerNoteServiceTests : IDisposable
     }
 
     [Fact]
-    public void RecordNote_SameTitleDifferentUrl_CreatesNote()
+    public void RecordNote_SameTitleDifferentUrl_ThrowsException()
     {
         // Arrange
         var title = "测试视频";
         _noteService.RecordNote("https://example.com/video1", title);
 
-        // Act
-        var note2 = _noteService.RecordNote("https://example.com/video2", title);
-
-        // Assert
-        Assert.NotNull(note2);
+        // Act & Assert - 同级目录下相同标题应该抛出异常
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => _noteService.RecordNote("https://example.com/video2", title));
+        Assert.Contains("同级目录下已存在相同标题的笔记", ex.Message);
     }
 
     [Fact]
-    public void RecordNote_DifferentTitleSameUrl_CreatesNote()
+    public void RecordNote_DifferentTitleSameUrl_ThrowsException()
     {
         // Arrange
         var url = "https://example.com/video";
         _noteService.RecordNote(url, "标题1");
 
-        // Act
-        var note2 = _noteService.RecordNote(url, "标题2");
-
-        // Assert
-        Assert.NotNull(note2);
+        // Act & Assert - 相同 URL 应该抛出异常
+        var ex = Assert.Throws<InvalidOperationException>(() => _noteService.RecordNote(url, "标题2"));
+        Assert.Contains("已存在相同 URL 的笔记", ex.Message);
     }
 
     [Fact]
-    public void RecordNote_DuplicateInDifferentFolders_CreatesNote()
+    public void RecordNote_DuplicateUrlInDifferentFolders_ThrowsException()
     {
         // Arrange
         var folder1 = _noteService.CreateFolder("目录1");
         var folder2 = _noteService.CreateFolder("目录2");
         var url = "https://example.com/video";
-        var title = "测试视频";
-        _noteService.RecordNote(url, title, folder1.Id);
+        _noteService.RecordNote(url, "测试视频1", folder1.Id);
 
-        // Act
-        var note2 = _noteService.RecordNote(url, title, folder2.Id);
+        // Act & Assert - 不同目录下相同 URL 也应该抛出异常
+        var ex = Assert.Throws<InvalidOperationException>(() => _noteService.RecordNote(url, "测试视频2", folder2.Id));
+        Assert.Contains("已存在相同 URL 的笔记", ex.Message);
+    }
+
+    [Fact]
+    public void RecordNote_SameTitleInDifferentFolders_CreatesNote()
+    {
+        // Arrange
+        var folder1 = _noteService.CreateFolder("目录1");
+        var folder2 = _noteService.CreateFolder("目录2");
+        var title = "测试视频";
+        _noteService.RecordNote("https://example.com/video1", title, folder1.Id);
+
+        // Act - 不同目录下相同标题但不同 URL 应该可以创建
+        var note2 = _noteService.RecordNote("https://example.com/video2", title, folder2.Id);
 
         // Assert
         Assert.NotNull(note2);

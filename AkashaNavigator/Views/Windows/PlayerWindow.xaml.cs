@@ -328,6 +328,9 @@ public partial class PlayerWindow : Window
             // 监听 URL 变化（包括 SPA 路由变化）
             WebView.CoreWebView2.SourceChanged += CoreWebView2_SourceChanged;
 
+            // 监听页面标题变化
+            WebView.CoreWebView2.DocumentTitleChanged += CoreWebView2_DocumentTitleChanged;
+
             // 拦截新窗口请求，在当前窗口打开而非弹出新窗口
             WebView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
 
@@ -465,6 +468,17 @@ public partial class PlayerWindow : Window
 
         // 注意：字幕获取现在由被动拦截处理（SubtitleService.OnWebResourceResponseReceived）
         // 不需要在这里主动请求字幕
+    }
+
+    /// <summary>
+    /// 页面标题变化事件处理
+    /// </summary>
+    private void CoreWebView2_DocumentTitleChanged(object? sender, object e)
+    {
+        var currentTitle = WebView.CoreWebView2?.DocumentTitle ?? string.Empty;
+
+        // 发布标题变化事件
+        _eventBus.Publish(new TitleChangedEvent { Title = currentTitle });
     }
 
     /// <summary>
@@ -1087,12 +1101,23 @@ public partial class PlayerWindow : Window
                         return;
 
                     case PromptResult.QuickRecord:
-                        // 取消退出，打开记录笔记对话框
-                        e.Cancel = true;
+                        // 打开记录笔记对话框
                         var recordDialog = _dialogFactory.CreateRecordNoteDialog(currentUrl, currentTitle);
                         recordDialog.Owner = this;
                         recordDialog.ShowDialog();
-                        return;
+
+                        // 如果用户成功保存了笔记，继续退出；否则取消退出
+                        if (recordDialog.Result && recordDialog.CreatedNote != null)
+                        {
+                            // 保存成功，继续退出
+                            break;
+                        }
+                        else
+                        {
+                            // 取消或保存失败，取消退出
+                            e.Cancel = true;
+                            return;
+                        }
 
                     case PromptResult.Exit:
                     default:

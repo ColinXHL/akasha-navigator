@@ -87,6 +87,15 @@ public class Bootstrapper
                                                  }
                                              });
 
+        // 订阅标题变化事件，同步标题到 ControlBarWindow
+        _eventBus.Subscribe<TitleChangedEvent>(e =>
+                                               {
+                                                   if (_controlBarWindow != null)
+                                                   {
+                                                       _controlBarWindow.UpdateCurrentTitle(e.Title);
+                                                   }
+                                               });
+
         // 订阅菜单相关 EventBus 事件
         SetupMenuEventHandlers();
         SetupBookmarkEventHandlers();

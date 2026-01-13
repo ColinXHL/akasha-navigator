@@ -97,8 +97,17 @@ public static class ServiceCollectionExtensions
         // WindowStateService（依赖LogService + ProfileManager）
         services.AddSingleton<IWindowStateService, WindowStateService>();
 
-        // PioneerNoteService（依赖LogService + ProfileManager）
-        services.AddSingleton<IPioneerNoteService, PioneerNoteService>();
+        // PioneerNoteService（使用静态单例实例，确保与 Instance 属性一致）
+        services.AddSingleton<IPioneerNoteService>(sp =>
+                                                   {
+                                                       // 确保 DI 和静态 Instance 使用同一个实例
+                                                       var logService = sp.GetRequiredService<ILogService>();
+                                                       var profileManager = sp.GetRequiredService<IProfileManager>();
+                                                       var instance =
+                                                           new PioneerNoteService(logService, profileManager);
+                                                       PioneerNoteService.Instance = instance;
+                                                       return instance;
+                                                   });
 
         // DataService（依赖LogService + ProfileManager，必须在ProfileManager之后）
         services.AddSingleton<IDataService, DataService>();

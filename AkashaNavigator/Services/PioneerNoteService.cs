@@ -25,8 +25,7 @@ public class PioneerNoteService : IPioneerNoteService
     /// </summary>
     public static IPioneerNoteService Instance
     {
-        get
-        {
+        get {
             if (_instance == null)
             {
                 _instance = new PioneerNoteService(LogService.Instance, ProfileManager.Instance);
@@ -118,17 +117,25 @@ public class PioneerNoteService : IPioneerNoteService
             folderId = null;
         }
 
-        // 检查同级目录是否已存在相同标题+URL的笔记
-        var duplicateExists =
-            _cache.Items.Any(i => i.FolderId == folderId && i.Title == title.Trim() && i.Url == (url ?? string.Empty));
+        // 规范化 URL
+        var normalizedUrl = NormalizeUrl(url ?? string.Empty);
 
-        if (duplicateExists)
+        // 检查全局是否已存在相同 URL 的笔记（不限于同级目录）
+        var urlExists = _cache.Items.Any(i => NormalizeUrl(i.Url) == normalizedUrl);
+        if (urlExists && !string.IsNullOrWhiteSpace(normalizedUrl))
         {
-            throw new InvalidOperationException($"同级目录下已存在相同标题和URL的笔记：{title}");
+            throw new InvalidOperationException($"已存在相同 URL 的笔记");
+        }
+
+        // 检查同级目录是否已存在相同标题的笔记
+        var titleExists = _cache.Items.Any(i => i.FolderId == folderId && i.Title == title.Trim());
+        if (titleExists)
+        {
+            throw new InvalidOperationException($"同级目录下已存在相同标题的笔记：{title}");
         }
 
         var now = DateTime.Now;
-        var item = new NoteItem { Id = Guid.NewGuid().ToString(), Url = url ?? string.Empty, Title = title.Trim(),
+        var item = new NoteItem { Id = Guid.NewGuid().ToString(), Url = normalizedUrl, Title = title.Trim(),
                                   FolderId = folderId, RecordedTime = now };
 
         _cache.Items.Add(item);
@@ -529,12 +536,32 @@ public class PioneerNoteService : IPioneerNoteService
             return false;
 
         EnsureLoaded();
-        return _cache.Items.Any(i => i.Url == url);
+        var normalizedUrl = NormalizeUrl(url);
+        return _cache.Items.Any(i => NormalizeUrl(i.Url) == normalizedUrl);
+    }
+
+    /// <summary>
+    /// 规范化 URL 用于比较
+    /// </summary>
+    /// <param name="url">原始 URL</param>
+    /// <returns>规范化后的 URL</returns>
+    private static string NormalizeUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return string.Empty;
+
+        var normalized = url.Trim();
+        // 移除末尾斜杠（但保留根路径的斜杠）
+        if (normalized.Length > 1 && normalized.EndsWith('/'))
+        {
+            normalized = normalized.TrimEnd('/');
+        }
+        return normalized;
     }
 
 #endregion
 
-#region Interface Compatibility Methods (for UI code compatibility)
+#region Interface Compatibility Methods(for UI code compatibility)
 
     /// <summary>
     /// 获取所有笔记项（按排序规则）- 别名方法
@@ -610,7 +637,7 @@ public class PioneerNoteService : IPioneerNoteService
         catch (Exception ex)
         {
             _logService.Warn(nameof(PioneerNoteService), "加载笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                     ex.Message);
+                             ex.Message);
             _cache = new PioneerNoteData();
         }
         _cacheLoaded = true;
@@ -628,13 +655,13 @@ public class PioneerNoteService : IPioneerNoteService
             if (result.IsFailure)
             {
                 _logService.Debug(nameof(PioneerNoteService), "保存笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                          result.Error?.Message ?? "Unknown error");
+                                  result.Error?.Message ?? "Unknown error");
             }
         }
         catch (Exception ex)
         {
             _logService.Debug(nameof(PioneerNoteService), "保存笔记数据失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                      ex.Message);
+                              ex.Message);
         }
     }
 
