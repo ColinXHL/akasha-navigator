@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Plugins.Apis;
 using AkashaNavigator.Plugins.Core;
@@ -280,5 +281,201 @@ public class WindowApiTests : IDisposable
     }
 
 #endregion
+
+#region Property 5 : 空白名单验证(Cursor Detection)
+
+    /// <summary>
+    /// **Feature: smart-cursor-detection-plugin, Property 5: 空白名单验证**
+    /// **Validates: Requirements 2.4, 6.5**
+    ///
+    /// *For any* call to startCursorDetection with an empty or null process whitelist,
+    /// the method SHALL return false and cursor detection SHALL NOT be started.
+    /// </summary>
+    [Fact]
+    public void StartCursorDetection_EmptyWhitelist_ReturnsFalse()
+    {
+        var windowApi = new WindowApi(_context, null);
+        var mockService = new MockCursorDetectionService();
+        windowApi.SetCursorDetectionService(mockService);
+
+        // 使用空数组
+        var options = new { processWhitelist = new string[0], intervalMs = 200 };
+        var result = windowApi.StartCursorDetection(options);
+
+        Assert.False(result);
+        Assert.False(mockService.IsRunning);
+    }
+
+    /// <summary>
+    /// **Feature: smart-cursor-detection-plugin, Property 5: 空白名单验证**
+    /// **Validates: Requirements 2.4, 6.5**
+    ///
+    /// 验证 null 白名单返回 false
+    /// </summary>
+    [Fact]
+    public void StartCursorDetection_NullWhitelist_ReturnsFalse()
+    {
+        var windowApi = new WindowApi(_context, null);
+        var mockService = new MockCursorDetectionService();
+        windowApi.SetCursorDetectionService(mockService);
+
+        // 使用 null 白名单
+        var options = new { processWhitelist = (string[]?)null, intervalMs = 200 };
+        var result = windowApi.StartCursorDetection(options);
+
+        Assert.False(result);
+        Assert.False(mockService.IsRunning);
+    }
+
+    /// <summary>
+    /// **Feature: smart-cursor-detection-plugin, Property 5: 空白名单验证**
+    /// **Validates: Requirements 2.4, 6.5**
+    ///
+    /// *For any* non-empty process whitelist, startCursorDetection SHALL return true
+    /// and cursor detection SHALL be started.
+    /// </summary>
+    [Fact]
+    public void StartCursorDetection_NonEmptyWhitelist_ReturnsTrue_Simple()
+    {
+        var windowApi = new WindowApi(_context, null);
+        var mockService = new MockCursorDetectionService();
+        windowApi.SetCursorDetectionService(mockService);
+
+        // 使用非空白名单
+        var options = new { processWhitelist = new[] { "TestProcess" }, intervalMs = 200 };
+        var result = windowApi.StartCursorDetection(options);
+
+        Assert.True(result, "StartCursorDetection should return true");
+        Assert.True(mockService.StartWithWhitelistCalled, "StartWithWhitelist should be called");
+        Assert.True(mockService.IsRunning, "Service should be running");
+
+        // 清理
+        windowApi.StopCursorDetection();
+    }
+
+    /// <summary>
+    /// **Feature: smart-cursor-detection-plugin, Property 5: 空白名单验证**
+    /// **Validates: Requirements 2.4, 6.5**
+    ///
+    /// 验证只包含空字符串的白名单被视为空
+    /// </summary>
+    [Fact]
+    public void StartCursorDetection_WhitelistWithOnlyEmptyStrings_ReturnsFalse()
+    {
+        var windowApi = new WindowApi(_context, null);
+        var mockService = new MockCursorDetectionService();
+        windowApi.SetCursorDetectionService(mockService);
+
+        // 使用只包含空字符串的白名单
+        var options = new { processWhitelist = new[] { "", "  ", "\t" }, intervalMs = 200 };
+        var result = windowApi.StartCursorDetection(options);
+
+        Assert.False(result);
+        Assert.False(mockService.IsRunning);
+    }
+
+    /// <summary>
+    /// **Feature: smart-cursor-detection-plugin, Property 5: 空白名单验证**
+    /// **Validates: Requirements 2.4, 6.5**
+    ///
+    /// 验证 stopCursorDetection 正确停止检测
+    /// </summary>
+    [Fact]
+    public void StopCursorDetection_AfterStart_StopsDetection()
+    {
+        var windowApi = new WindowApi(_context, null);
+        var mockService = new MockCursorDetectionService();
+        windowApi.SetCursorDetectionService(mockService);
+
+        // 启动检测
+        var options = new { processWhitelist = new[] { "TestProcess" }, intervalMs = 200 };
+        windowApi.StartCursorDetection(options);
+
+        Assert.True(mockService.IsRunning);
+
+        // 停止检测
+        windowApi.StopCursorDetection();
+
+        Assert.False(mockService.IsRunning);
+        Assert.True(mockService.StopCalled);
+    }
+
+    /// <summary>
+    /// **Feature: smart-cursor-detection-plugin, Property 5: 空白名单验证**
+    /// **Validates: Requirements 2.4, 6.5**
+    ///
+    /// 验证 isAutoClickThrough 无窗口时返回 false
+    /// </summary>
+    [Fact]
+    public void IsAutoClickThrough_NoWindow_ReturnsFalse()
+    {
+        var windowApi = new WindowApi(_context, null);
+        var result = windowApi.IsAutoClickThrough();
+        Assert.False(result);
+    }
+
+#endregion
+}
+
+/// <summary>
+/// Mock CursorDetectionService 用于测试
+/// </summary>
+internal class MockCursorDetectionService : ICursorDetectionService
+{
+    public event EventHandler? CursorShown;
+    public event EventHandler? CursorHidden;
+
+    public bool IsRunning { get; private set; }
+    public bool IsCursorCurrentlyVisible => true;
+    public string? TargetProcessName { get; private set; }
+    public bool EnableDebugLog { get; set; }
+    public bool IsSuspended { get; private set; }
+
+    public bool StartWithWhitelistCalled { get; private set; }
+    public bool StopCalled { get; private set; }
+    public bool SuspendCalled { get; private set; }
+    public bool ResumeCalled { get; private set; }
+    public HashSet<string>? LastWhitelist { get; private set; }
+
+    public void Start(string? targetProcessName = null, int intervalMs = 200, bool enableDebugLog = false)
+    {
+        TargetProcessName = targetProcessName;
+        IsRunning = true;
+    }
+
+    public void StartWithWhitelist(HashSet<string> whitelist, int intervalMs = 200, bool enableDebugLog = false)
+    {
+        StartWithWhitelistCalled = true;
+        LastWhitelist = whitelist;
+        IsRunning = true;
+    }
+
+    public void Stop()
+    {
+        StopCalled = true;
+        IsRunning = false;
+        IsSuspended = false;
+    }
+
+    public void Suspend()
+    {
+        SuspendCalled = true;
+        IsSuspended = true;
+    }
+
+    public void Resume()
+    {
+        ResumeCalled = true;
+        IsSuspended = false;
+    }
+
+    public void Dispose()
+    {
+        Stop();
+    }
+
+    // 用于测试触发事件
+    public void TriggerCursorShown() => CursorShown?.Invoke(this, EventArgs.Empty);
+    public void TriggerCursorHidden() => CursorHidden?.Invoke(this, EventArgs.Empty);
 }
 }

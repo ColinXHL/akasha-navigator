@@ -57,97 +57,28 @@ public class ProfileEditDialogViewModelPropertyTests
     }
 
     [Fact]
-    public void Initialize_WithCursorDetection_PreservesSettings()
+    public void Initialize_WithValidProfile_LoadsBasicInfo()
+    {
+        var profile = CreateTestProfile(name: "Test Profile", icon: "🎮");
+        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
+
+        viewModel.Initialize(profile);
+
+        Assert.Equal("Test Profile", viewModel.ProfileName);
+        Assert.Equal("🎮", viewModel.SelectedIcon);
+    }
+
+    [Fact]
+    public void Initialize_WithDefaults_LoadsDefaultSettings()
     {
         var profile =
-            CreateTestProfile(cursorDetection: new CursorDetectionConfig { Enabled = true, MinOpacity = 0.5 });
+            CreateTestProfile(defaults: new ProfileDefaults { Url = "https://example.com", SeekSeconds = 15 });
         var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
 
         viewModel.Initialize(profile);
 
-        Assert.True(viewModel.CursorDetectionEnabled);
-        Assert.Equal(0.5, viewModel.CursorDetectionMinOpacity);
-    }
-
-    [Fact]
-    public void Initialize_WithoutCursorDetection_UsesDefaults()
-    {
-        var profile = CreateTestProfile(cursorDetection: null);
-        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-
-        viewModel.Initialize(profile);
-
-        Assert.False(viewModel.CursorDetectionEnabled);
-    }
-
-#endregion
-
-#region Property 2 : Opacity Clamping
-
-    [Property(MaxTest = 100)]
-    public Property CursorDetectionMinOpacity_IsClamped_ToValidRange()
-    {
-        return Prop.ForAll(Arb.From<NormalFloat>(), (opacity) =>
-                                                    {
-                                                        var viewModel =
-                                                            new ProfileEditDialogViewModel(_mockProfileManager.Object);
-                                                        var profile = CreateTestProfile();
-                                                        viewModel.Initialize(profile);
-                                                        viewModel.CursorDetectionMinOpacity = opacity.Get;
-                                                        return viewModel.CursorDetectionMinOpacity >= 0.1 &&
-                                                               viewModel.CursorDetectionMinOpacity <= 0.8;
-                                                    });
-    }
-
-#endregion
-
-#region Property 3 : Save Behavior
-
-    [Fact]
-    public void Save_WithCursorDetectionSettings_SavesConfig()
-    {
-        ProfileUpdateData? capturedUpdateData = null;
-        var mockManager = new Mock<IProfileManager>();
-        mockManager.Setup(x => x.ProfileIcons).Returns(new[] { "📦", "🎮" });
-        mockManager.Setup(x => x.UpdateProfile(It.IsAny<string>(), It.IsAny<ProfileUpdateData>()))
-            .Callback<string, ProfileUpdateData>((id, data) => capturedUpdateData = data)
-            .Returns(true);
-
-        var viewModel = new ProfileEditDialogViewModel(mockManager.Object);
-        var profile = CreateTestProfile();
-        viewModel.Initialize(profile);
-
-        viewModel.CursorDetectionEnabled = true;
-        viewModel.CursorDetectionMinOpacity = 0.5;
-        viewModel.SaveCommand.Execute(null);
-
-        Assert.NotNull(capturedUpdateData);
-        Assert.NotNull(capturedUpdateData.CursorDetection);
-        Assert.True(capturedUpdateData.CursorDetection.Enabled);
-        Assert.Equal(0.5, capturedUpdateData.CursorDetection.MinOpacity);
-    }
-
-    [Fact]
-    public void Save_WithNoSettings_ClearsCursorDetection()
-    {
-        ProfileUpdateData? capturedUpdateData = null;
-        var mockManager = new Mock<IProfileManager>();
-        mockManager.Setup(x => x.ProfileIcons).Returns(new[] { "📦", "🎮" });
-        mockManager.Setup(x => x.UpdateProfile(It.IsAny<string>(), It.IsAny<ProfileUpdateData>()))
-            .Callback<string, ProfileUpdateData>((id, data) => capturedUpdateData = data)
-            .Returns(true);
-
-        var viewModel = new ProfileEditDialogViewModel(mockManager.Object);
-        var profile = CreateTestProfile(cursorDetection: new CursorDetectionConfig { Enabled = true });
-        viewModel.Initialize(profile);
-
-        // Reset to defaults
-        viewModel.CursorDetectionEnabled = false;
-        viewModel.CursorDetectionMinOpacity = 0.3;
-        viewModel.SaveCommand.Execute(null);
-
-        Assert.NotNull(capturedUpdateData);
-        Assert.True(capturedUpdateData.ClearCursorDetection);
+        Assert.Equal("https://example.com", viewModel.DefaultUrl);
+        Assert.Equal(15, viewModel.SeekSeconds);
     }
 
 #endregion
@@ -227,86 +158,10 @@ public class ProfileEditDialogViewModelPropertyTests
 
 #endregion
 
-#region Property 7 : Process Whitelist
+#region Property 6 : Save Behavior
 
     [Fact]
-    public void Initialize_WithProcessWhitelist_PreservesWhitelist()
-    {
-        var profile = CreateTestProfile(cursorDetection: new CursorDetectionConfig {
-            Enabled = true,
-            ProcessWhitelist = new System.Collections.Generic.List<string> { "genshin", "eldenring" }
-        });
-        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-
-        viewModel.Initialize(profile);
-
-        Assert.Equal(2, viewModel.ProcessWhitelist.Count);
-        Assert.Contains("genshin", viewModel.ProcessWhitelist);
-        Assert.Contains("eldenring", viewModel.ProcessWhitelist);
-    }
-
-    [Fact]
-    public void AddProcess_WithValidName_AddsToWhitelist()
-    {
-        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-        var profile = CreateTestProfile();
-        viewModel.Initialize(profile);
-
-        viewModel.NewProcessName = "testgame";
-        viewModel.AddProcessCommand.Execute(null);
-
-        Assert.Single(viewModel.ProcessWhitelist);
-        Assert.Contains("testgame", viewModel.ProcessWhitelist);
-        Assert.Empty(viewModel.NewProcessName);
-    }
-
-    [Fact]
-    public void AddProcess_WithExeSuffix_RemovesSuffix()
-    {
-        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-        var profile = CreateTestProfile();
-        viewModel.Initialize(profile);
-
-        viewModel.NewProcessName = "testgame.exe";
-        viewModel.AddProcessCommand.Execute(null);
-
-        Assert.Single(viewModel.ProcessWhitelist);
-        Assert.Contains("testgame", viewModel.ProcessWhitelist);
-    }
-
-    [Fact]
-    public void AddProcess_WithDuplicateName_DoesNotAddDuplicate()
-    {
-        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-        var profile = CreateTestProfile();
-        viewModel.Initialize(profile);
-
-        viewModel.NewProcessName = "testgame";
-        viewModel.AddProcessCommand.Execute(null);
-        viewModel.NewProcessName = "testgame";
-        viewModel.AddProcessCommand.Execute(null);
-
-        Assert.Single(viewModel.ProcessWhitelist);
-    }
-
-    [Fact]
-    public void RemoveProcess_RemovesFromWhitelist()
-    {
-        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-        var profile = CreateTestProfile(cursorDetection: new CursorDetectionConfig {
-            Enabled = true, ProcessWhitelist = new System.Collections.Generic.List<string> { "game1", "game2" }
-        });
-        viewModel.Initialize(profile);
-
-        viewModel.RemoveProcessCommand.Execute("game1");
-
-        Assert.Single(viewModel.ProcessWhitelist);
-        Assert.DoesNotContain("game1", viewModel.ProcessWhitelist);
-        Assert.Contains("game2", viewModel.ProcessWhitelist);
-    }
-
-    [Fact]
-    public void Save_WithProcessWhitelist_IncludesWhitelistInConfig()
+    public void Save_WithValidChanges_CallsProfileManager()
     {
         ProfileUpdateData? capturedUpdateData = null;
         var mockManager = new Mock<IProfileManager>();
@@ -319,27 +174,64 @@ public class ProfileEditDialogViewModelPropertyTests
         var profile = CreateTestProfile();
         viewModel.Initialize(profile);
 
-        viewModel.NewProcessName = "testgame";
-        viewModel.AddProcessCommand.Execute(null);
+        viewModel.ProfileName = "Updated Name";
         viewModel.SaveCommand.Execute(null);
 
         Assert.NotNull(capturedUpdateData);
-        Assert.NotNull(capturedUpdateData.CursorDetection);
-        Assert.NotNull(capturedUpdateData.CursorDetection.ProcessWhitelist);
-        Assert.Contains("testgame", capturedUpdateData.CursorDetection.ProcessWhitelist);
+        Assert.Equal("Updated Name", capturedUpdateData.Name);
     }
 
     [Fact]
-    public void WhitelistChange_TriggersHasChanges()
+    public void Save_WithDefaultsChange_UpdatesDefaults()
+    {
+        ProfileUpdateData? capturedUpdateData = null;
+        var mockManager = new Mock<IProfileManager>();
+        mockManager.Setup(x => x.ProfileIcons).Returns(new[] { "📦", "🎮" });
+        mockManager.Setup(x => x.UpdateProfile(It.IsAny<string>(), It.IsAny<ProfileUpdateData>()))
+            .Callback<string, ProfileUpdateData>((id, data) => capturedUpdateData = data)
+            .Returns(true);
+
+        var viewModel = new ProfileEditDialogViewModel(mockManager.Object);
+        var profile = CreateTestProfile();
+        viewModel.Initialize(profile);
+
+        viewModel.DefaultUrl = "https://newurl.com";
+        viewModel.SeekSeconds = 20;
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.NotNull(capturedUpdateData);
+        Assert.NotNull(capturedUpdateData.Defaults);
+        Assert.Equal("https://newurl.com", capturedUpdateData.Defaults.Url);
+        Assert.Equal(20, capturedUpdateData.Defaults.SeekSeconds);
+    }
+
+#endregion
+
+#region Property 7 : Icon Selection
+
+    [Fact]
+    public void Initialize_LoadsAvailableIcons()
     {
         var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
         var profile = CreateTestProfile();
+
+        viewModel.Initialize(profile);
+
+        Assert.NotEmpty(viewModel.AvailableIcons);
+        Assert.Contains("📦", viewModel.AvailableIcons);
+        Assert.Contains("🎮", viewModel.AvailableIcons);
+    }
+
+    [Fact]
+    public void IconChange_TriggersHasChanges()
+    {
+        var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
+        var profile = CreateTestProfile(icon: "📦");
         viewModel.Initialize(profile);
 
         Assert.False(viewModel.SaveCommand.CanExecute(null));
 
-        viewModel.NewProcessName = "newgame";
-        viewModel.AddProcessCommand.Execute(null);
+        viewModel.SelectedIcon = "🎮";
 
         Assert.True(viewModel.SaveCommand.CanExecute(null));
     }
@@ -349,16 +241,11 @@ public class ProfileEditDialogViewModelPropertyTests
 #region Helper Methods
 
     private static GameProfile CreateTestProfile(string id = "test-profile", string name = "Test Profile",
-                                                 string icon = "📦", ProfileDefaults? defaults = null,
-                                                 CursorDetectionConfig? cursorDetection = null)
+                                                 string icon = "📦", ProfileDefaults? defaults = null)
     {
-        return new GameProfile { Id = id,
-                                 Name = name,
-                                 Icon = icon,
-                                 Version = 1,
+        return new GameProfile { Id = id, Name = name, Icon = icon, Version = 1,
                                  Defaults =
-                                     defaults ?? new ProfileDefaults { Url = "https://example.com", SeekSeconds = 5 },
-                                 CursorDetection = cursorDetection };
+                                     defaults ?? new ProfileDefaults { Url = "https://example.com", SeekSeconds = 5 } };
     }
 
 #endregion

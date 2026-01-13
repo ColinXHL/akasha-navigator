@@ -3,7 +3,7 @@
   "name": "原神",
   "icon": "🎮",
   "version": 1,
-  "recommendedPlugins": ["genshin-direction-marker"],
+  "recommendedPlugins": ["genshin-direction-marker", "smart-cursor-detection"],
   "activation": {
     "processes": ["GenshinImpact", "YuanShen"],
     "autoSwitch": true
@@ -11,8 +11,10 @@
   "defaults": {
     "url": "https://www.bilibili.com"
   },
-  "cursorDetection": {
-    "enabled": true,
-    "processWhitelist": ["GenshinImpact", "YuanShen"]
+  "pluginConfigs": {
+    "smart-cursor-detection": {
+      "processWhitelist": "YuanShen, GenshinImpact",
+      "minOpacity": 0.2
+    }
   }
 }

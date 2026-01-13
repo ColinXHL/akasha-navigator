@@ -93,15 +93,6 @@ public partial class SettingsViewModel : ObservableObject
 
         var config = _configService.Config;
 
-        // 调试日志
-        System.Diagnostics.Debug.WriteLine(
-            $"[SettingsViewModel] Constructor: Config.CursorDetection is null = {config.CursorDetection == null}");
-        if (config.CursorDetection != null)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"[SettingsViewModel] Constructor: CursorDetection.Enabled = {config.CursorDetection.Enabled}");
-        }
-
         // 从各 PageViewModel 加载设置
         _windowPageVM.LoadSettings(config);
         _hotkeysPageVM.LoadHotkeys(config);

@@ -269,6 +269,13 @@ public partial class OverlayWindow : Window
         // 停止之前的定时器
         StopHideTimer();
 
+        // 确保窗口可见（非常驻模式下窗口可能未显示）
+        if (!IsVisible)
+        {
+            Show();
+            Services.LogService.Instance.Debug(nameof(OverlayWindow), "Window was hidden, now shown");
+        }
+
         // 隐藏所有标记
         HideAllMarkers();
 
@@ -281,8 +288,8 @@ public partial class OverlayWindow : Window
         }
         else
         {
-            Services.LogService.Instance.Warn(nameof(OverlayWindow), "Marker {Direction} not found in _markers dictionary",
-                                              direction);
+            Services.LogService.Instance.Warn(nameof(OverlayWindow),
+                                              "Marker {Direction} not found in _markers dictionary", direction);
         }
 
         // 如果指定了时长，设置定时隐藏
@@ -435,8 +442,8 @@ public partial class OverlayWindow : Window
     {
         if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
         {
-            Services.LogService.Instance.Error(nameof(OverlayWindow), "SetMarkerImage: Image file not found: {ImagePath}",
-                                               imagePath);
+            Services.LogService.Instance.Error(nameof(OverlayWindow),
+                                               "SetMarkerImage: Image file not found: {ImagePath}", imagePath);
             return false;
         }
 

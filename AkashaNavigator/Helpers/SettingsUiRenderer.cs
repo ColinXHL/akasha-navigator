@@ -105,9 +105,17 @@ public class SettingsUiRenderer
         // 分组标题
         if (!string.IsNullOrWhiteSpace(section.Title))
         {
-            var header = new TextBlock { Text = section.Title, FontSize = 13, FontWeight = FontWeights.SemiBold,
-                                         Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4)),
-                                         Margin = new Thickness(0, 16, 0, 8) };
+            var header = new TextBlock { Text = section.Title };
+
+            // 尝试应用共享样式，如果不存在则使用回退样式
+            if (!ApplyStyleIfExists(header, "SettingsGroupHeaderStyle"))
+            {
+                header.FontSize = 13;
+                header.FontWeight = FontWeights.SemiBold;
+                header.Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4));
+                header.Margin = new Thickness(0, 16, 0, 8);
+            }
+
             parent.Children.Add(header);
         }
 
@@ -138,6 +146,7 @@ public class SettingsUiRenderer
                                                      "slider" => RenderSlider(item),
                                                      "button" => RenderButton(item),
                                                      "group" => RenderGroupBox(item),
+                                                     "processlist" => RenderProcessList(item),
                                                      _ => null };
     }
 
@@ -149,21 +158,23 @@ public class SettingsUiRenderer
     {
         var container = CreateItemContainer(item.Label);
 
-        var textBox = new TextBox { Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
-                                    Foreground = Brushes.White,
-                                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
-                                    BorderThickness = new Thickness(1),
-                                    Padding = new Thickness(8, 6, 8, 6),
-                                    FontSize = 12,
-                                    MinWidth = 200 };
+        var textBox = new TextBox { MinWidth = 200 };
 
-        // 应用圆角样式
-        ApplyRoundedTextBoxStyle(textBox);
+        // 尝试应用共享样式，如果不存在则使用回退样式
+        if (!ApplyStyleIfExists(textBox, "DarkTextBoxStyle"))
+        {
+            textBox.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+            textBox.Foreground = Brushes.White;
+            textBox.BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+            textBox.BorderThickness = new Thickness(1);
+            textBox.Padding = new Thickness(8, 6, 8, 6);
+            textBox.FontSize = 12;
+            ApplyRoundedTextBoxStyle(textBox);
+        }
 
-        // 设置占位符
+        // 设置占位符 (DarkTextBoxStyle 使用 Tag 作为 placeholder)
         if (!string.IsNullOrEmpty(item.Placeholder))
         {
-            // WPF 没有原生占位符，使用 Tag 存储
             textBox.Tag = item.Placeholder;
         }
 
@@ -395,26 +406,69 @@ public class SettingsUiRenderer
     {
         var container = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
 
-        // 使用 ToggleButton 样式的开关
-        var toggle = new ToggleButton { Width = 44, Height = 22, Margin = new Thickness(0, 0, 8, 0) };
+        // 使用 CheckBox 并应用 ToggleSwitchStyle
+        var checkBox = new CheckBox { Margin = new Thickness(0, 0, 8, 0) };
 
-        // 应用开关样式
-        ApplyToggleSwitchStyle(toggle);
+        // 尝试应用共享样式，如果不存在则使用回退样式（ToggleButton）
+        if (!ApplyStyleIfExists(checkBox, "ToggleSwitchStyle"))
+        {
+            // 回退到使用 ToggleButton 样式
+            var toggle = new ToggleButton { Width = 44, Height = 22, Margin = new Thickness(0, 0, 8, 0) };
+            ApplyToggleSwitchStyle(toggle);
 
+            // 加载当前值或默认值
+            var defaultValueFallback = item.GetDefaultValue<bool?>() ?? false;
+            var currentValueFallback = GetConfigValue(item.Key, defaultValueFallback);
+            toggle.IsChecked = currentValueFallback;
+
+            // 值变更事件
+            toggle.Checked += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(item.Key))
+                {
+                    OnValueChanged(item.Key, true);
+                }
+            };
+            toggle.Unchecked += (s, e) =>
+            {
+                if (!string.IsNullOrEmpty(item.Key))
+                {
+                    OnValueChanged(item.Key, false);
+                }
+            };
+
+            if (!string.IsNullOrEmpty(item.Key))
+            {
+                _controlMap[item.Key] = toggle;
+                _itemMap[item.Key] = item;
+            }
+
+            container.Children.Add(toggle);
+
+            if (!string.IsNullOrEmpty(item.Label))
+            {
+                container.Children.Add(new TextBlock { Text = item.Label, Foreground = Brushes.White, FontSize = 12,
+                                                       VerticalAlignment = VerticalAlignment.Center });
+            }
+
+            return container;
+        }
+
+        // 使用共享样式的 CheckBox
         // 加载当前值或默认值
         var defaultValue = item.GetDefaultValue<bool?>() ?? false;
         var currentValue = GetConfigValue(item.Key, defaultValue);
-        toggle.IsChecked = currentValue;
+        checkBox.IsChecked = currentValue;
 
         // 值变更事件
-        toggle.Checked += (s, e) =>
+        checkBox.Checked += (s, e) =>
         {
             if (!string.IsNullOrEmpty(item.Key))
             {
                 OnValueChanged(item.Key, true);
             }
         };
-        toggle.Unchecked += (s, e) =>
+        checkBox.Unchecked += (s, e) =>
         {
             if (!string.IsNullOrEmpty(item.Key))
             {
@@ -424,11 +478,11 @@ public class SettingsUiRenderer
 
         if (!string.IsNullOrEmpty(item.Key))
         {
-            _controlMap[item.Key] = toggle;
+            _controlMap[item.Key] = checkBox;
             _itemMap[item.Key] = item;
         }
 
-        container.Children.Add(toggle);
+        container.Children.Add(checkBox);
 
         if (!string.IsNullOrEmpty(item.Label))
         {
@@ -439,6 +493,9 @@ public class SettingsUiRenderer
         return container;
     }
 
+    /// <summary>
+    /// 回退：应用开关样式到 ToggleButton（用于测试环境）
+    /// </summary>
     private void ApplyToggleSwitchStyle(ToggleButton toggle)
     {
         // 简化的开关样式
@@ -490,8 +547,11 @@ public class SettingsUiRenderer
 
         var comboBox = new ComboBox { MinWidth = 150 };
 
-        // 应用深色主题样式
-        ApplyDarkComboBoxStyle(comboBox);
+        // 尝试应用共享样式，如果不存在则使用回退样式
+        if (!ApplyStyleIfExists(comboBox, "DarkComboBoxStyle"))
+        {
+            ApplyDarkComboBoxStyleFallback(comboBox);
+        }
 
         // 添加选项
         if (item.Options != null)
@@ -499,7 +559,13 @@ public class SettingsUiRenderer
             foreach (var option in item.Options)
             {
                 var comboBoxItem = new ComboBoxItem { Content = option.Label, Tag = option.Value };
-                ApplyDarkComboBoxItemStyle(comboBoxItem);
+
+                // 尝试应用共享样式，如果不存在则使用回退样式
+                if (!ApplyStyleIfExists(comboBoxItem, "DarkComboBoxItemStyle"))
+                {
+                    ApplyDarkComboBoxItemStyleFallback(comboBoxItem);
+                }
+
                 comboBox.Items.Add(comboBoxItem);
             }
         }
@@ -535,6 +601,31 @@ public class SettingsUiRenderer
 
         container.Children.Add(comboBox);
         return container;
+    }
+
+    /// <summary>
+    /// 回退：应用深色主题 ComboBox 样式（用于测试环境）
+    /// </summary>
+    private void ApplyDarkComboBoxStyleFallback(ComboBox comboBox)
+    {
+        comboBox.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+        comboBox.Foreground = Brushes.White;
+        comboBox.BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+        comboBox.BorderThickness = new Thickness(1);
+        comboBox.Padding = new Thickness(8, 6, 8, 6);
+        comboBox.FontSize = 12;
+        ApplyDarkComboBoxStyle(comboBox);
+    }
+
+    /// <summary>
+    /// 回退：应用深色主题 ComboBoxItem 样式（用于测试环境）
+    /// </summary>
+    private void ApplyDarkComboBoxItemStyleFallback(ComboBoxItem item)
+    {
+        item.Background = Brushes.Transparent;
+        item.Foreground = Brushes.White;
+        item.Padding = new Thickness(8, 6, 8, 6);
+        ApplyDarkComboBoxItemStyle(item);
     }
 
     /// <summary>
@@ -747,6 +838,307 @@ public class SettingsUiRenderer
 
 #endregion
 
+#region ProcessList Rendering
+
+    /// <summary>
+    /// 渲染进程列表控件
+    /// 包含输入框、添加按钮、选取窗口按钮、Popup 进程选择器和已添加进程标签列表
+    /// </summary>
+    private FrameworkElement RenderProcessList(SettingsItem item)
+    {
+        var container = CreateItemContainer(item.Label);
+
+        // 输入行容器
+        var inputRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        // 输入框 - 使用共享样式
+        var textBox = new TextBox { MinWidth = 150, VerticalContentAlignment = VerticalAlignment.Center };
+
+        // 尝试应用共享样式，如果不存在则使用回退样式
+        if (!ApplyStyleIfExists(textBox, "DarkTextBoxStyle"))
+        {
+            textBox.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+            textBox.Foreground = Brushes.White;
+            textBox.BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+            textBox.BorderThickness = new Thickness(1);
+            textBox.Padding = new Thickness(8, 6, 8, 6);
+            textBox.FontSize = 12;
+            ApplyRoundedTextBoxStyle(textBox);
+        }
+
+        if (!string.IsNullOrEmpty(item.Placeholder))
+        {
+            textBox.Tag = item.Placeholder;
+        }
+
+        // 添加按钮 - 使用共享样式
+        var addButton = CreateProcessListButton("添加");
+        addButton.Margin = new Thickness(8, 0, 0, 0);
+        Grid.SetColumn(addButton, 1);
+
+        // 选取窗口按钮和 Popup - 使用共享样式
+        var selectButton = CreateProcessListButton("选取窗口");
+        selectButton.Margin = new Thickness(8, 0, 0, 0);
+        Grid.SetColumn(selectButton, 2);
+
+        // Popup 进程选择器
+        var popup = new Popup { PlacementTarget = selectButton, Placement = PlacementMode.Bottom, StaysOpen = false,
+                                AllowsTransparency = true };
+
+        var popupBorder =
+            new Border { Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+                         BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                         BorderThickness = new Thickness(1),
+                         CornerRadius = new CornerRadius(4),
+                         Margin = new Thickness(0, 4, 0, 0),
+                         MaxHeight = 300,
+                         MinWidth = 250,
+                         Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 8, ShadowDepth = 2,
+                                                                                      Opacity = 0.3 } };
+
+        var popupScrollViewer =
+            new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(4) };
+
+        var popupList = new StackPanel();
+        popupScrollViewer.Content = popupList;
+        popupBorder.Child = popupScrollViewer;
+        popup.Child = popupBorder;
+
+        // 已添加进程标签列表
+        var tagsPanel = new WrapPanel { Orientation = Orientation.Horizontal };
+
+        // 加载当前配置值
+        var currentValue = GetConfigValue<string>(item.Key, item.GetDefaultValue<string>() ?? string.Empty);
+        var processList = ProcessListHelper.ParseProcessList(currentValue);
+
+        // 辅助方法：更新标签列表
+        void UpdateTagsPanel()
+        {
+            tagsPanel.Children.Clear();
+            foreach (var processName in processList)
+            {
+                var tag = CreateProcessTag(processName, () =>
+                                                        {
+                                                            processList.Remove(processName);
+                                                            UpdateTagsPanel();
+                                                            SaveProcessList();
+                                                        });
+                tagsPanel.Children.Add(tag);
+            }
+        }
+
+        // 辅助方法：保存进程列表到配置
+        void SaveProcessList()
+        {
+            var serialized = ProcessListHelper.SerializeProcessList(processList);
+            if (!string.IsNullOrEmpty(item.Key))
+            {
+                OnValueChanged(item.Key, serialized);
+            }
+        }
+
+        // 辅助方法：添加进程
+        void AddProcess(string processName)
+        {
+            var cleaned = processName.Trim();
+            if (!string.IsNullOrEmpty(cleaned) && !processList.Contains(cleaned))
+            {
+                processList.Add(cleaned);
+                UpdateTagsPanel();
+                SaveProcessList();
+            }
+        }
+
+        // 初始化标签列表
+        UpdateTagsPanel();
+
+        // 添加按钮点击事件
+        addButton.Click += (s, e) =>
+        {
+            AddProcess(textBox.Text);
+            textBox.Text = string.Empty;
+            textBox.Focus();
+        };
+
+        // 输入框回车事件
+        textBox.KeyDown += (s, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                AddProcess(textBox.Text);
+                textBox.Text = string.Empty;
+            }
+        };
+
+        // 选取窗口按钮点击事件
+        selectButton.Click += (s, e) =>
+        {
+            // 刷新进程列表
+            popupList.Children.Clear();
+            var runningProcesses = ProcessListHelper.GetRunningProcesses();
+
+            if (runningProcesses.Count == 0)
+            {
+                var emptyLabel = new TextBlock { Text = "没有找到运行中的窗口",
+                                                 Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                                                 FontSize = 12, Margin = new Thickness(8, 4, 8, 4) };
+                popupList.Children.Add(emptyLabel);
+            }
+            else
+            {
+                foreach (var processInfo in runningProcesses)
+                {
+                    var processItem = CreateProcessListItem(processInfo, () =>
+                                                                         {
+                                                                             AddProcess(processInfo.ProcessName);
+                                                                             popup.IsOpen = false;
+                                                                         });
+                    popupList.Children.Add(processItem);
+                }
+            }
+
+            popup.IsOpen = true;
+        };
+
+        // 组装控件
+        inputRow.Children.Add(textBox);
+        inputRow.Children.Add(addButton);
+        inputRow.Children.Add(selectButton);
+
+        container.Children.Add(inputRow);
+        container.Children.Add(popup);
+        container.Children.Add(tagsPanel);
+
+        if (!string.IsNullOrEmpty(item.Key))
+        {
+            _controlMap[item.Key] = tagsPanel;
+            _itemMap[item.Key] = item;
+        }
+
+        return container;
+    }
+
+    /// <summary>
+    /// 创建进程列表按钮 - 使用共享样式
+    /// </summary>
+    private Button CreateProcessListButton(string content)
+    {
+        var button =
+            new Button { Content = content, Padding = new Thickness(12, 6, 12, 6), FontSize = 12, Height = 32 };
+
+        // 尝试应用共享样式，如果不存在则使用回退样式
+        if (!ApplyStyleIfExists(button, "ActionButtonStyle"))
+        {
+            button.Background = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44));
+            button.Foreground = Brushes.White;
+            button.BorderThickness = new Thickness(0);
+            ApplyRoundedButtonStyle(button);
+        }
+
+        return button;
+    }
+
+    /// <summary>
+    /// 创建进程标签（带删除按钮）
+    /// </summary>
+    private Border CreateProcessTag(string processName, Action onRemove)
+    {
+        var tag = new Border { Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3A)),
+                               BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+                               BorderThickness = new Thickness(1),
+                               CornerRadius = new CornerRadius(4),
+                               Margin = new Thickness(0, 0, 8, 8),
+                               Padding = new Thickness(8, 4, 4, 4) };
+
+        var content = new StackPanel { Orientation = Orientation.Horizontal };
+
+        var label = new TextBlock { Text = processName, Foreground = Brushes.White, FontSize = 12,
+                                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
+
+        var removeButton = new Button { Content = "×",
+                                        Background = Brushes.Transparent,
+                                        Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                                        BorderThickness = new Thickness(0),
+                                        FontSize = 14,
+                                        FontWeight = FontWeights.Bold,
+                                        Width = 20,
+                                        Height = 20,
+                                        Padding = new Thickness(0),
+                                        VerticalContentAlignment = VerticalAlignment.Center,
+                                        HorizontalContentAlignment = HorizontalAlignment.Center,
+                                        Cursor = System.Windows.Input.Cursors.Hand };
+
+        // 应用简单的按钮模板
+        var template = new ControlTemplate(typeof(Button));
+        var borderFactory = new FrameworkElementFactory(typeof(Border));
+        borderFactory.Name = "border";
+        borderFactory.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(2));
+
+        var contentFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+        contentFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        contentFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        borderFactory.AppendChild(contentFactory);
+        template.VisualTree = borderFactory;
+
+        var mouseOverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        mouseOverTrigger.Setters.Add(
+            new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)), "border"));
+        mouseOverTrigger.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.White));
+        template.Triggers.Add(mouseOverTrigger);
+
+        removeButton.Template = template;
+        removeButton.Click += (s, e) => onRemove();
+
+        content.Children.Add(label);
+        content.Children.Add(removeButton);
+        tag.Child = content;
+
+        return tag;
+    }
+
+    /// <summary>
+    /// 创建 Popup 中的进程列表项
+    /// </summary>
+    private Border CreateProcessListItem(ProcessInfo processInfo, Action onClick)
+    {
+        var item = new Border { Background = Brushes.Transparent, Padding = new Thickness(8, 6, 8, 6),
+                                CornerRadius = new CornerRadius(3), Cursor = System.Windows.Input.Cursors.Hand };
+
+        var content = new StackPanel();
+
+        var processNameLabel = new TextBlock { Text = processInfo.ProcessName, Foreground = Brushes.White,
+                                               FontSize = 12, FontWeight = FontWeights.SemiBold };
+
+        var windowTitleLabel =
+            new TextBlock { Text = processInfo.WindowTitle,
+                            Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), FontSize = 11,
+                            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 230 };
+
+        content.Children.Add(processNameLabel);
+        if (!string.IsNullOrEmpty(processInfo.WindowTitle))
+        {
+            content.Children.Add(windowTitleLabel);
+        }
+        item.Child = content;
+
+        // 鼠标悬停效果
+        item.MouseEnter += (s, e) =>
+        { item.Background = new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)); };
+        item.MouseLeave += (s, e) =>
+        { item.Background = Brushes.Transparent; };
+
+        // 点击事件
+        item.MouseLeftButtonDown += (s, e) => onClick();
+
+        return item;
+    }
+
+#endregion
+
 #region Slider Rendering
 
     private FrameworkElement RenderSlider(SettingsItem item)
@@ -764,6 +1156,9 @@ public class SettingsUiRenderer
                                   MinWidth = 150,
                                   VerticalAlignment = VerticalAlignment.Center };
 
+        // 尝试应用共享样式
+        ApplyStyleIfExists(slider, "DarkSliderStyle");
+
         var valueLabel = new TextBlock { Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
                                          FontSize = 12,
                                          MinWidth = 40,
@@ -772,16 +1167,19 @@ public class SettingsUiRenderer
                                          Margin = new Thickness(8, 0, 0, 0) };
         Grid.SetColumn(valueLabel, 1);
 
+        // 确定显示格式
+        var displayFormat = DetermineSliderFormat(item);
+
         // 加载当前值或默认值
         var defaultValue = item.GetDefaultValue<double?>() ?? item.Min ?? 0;
         var currentValue = GetConfigValue(item.Key, defaultValue);
         slider.Value = currentValue;
-        valueLabel.Text = currentValue.ToString("F0");
+        valueLabel.Text = FormatSliderValue(currentValue, displayFormat);
 
         // 值变更事件
         slider.ValueChanged += (s, e) =>
         {
-            valueLabel.Text = slider.Value.ToString("F0");
+            valueLabel.Text = FormatSliderValue(slider.Value, displayFormat);
             if (!string.IsNullOrEmpty(item.Key))
             {
                 OnValueChanged(item.Key, slider.Value);
@@ -800,23 +1198,62 @@ public class SettingsUiRenderer
         return container;
     }
 
+    /// <summary>
+    /// 确定滑动条的显示格式
+    /// </summary>
+    /// <param name="item">设置项</param>
+    /// <returns>格式类型: "percent", "integer", "decimal"</returns>
+    internal static string DetermineSliderFormat(SettingsItem item)
+    {
+        // 如果明确指定了格式，使用指定的格式
+        if (!string.IsNullOrEmpty(item.Format))
+        {
+            return item.Format.ToLowerInvariant();
+        }
+
+        // 自动检测：min=0 且 max<=1 时使用百分比格式
+        var min = item.Min ?? 0;
+        var max = item.Max ?? 100;
+        if (min >= 0 && max <= 1)
+        {
+            return "percent";
+        }
+
+        // 默认使用整数格式
+        return "integer";
+    }
+
+    /// <summary>
+    /// 格式化滑动条值
+    /// </summary>
+    /// <param name="value">原始值</param>
+    /// <param name="format">格式类型</param>
+    /// <returns>格式化后的字符串</returns>
+    internal static string FormatSliderValue(double value, string format)
+    {
+        return format switch {
+            "percent" => $"{(value * 100):F0}%", "decimal" => value.ToString("F1"),
+            _ => value.ToString("F0") // "integer" 或其他
+        };
+    }
+
 #endregion
 
 #region Button Rendering
 
     private FrameworkElement RenderButton(SettingsItem item)
     {
-        var button = new Button { Content = item.Label ?? "按钮",
-                                  Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
-                                  Foreground = Brushes.White,
-                                  BorderThickness = new Thickness(0),
-                                  Padding = new Thickness(16, 8, 16, 8),
-                                  FontSize = 12,
-                                  Margin = new Thickness(0, 8, 0, 0),
-                                  MinWidth = 80 };
+        var button = new Button { Content = item.Label ?? "按钮", Padding = new Thickness(16, 8, 16, 8), FontSize = 12,
+                                  Margin = new Thickness(0, 8, 0, 0), MinWidth = 80 };
 
-        // 应用圆角按钮样式
-        ApplyRoundedButtonStyle(button);
+        // 尝试应用共享样式，如果不存在则使用回退样式
+        if (!ApplyStyleIfExists(button, "ActionButtonStyle"))
+        {
+            button.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+            button.Foreground = Brushes.White;
+            button.BorderThickness = new Thickness(0);
+            ApplyRoundedButtonStyle(button);
+        }
 
         button.Click += (s, e) =>
         { OnButtonAction(item.Action ?? string.Empty); };
@@ -825,7 +1262,7 @@ public class SettingsUiRenderer
     }
 
     /// <summary>
-    /// 应用圆角按钮样式
+    /// 回退：应用圆角按钮样式（用于测试环境）
     /// </summary>
     private void ApplyRoundedButtonStyle(Button button)
     {
@@ -899,6 +1336,45 @@ public class SettingsUiRenderer
 
 #endregion
 
+#region Style Helper Methods
+
+    /// <summary>
+    /// 从 Application.Current.Resources 获取共享样式
+    /// </summary>
+    /// <param name="key">样式键名</param>
+    /// <returns>找到的样式，如果不存在则返回 null</returns>
+    private static Style? GetStyle(string key)
+    {
+        try
+        {
+            return Application.Current?.TryFindResource(key) as Style;
+        }
+        catch
+        {
+            // 在测试环境中 Application.Current 可能为 null
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 尝试应用共享样式到控件
+    /// </summary>
+    /// <param name="element">目标控件</param>
+    /// <param name="styleKey">样式键名</param>
+    /// <returns>是否成功应用样式</returns>
+    private static bool ApplyStyleIfExists(FrameworkElement element, string styleKey)
+    {
+        var style = GetStyle(styleKey);
+        if (style != null)
+        {
+            element.Style = style;
+            return true;
+        }
+        return false;
+    }
+
+#endregion
+
 #region Helper Methods
 
     private StackPanel CreateItemContainer(string? label)
@@ -907,8 +1383,17 @@ public class SettingsUiRenderer
 
         if (!string.IsNullOrEmpty(label))
         {
-            container.Children.Add(new TextBlock { Text = label, Foreground = Brushes.White, FontSize = 12,
-                                                   Margin = new Thickness(0, 0, 0, 4) });
+            var labelBlock = new TextBlock { Text = label };
+
+            // 尝试应用共享样式，如果不存在则使用回退样式
+            if (!ApplyStyleIfExists(labelBlock, "SettingsLabelStyle"))
+            {
+                labelBlock.Foreground = Brushes.White;
+                labelBlock.FontSize = 12;
+            }
+            labelBlock.Margin = new Thickness(0, 0, 0, 4);
+
+            container.Children.Add(labelBlock);
         }
 
         return container;
@@ -996,6 +1481,11 @@ public class SettingsUiRenderer
                 // 使用 SettingsItem 中的默认值
                 slider.Value = item?.GetDefaultValue<double?>() ?? item?.Min ?? 0;
             }
+            break;
+        case WrapPanel tagsPanel:
+            // ProcessList 控件：刷新标签列表
+            // 注意：由于 ProcessList 使用闭包来管理状态，这里只能重新加载配置值
+            // 实际的刷新需要重新渲染整个控件，这里暂时不支持动态刷新
             break;
         }
     }

@@ -31,7 +31,7 @@ public class GameProfileTests
         Assert.Null(profile.QuickLinks);
         Assert.Null(profile.Tools);
         Assert.Null(profile.CustomScript);
-        Assert.Null(profile.CursorDetection);
+        Assert.Null(profile.PluginConfigs);
     }
 
     [Fact]
@@ -161,31 +161,6 @@ public class GameProfileTests
         Assert.True(tool.RunAsAdmin);
     }
 
-    [Fact]
-    public void CursorDetectionConfig_WithDefaultValues_HasCorrectDefaults()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig();
-
-        // Assert
-        // Enabled 是 bool? 类型，null 表示继承全局设置
-        Assert.Null(config.Enabled);
-        Assert.Null(config.MinOpacity);      // null 表示继承全局
-        Assert.Null(config.CheckIntervalMs); // null 表示继承全局
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_WithCustomValues_StoresCorrectly()
-    {
-        // Arrange & Act
-        var cursorConfig = new CursorDetectionConfig { Enabled = true, MinOpacity = 0.5, CheckIntervalMs = 100 };
-
-        // Assert
-        Assert.True(cursorConfig.Enabled);
-        Assert.Equal(0.5, cursorConfig.MinOpacity);
-        Assert.Equal(100, cursorConfig.CheckIntervalMs);
-    }
-
 #endregion
 
 #region Serialization / Deserialization Tests - 3.2.2
@@ -204,8 +179,7 @@ public class GameProfileTests
             QuickLinks =
                 new List<QuickLink> { new QuickLink { Label = "Test", Url = "https://test.com", Type = "url" } },
             Tools = new List<ExternalTool> { new ExternalTool { Label = "Tool", Path = "C:\\tool.exe" } },
-            CustomScript = "test.js",
-            CursorDetection = new CursorDetectionConfig { Enabled = true, MinOpacity = 0.4, CheckIntervalMs = 150 }
+            CustomScript = "test.js"
         };
 
         // Act
@@ -241,12 +215,7 @@ public class GameProfileTests
 ""tools"": [
     { ""label"": ""Editor"", ""path"": ""C:\\editor.exe"" }
 ],
-""customScript"": ""custom.js"",
-""cursorDetection"": {
-    ""enabled"": true,
-    ""minOpacity"": 0.5,
-    ""checkIntervalMs"": 300
-}
+""customScript"": ""custom.js""
 }";
 
         // Act
@@ -273,10 +242,6 @@ public class GameProfileTests
         Assert.Single(profile.Tools);
         Assert.Equal("Editor", profile.Tools[0].Label);
         Assert.Equal("custom.js", profile.CustomScript);
-        Assert.NotNull(profile.CursorDetection);
-        Assert.True(profile.CursorDetection.Enabled);
-        Assert.Equal(0.5, profile.CursorDetection.MinOpacity);
-        Assert.Equal(300, profile.CursorDetection.CheckIntervalMs);
     }
 
     [Fact]
@@ -298,8 +263,7 @@ public class GameProfileTests
                                                                 Args = "--arg1", RunAsAdmin = false },
                                              new ExternalTool { Label = "Tool2", Path = "C:\\tool2.exe",
                                                                 Args = "--arg2", RunAsAdmin = true } },
-            CustomScript = "roundtrip.js",
-            CursorDetection = new CursorDetectionConfig { Enabled = true, MinOpacity = 0.6, CheckIntervalMs = 250 }
+            CustomScript = "roundtrip.js"
         };
 
         // Act
@@ -333,10 +297,6 @@ public class GameProfileTests
         Assert.Equal(original.Tools[0].RunAsAdmin, deserialized.Tools[0].RunAsAdmin);
         Assert.Equal(original.Tools[1].RunAsAdmin, deserialized.Tools[1].RunAsAdmin);
         Assert.Equal(original.CustomScript, deserialized.CustomScript);
-        Assert.NotNull(deserialized.CursorDetection);
-        Assert.Equal(original.CursorDetection.Enabled, deserialized.CursorDetection.Enabled);
-        Assert.Equal(original.CursorDetection.MinOpacity, deserialized.CursorDetection.MinOpacity);
-        Assert.Equal(original.CursorDetection.CheckIntervalMs, deserialized.CursorDetection.CheckIntervalMs);
     }
 
     [Fact]
@@ -363,7 +323,6 @@ public class GameProfileTests
         Assert.Null(profile.QuickLinks);
         Assert.Null(profile.Tools);
         Assert.Null(profile.CustomScript);
-        Assert.Null(profile.CursorDetection);
     }
 
     [Fact]
@@ -571,201 +530,73 @@ public class GameProfileTests
         Assert.False(tool.RunAsAdmin);
     }
 
-    [Fact]
-    public void CursorDetectionConfig_DefaultEnabled_IsNull()
-    {
-        // Act
-        var config = new CursorDetectionConfig();
-
-        // Assert
-        // Enabled 是 bool? 类型，null 表示继承全局设置
-        Assert.Null(config.Enabled);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_DefaultMinOpacity_IsNull()
-    {
-        // Act
-        var config = new CursorDetectionConfig();
-
-        // Assert
-        // MinOpacity 是 double? 类型，null 表示继承全局设置
-        Assert.Null(config.MinOpacity);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_DefaultCheckIntervalMs_IsNull()
-    {
-        // Act
-        var config = new CursorDetectionConfig();
-
-        // Assert
-        // CheckIntervalMs 是 int? 类型，null 表示继承全局设置
-        Assert.Null(config.CheckIntervalMs);
-    }
-
 #endregion
 
-#region CursorDetection Whitelist Tests - 6.3.1
+#region PluginConfigs Tests
 
     [Fact]
-    public void CursorDetectionConfig_ProcessWhitelist_WithDefaults_IsNull()
+    public void GameProfile_PluginConfigs_WithDefaults_IsNull()
     {
         // Arrange & Act
-        var config = new CursorDetectionConfig();
+        var profile = new GameProfile();
 
         // Assert
-        Assert.Null(config.ProcessWhitelist); // 继承全局
+        Assert.Null(profile.PluginConfigs);
     }
 
     [Fact]
-    public void CursorDetectionConfig_ProcessWhitelist_WithCustomValues_StoresCorrectly()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig { ProcessWhitelist = new List<string> { "game1", "game2", "game3" } };
-
-        // Assert
-        Assert.NotNull(config.ProcessWhitelist);
-        Assert.Equal(3, config.ProcessWhitelist.Count);
-        Assert.Contains("game1", config.ProcessWhitelist);
-        Assert.Contains("game2", config.ProcessWhitelist);
-        Assert.Contains("game3", config.ProcessWhitelist);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_ProcessWhitelist_WithEmptyList_AllowsEmpty()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig { ProcessWhitelist = new List<string>() };
-
-        // Assert
-        Assert.NotNull(config.ProcessWhitelist);
-        Assert.Empty(config.ProcessWhitelist);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_Enabled_WithNull_InheritsGlobal()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig { Enabled = null, // 继承全局
-                                                 MinOpacity = 0.5 };
-
-        // Assert
-        Assert.Null(config.Enabled);
-        Assert.Equal(0.5, config.MinOpacity);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_Enabled_WithTrue_OverridesGlobal()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig {
-            Enabled = true // 覆盖全局设置
-        };
-
-        // Assert
-        Assert.True(config.Enabled);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_MinOpacity_WithNull_InheritsGlobal()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig {
-            MinOpacity = null // 继承全局
-        };
-
-        // Assert
-        Assert.Null(config.MinOpacity);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_MinOpacity_WithValue_OverridesGlobal()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig {
-            MinOpacity = 0.7 // 覆盖全局设置
-        };
-
-        // Assert
-        Assert.Equal(0.7, config.MinOpacity);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_CheckIntervalMs_WithNull_InheritsGlobal()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig {
-            CheckIntervalMs = null // 继承全局
-        };
-
-        // Assert
-        Assert.Null(config.CheckIntervalMs);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_CheckIntervalMs_WithValue_OverridesGlobal()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig {
-            CheckIntervalMs = 300 // 覆盖全局设置
-        };
-
-        // Assert
-        Assert.Equal(300, config.CheckIntervalMs);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_EnableDebugLog_WithFalse_IsDefault()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig();
-
-        // Assert
-        Assert.False(config.EnableDebugLog);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_EnableDebugLog_WithTrue_WorksCorrectly()
-    {
-        // Arrange & Act
-        var config = new CursorDetectionConfig { EnableDebugLog = true };
-
-        // Assert
-        Assert.True(config.EnableDebugLog);
-    }
-
-    [Fact]
-    public void GameProfile_Serialize_WithWhitelist_ProducesCorrectJson()
+    public void GameProfile_PluginConfigs_WithCustomValues_StoresCorrectly()
     {
         // Arrange
-        var profile =
-            new GameProfile { Id = "test", Name = "Test",
-                              CursorDetection = new CursorDetectionConfig {
-                                  Enabled = true, ProcessWhitelist = new List<string> { "eldenring" }, MinOpacity = 0.4
-                              } };
+        var pluginConfigs = new Dictionary<string, Dictionary<string, JsonElement>> {
+            ["test-plugin"] =
+                new Dictionary<string, JsonElement> { ["setting1"] = JsonDocument.Parse("\"value1\"").RootElement,
+                                                      ["setting2"] = JsonDocument.Parse("123").RootElement }
+        };
+
+        // Act
+        var profile = new GameProfile { PluginConfigs = pluginConfigs };
+
+        // Assert
+        Assert.NotNull(profile.PluginConfigs);
+        Assert.Single(profile.PluginConfigs);
+        Assert.True(profile.PluginConfigs.ContainsKey("test-plugin"));
+    }
+
+    [Fact]
+    public void GameProfile_Serialize_WithPluginConfigs_ProducesCorrectJson()
+    {
+        // Arrange
+        var pluginConfigs = new Dictionary<string, Dictionary<string, JsonElement>> {
+            ["smart-cursor-detection"] =
+                new Dictionary<string, JsonElement> { ["processWhitelist"] =
+                                                          JsonDocument.Parse("\"YuanShen, GenshinImpact\"")
+                                                              .RootElement }
+        };
+
+        var profile = new GameProfile { Id = "test", Name = "Test", PluginConfigs = pluginConfigs };
 
         // Act
         var json = JsonSerializer.Serialize(profile, JsonHelper.WriteOptions);
 
         // Assert
-        Assert.Contains("processWhitelist", json); // JSON 使用 camelCase
-        Assert.Contains("eldenring", json);
+        Assert.Contains("pluginConfigs", json);
+        Assert.Contains("smart-cursor-detection", json);
+        Assert.Contains("processWhitelist", json);
     }
 
     [Fact]
-    public void GameProfile_Deserialize_WithWhitelist_ProducesCorrectConfig()
+    public void GameProfile_Deserialize_WithPluginConfigs_ProducesCorrectConfig()
     {
         // Arrange
         var json = @"{
-""id"": ""whitelist_test"",
-""name"": ""Whitelist Test"",
-""cursorDetection"": {
-    ""enabled"": true,
-    ""processWhitelist"": [""game1"", ""game2""],
-    ""minOpacity"": 0.6,
-    ""checkIntervalMs"": 250,
-    ""enableDebugLog"": true
+""id"": ""plugin_config_test"",
+""name"": ""Plugin Config Test"",
+""pluginConfigs"": {
+    ""test-plugin"": {
+        ""enabled"": true,
+        ""threshold"": 0.5
+    }
 }
 }";
 
@@ -774,29 +605,11 @@ public class GameProfileTests
 
         // Assert
         Assert.NotNull(profile);
-        Assert.NotNull(profile.CursorDetection);
-        Assert.True(profile.CursorDetection.Enabled);
-        Assert.NotNull(profile.CursorDetection.ProcessWhitelist);
-        Assert.Equal(2, profile.CursorDetection.ProcessWhitelist.Count);
-        Assert.Contains("game1", profile.CursorDetection.ProcessWhitelist);
-        Assert.Contains("game2", profile.CursorDetection.ProcessWhitelist);
-        Assert.Equal(0.6, profile.CursorDetection.MinOpacity);
-        Assert.Equal(250, profile.CursorDetection.CheckIntervalMs);
-        Assert.True(profile.CursorDetection.EnableDebugLog);
-    }
-
-    [Fact]
-    public void CursorDetectionConfig_NullValues_SerializeCorrectly()
-    {
-        // Arrange
-        var config = new CursorDetectionConfig { Enabled = null, ProcessWhitelist = null, MinOpacity = null,
-                                                 CheckIntervalMs = null };
-
-        // Act
-        var json = JsonSerializer.Serialize(config, JsonHelper.WriteOptions);
-
-        // Assert - null 值应被序列化为 null
-        Assert.NotNull(json);
+        Assert.NotNull(profile.PluginConfigs);
+        Assert.True(profile.PluginConfigs.ContainsKey("test-plugin"));
+        var pluginConfig = profile.PluginConfigs["test-plugin"];
+        Assert.True(pluginConfig.ContainsKey("enabled"));
+        Assert.True(pluginConfig.ContainsKey("threshold"));
     }
 
 #endregion

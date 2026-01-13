@@ -69,19 +69,14 @@ public class ProfileManagerPropertyTests : IDisposable
         return manager;
     }
 
-    private void CreateTestProfile(string id, string name, string icon, ProfileDefaults? defaults = null,
-                                   CursorDetectionConfig? cursorDetection = null)
+    private void CreateTestProfile(string id, string name, string icon, ProfileDefaults? defaults = null)
     {
         var profileDir = Path.Combine(_profilesDir, id);
         Directory.CreateDirectory(profileDir);
 
-        var profile = new GameProfile { Id = id,
-                                        Name = name,
-                                        Icon = icon,
-                                        Version = 1,
-                                        Defaults = defaults ??
-                                                   new ProfileDefaults { Url = "https://example.com", SeekSeconds = 5 },
-                                        CursorDetection = cursorDetection };
+        var profile = new GameProfile { Id = id, Name = name, Icon = icon, Version = 1,
+                                        Defaults = defaults ?? new ProfileDefaults { Url = "https://example.com",
+                                                                                     SeekSeconds = 5 } };
 
         var options =
             new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -212,76 +207,6 @@ public class ProfileManagerPropertyTests : IDisposable
     /// **Feature: profile-edit-expansion, Property 8: UpdateProfile Preserves Unchanged Fields**
     /// **Validates: Requirements 5.1, 5.2, 5.3**
     ///
-    /// *For any* Profile and ProfileUpdateData where CursorDetection is null and ClearCursorDetection is false,
-    /// calling UpdateProfile SHALL preserve the original CursorDetection value.
-    /// </summary>
-    [Property(MaxTest = 100)]
-    public Property UpdateProfile_WithNullCursorDetection_PreservesOriginalCursorDetection()
-    {
-        return Prop.ForAll(Arb.From<bool>(), Arb.From<NormalFloat>(),
-                           (enabled, minOpacity) =>
-                           {
-                               // Clamp opacity to valid range
-                               var validOpacity = Math.Max(0.2, Math.Min(1.0, Math.Abs(minOpacity.Get)));
-
-                               // Arrange
-                               var originalCursorDetection =
-                                   new CursorDetectionConfig { Enabled = enabled, MinOpacity = validOpacity };
-
-                               var profile = new GameProfile { Id = "test-profile", Name = "Test", Icon = "🎮",
-                                                               CursorDetection = originalCursorDetection };
-
-                               var updateData =
-                                   new ProfileUpdateData { Name = "Updated Name",
-                                                           CursorDetection = null, // Not updating cursor detection
-                                                           ClearCursorDetection = false };
-
-                               // Act - Apply partial update logic
-                               var updatedProfile = ApplyPartialUpdate(profile, updateData);
-
-                               // Assert - CursorDetection should be preserved
-                               return updatedProfile.CursorDetection != null &&
-                                      updatedProfile.CursorDetection.Enabled == originalCursorDetection.Enabled &&
-                                      updatedProfile.CursorDetection.MinOpacity == originalCursorDetection.MinOpacity;
-                           });
-    }
-
-    /// <summary>
-    /// **Feature: profile-edit-expansion, Property 8: UpdateProfile Preserves Unchanged Fields**
-    /// **Validates: Requirements 5.1, 5.2, 5.3**
-    ///
-    /// *For any* Profile, when ClearCursorDetection is true,
-    /// calling UpdateProfile SHALL set CursorDetection to null.
-    /// </summary>
-    [Property(MaxTest = 100)]
-    public Property UpdateProfile_WithClearCursorDetection_SetsCursorDetectionToNull()
-    {
-        return Prop.ForAll(
-            Arb.From<bool>(),
-            (enabled) =>
-            {
-                // Arrange
-                var profile = new GameProfile { Id = "test-profile", Name = "Test", Icon = "🎮",
-                                                CursorDetection =
-                                                    new CursorDetectionConfig { Enabled = enabled, MinOpacity = 0.5 } };
-
-                var updateData = new ProfileUpdateData {
-                    ClearCursorDetection = true,
-                    CursorDetection = new CursorDetectionConfig { Enabled = true } // This should be ignored
-                };
-
-                // Act - Apply partial update logic
-                var updatedProfile = ApplyPartialUpdate(profile, updateData);
-
-                // Assert - CursorDetection should be null
-                return updatedProfile.CursorDetection == null;
-            });
-    }
-
-    /// <summary>
-    /// **Feature: profile-edit-expansion, Property 8: UpdateProfile Preserves Unchanged Fields**
-    /// **Validates: Requirements 5.1, 5.2, 5.3**
-    ///
     /// *For any* Profile and ProfileUpdateData with non-null Defaults,
     /// calling UpdateProfile SHALL update the Defaults value.
     /// </summary>
@@ -332,8 +257,7 @@ public class ProfileManagerPropertyTests : IDisposable
                                        Defaults = profile.Defaults,
                                        QuickLinks = profile.QuickLinks,
                                        Tools = profile.Tools,
-                                       CustomScript = profile.CustomScript,
-                                       CursorDetection = profile.CursorDetection };
+                                       CustomScript = profile.CustomScript };
 
         // Apply partial updates (same logic as ProfileManager.UpdateProfile)
         if (updateData.Name != null)
@@ -349,16 +273,6 @@ public class ProfileManagerPropertyTests : IDisposable
         if (updateData.Defaults != null)
         {
             result.Defaults = updateData.Defaults;
-        }
-
-        // Handle CursorDetection: ClearCursorDetection takes priority
-        if (updateData.ClearCursorDetection)
-        {
-            result.CursorDetection = null;
-        }
-        else if (updateData.CursorDetection != null)
-        {
-            result.CursorDetection = updateData.CursorDetection;
         }
 
         return result;

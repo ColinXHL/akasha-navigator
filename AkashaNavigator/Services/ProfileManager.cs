@@ -490,16 +490,6 @@ public class ProfileManager : IProfileManager
                 profile.Defaults = updateData.Defaults;
             }
 
-            // 处理 CursorDetection：ClearCursorDetection 优先级高于 CursorDetection
-            if (updateData.ClearCursorDetection)
-            {
-                profile.CursorDetection = null;
-            }
-            else if (updateData.CursorDetection != null)
-            {
-                profile.CursorDetection = updateData.CursorDetection;
-            }
-
             // 保存到文件
             SaveProfile(profile);
 
@@ -890,6 +880,12 @@ public class ProfileManager : IProfileManager
             var profileConfig = data.ProfileConfig ?? new GameProfile { Id = data.ProfileId, Name = data.ProfileName };
             profileConfig.Id = data.ProfileId; // 确保 ID 一致
             SaveProfile(profileConfig);
+
+            // 应用插件预设配置（如果有）
+            if (profileConfig.PluginConfigs != null && profileConfig.PluginConfigs.Count > 0)
+            {
+                _pluginAssociationManager.ApplyPluginPresetConfigs(data.ProfileId, profileConfig.PluginConfigs);
+            }
 
             // 创建插件关联
             foreach (var reference in data.PluginReferences)

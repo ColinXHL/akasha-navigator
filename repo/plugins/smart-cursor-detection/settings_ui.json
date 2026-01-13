@@ -1,0 +1,45 @@
+{
+  "sections": [
+    {
+      "title": "基本设置",
+      "items": [
+        {
+          "type": "processList",
+          "key": "processWhitelist",
+          "label": "监控进程列表",
+          "placeholder": "输入进程名（不含 .exe）",
+          "default": ""
+        },
+        {
+          "type": "slider",
+          "key": "minOpacity",
+          "label": "UI 模式最低透明度",
+          "default": 0.3,
+          "min": 0.1,
+          "max": 1.0,
+          "step": 0.1,
+          "format": "percent"
+        },
+        {
+          "type": "number",
+          "key": "intervalMs",
+          "label": "检测间隔（毫秒）",
+          "default": 200,
+          "min": 50,
+          "max": 1000,
+          "step": 50
+        }
+      ]
+    },
+    {
+      "title": "其他",
+      "items": [
+        {
+          "type": "button",
+          "label": "📂 打开插件目录",
+          "action": "openPluginFolder"
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace AkashaNavigator.Models.Profile
 {
@@ -54,9 +55,11 @@ public class GameProfile
     public string? CustomScript { get; set; }
 
     /// <summary>
-    /// 鼠标检测配置
+    /// 插件预设配置
+    /// Key: 插件ID, Value: 配置对象
+    /// 安装 Profile 时自动应用到插件配置
     /// </summary>
-    public CursorDetectionConfig? CursorDetection { get; set; }
+    public Dictionary<string, Dictionary<string, JsonElement>>? PluginConfigs { get; set; }
 }
 
 /// <summary>
@@ -146,37 +149,5 @@ public class ExternalTool
     /// 是否以管理员身份运行
     /// </summary>
     public bool RunAsAdmin { get; set; }
-}
-
-/// <summary>
-/// 鼠标检测配置
-/// 支持继承全局配置（null 值表示使用全局设置）
-/// </summary>
-public class CursorDetectionConfig
-{
-    /// <summary>
-    /// 是否启用鼠标检测（null = 继承全局设置）
-    /// </summary>
-    public bool? Enabled { get; set; } = null;
-
-    /// <summary>
-    /// Profile 级别的进程白名单（null 或空 = 使用全局白名单）
-    /// </summary>
-    public List<string>? ProcessWhitelist { get; set; }
-
-    /// <summary>
-    /// UI 模式下的最低透明度（null = 使用全局设置）
-    /// </summary>
-    public double? MinOpacity { get; set; } = null;
-
-    /// <summary>
-    /// 检测间隔（毫秒，null = 使用全局设置）
-    /// </summary>
-    public int? CheckIntervalMs { get; set; } = null;
-
-    /// <summary>
-    /// 是否启用调试日志
-    /// </summary>
-    public bool EnableDebugLog { get; set; } = false;
 }
 }

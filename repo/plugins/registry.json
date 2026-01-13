@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2025-12-15",
+  "updated": "2026-01-13",
   "plugins": [
     {
       "id": "genshin-direction-marker",
@@ -10,6 +10,18 @@
       "description": "识别攻略视频中的方位词，在小地图上显示方向标记",
       "tags": ["原神", "genshin", "方向", "小地图", "字幕"],
       "permissions": ["subtitle", "overlay"],
+      "profiles": ["genshin"],
+      "downloads": 0,
+      "stars": 0
+    },
+    {
+      "id": "smart-cursor-detection",
+      "name": "智能鼠标检测",
+      "version": "1.0.0",
+      "author": "AkashaNavigator",
+      "description": "检测游戏内鼠标状态，自动切换播放器点击穿透模式",
+      "tags": ["鼠标检测", "点击穿透", "游戏", "cursor", "click-through"],
+      "permissions": ["window", "events"],
       "profiles": ["genshin"],
       "downloads": 0,
       "stars": 0

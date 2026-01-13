@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Core.Interfaces;
@@ -110,8 +111,7 @@ public class PluginAssociationManager : IPluginAssociationManager
     /// </summary>
     public static IPluginAssociationManager Instance
     {
-        get
-        {
+        get {
             if (_instance == null)
             {
                 // 使用 DI 容器中的实例，避免创建单独的 PluginLibrary.Instance
@@ -417,7 +417,7 @@ public class PluginAssociationManager : IPluginAssociationManager
             if (File.Exists(profileConfigPath))
             {
                 _logService.Debug(nameof(PluginAssociationManager),
-                                          $"Profile 配置已存在，跳过复制: {profileConfigPath}");
+                                  $"Profile 配置已存在，跳过复制: {profileConfigPath}");
                 return;
             }
 
@@ -429,12 +429,12 @@ public class PluginAssociationManager : IPluginAssociationManager
             {
                 File.Copy(globalConfigPath, profileConfigPath);
                 _logService.Debug(nameof(PluginAssociationManager),
-                                          $"已复制全局配置到 Profile: {globalConfigPath} -> {profileConfigPath}");
+                                  $"已复制全局配置到 Profile: {globalConfigPath} -> {profileConfigPath}");
             }
             else
             {
                 _logService.Debug(nameof(PluginAssociationManager),
-                                          "全局配置不存在，将使用默认配置: {GlobalConfigPath}", globalConfigPath);
+                                  "全局配置不存在，将使用默认配置: {GlobalConfigPath}", globalConfigPath);
             }
         }
         catch (Exception ex)
@@ -822,6 +822,76 @@ public class PluginAssociationManager : IPluginAssociationManager
             {
                 _index.OriginalPlugins.Remove(profileId);
                 SaveIndex();
+            }
+        }
+    }
+
+#endregion
+
+#region Plugin Preset Configs(插件预设配置)
+
+    /// <summary>
+    /// 应用 Profile 的插件预设配置
+    /// 将 Profile 中定义的 pluginConfigs 应用到对应的插件配置目录
+    /// 如果配置文件已存在，则不覆盖
+    /// </summary>
+    /// <param name="profileId">Profile ID</param>
+    /// <param name="presetConfigs">预设配置字典，Key: 插件ID, Value: 配置对象（settings 内容）</param>
+    public void ApplyPluginPresetConfigs(string profileId,
+                                         Dictionary<string, Dictionary<string, JsonElement>>? presetConfigs)
+    {
+        if (string.IsNullOrEmpty(profileId))
+        {
+            _logService.Warn(nameof(PluginAssociationManager), "ApplyPluginPresetConfigs: profileId 为空");
+            return;
+        }
+
+        if (presetConfigs == null || presetConfigs.Count == 0)
+        {
+            _logService.Debug(nameof(PluginAssociationManager), "ApplyPluginPresetConfigs: 没有预设配置需要应用");
+            return;
+        }
+
+        foreach (var (pluginId, settingsConfig) in presetConfigs)
+        {
+            if (string.IsNullOrEmpty(pluginId))
+            {
+                _logService.Warn(nameof(PluginAssociationManager), "ApplyPluginPresetConfigs: 跳过空的插件ID");
+                continue;
+            }
+
+            try
+            {
+                // 获取 Profile 配置目录
+                var configDir = AppPaths.GetPluginConfigDirectory(profileId, pluginId);
+                var configPath = Path.Combine(configDir, AppConstants.PluginConfigFileName);
+
+                // 如果配置文件已存在，不覆盖
+                if (File.Exists(configPath))
+                {
+                    _logService.Debug(nameof(PluginAssociationManager), $"插件配置已存在，跳过预设配置: {configPath}");
+                    continue;
+                }
+
+                // 确保目录存在
+                Directory.CreateDirectory(configDir);
+
+                // 构建完整的 PluginConfig 格式
+                // PluginConfig 期望格式: { "pluginId": "xxx", "enabled": true, "settings": { ... } }
+                var fullConfig = new Dictionary<string, object> { ["pluginId"] = pluginId, ["enabled"] = true,
+                                                                  ["settings"] = settingsConfig };
+
+                // 序列化配置并写入文件
+                var json = JsonSerializer.Serialize(fullConfig, JsonHelper.WriteOptions);
+                File.WriteAllText(configPath, json);
+
+                _logService.Info(nameof(PluginAssociationManager),
+                                 $"已应用插件预设配置: Profile={profileId}, Plugin={pluginId}");
+            }
+            catch (Exception ex)
+            {
+                _logService.Error(nameof(PluginAssociationManager), ex,
+                                  $"应用插件预设配置失败: Profile={profileId}, Plugin={pluginId}");
             }
         }
     }

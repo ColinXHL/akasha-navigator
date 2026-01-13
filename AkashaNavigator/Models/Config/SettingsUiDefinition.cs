@@ -153,6 +153,13 @@ public class SettingsItem
     public List<SettingsItem>? Items { get; set; }
 
     /// <summary>
+    /// 显示格式（用于 slider 类型）
+    /// 可选值: "percent", "integer", "decimal", null (自动检测)
+    /// </summary>
+    [JsonPropertyName("format")]
+    public string? Format { get; set; }
+
+    /// <summary>
     /// 获取默认值
     /// </summary>
     public T? GetDefaultValue<T>()

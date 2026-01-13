@@ -70,26 +70,6 @@ public partial class PlayerWindow : Window
     private WindowBehaviorHelper _windowBehavior = null!;
 
     /// <summary>
-    /// 鼠标检测前保存的透明度
-    /// </summary>
-    private double _opacityBeforeCursorDetection = 1.0;
-
-    /// <summary>
-    /// 鼠标检测配置的最低透明度
-    /// </summary>
-    private double _cursorDetectionMinOpacity = 0.3;
-
-    /// <summary>
-    /// 是否因鼠标检测而降低了透明度
-    /// </summary>
-    private bool _isOpacityReducedByCursorDetection;
-
-    /// <summary>
-    /// 鼠标检测白名单（进程名集合）
-    /// </summary>
-    private HashSet<string>? _cursorDetectionWhitelist;
-
-    /// <summary>
     /// 视频时间同步定时器
     /// </summary>
     private DispatcherTimer? _videoTimeSyncTimer;
@@ -155,12 +135,6 @@ public partial class PlayerWindow : Window
 
         // 订阅 ViewModel 的导航请求
         _viewModel.NavigationRequested += OnViewModelNavigationRequested;
-
-        // 订阅 Profile 切换事件
-        _profileManager.ProfileChanged += OnProfileChanged;
-
-        // 初始化鼠标检测（如果当前 Profile 启用了）
-        InitializeCursorDetection();
 
         // 窗口关闭时清理
         Closing += PlayerWindow_Closing;
@@ -542,6 +516,9 @@ public partial class PlayerWindow : Window
         {
             _windowBehavior.SuspendClickThroughForMaximize();
 
+            // 暂停鼠标检测（全屏时不需要降低透明度）
+            _cursorDetectionService.Suspend();
+
             _restoreBounds = new Rect(Left, Top, Width, Height);
             var workArea = SystemParameters.WorkArea;
             Left = workArea.Left;
@@ -560,6 +537,9 @@ public partial class PlayerWindow : Window
 
             // 还原后恢复穿透模式
             _windowBehavior.ResumeClickThroughAfterRestore();
+
+            // 恢复鼠标检测（会立即检测当前状态）
+            _cursorDetectionService.Resume();
         }
     }
 
@@ -591,6 +571,11 @@ public partial class PlayerWindow : Window
     /// 当前页面 URL
     /// </summary>
     public string CurrentUrl => WebView.CoreWebView2?.Source ?? string.Empty;
+
+    /// <summary>
+    /// 是否处于自动点击穿透模式（插件控制）
+    /// </summary>
+    public bool IsAutoClickThrough => _windowBehavior.IsAutoClickThrough;
 
 #endregion
 
@@ -738,6 +723,23 @@ public partial class PlayerWindow : Window
         // WebView.Visibility = result ? Visibility.Hidden : Visibility.Visible;
 
         return result;
+    }
+
+    /// <summary>
+    /// 设置自动点击穿透状态（由插件控制）
+    /// </summary>
+    /// <param name="enabled">是否启用自动穿透</param>
+    public void SetAutoClickThrough(bool enabled)
+    {
+        _windowBehavior.SetAutoClickThrough(enabled);
+    }
+
+    /// <summary>
+    /// 重置自动点击穿透状态（插件卸载或禁用时调用）
+    /// </summary>
+    public void ResetAutoClickThrough()
+    {
+        _windowBehavior.ResetAutoClickThrough();
     }
 
     /// <summary>
@@ -1042,169 +1044,6 @@ public partial class PlayerWindow : Window
 
 #endregion
 
-#region Cursor Detection
-
-    /// <summary>
-    /// 解析鼠标检测配置（合并全局 + Profile）
-    /// 只检查配置是否启用，不检查前台进程（由检测服务内部持续检查）
-    /// </summary>
-    /// <returns>元组：是否启用、最低透明度、检测间隔、调试日志、白名单</returns>
-    private (bool enabled, double minOpacity, int intervalMs, bool debugLog, HashSet<string> whitelist)
-        ResolveCursorDetectionConfig()
-    {
-        var profile = _profileManager.CurrentProfile;
-        var globalConfig = _configService.Config.CursorDetection;
-        var profileConfig = profile?.CursorDetection;
-
-        // 合并白名单（Profile + 全局）
-        var whitelist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (globalConfig?.ProcessWhitelist != null)
-        {
-            foreach (var p in globalConfig.ProcessWhitelist)
-                whitelist.Add(p);
-        }
-        if (profileConfig?.ProcessWhitelist != null)
-        {
-            foreach (var p in profileConfig.ProcessWhitelist)
-                whitelist.Add(p);
-        }
-
-        // 确定是否启用（只要全局或 Profile 任一启用且白名单非空）
-        bool enabled = false;
-        if (whitelist.Count > 0)
-        {
-            // 有白名单，检查是否启用
-            if (profileConfig?.ProcessWhitelist != null && profileConfig.ProcessWhitelist.Count > 0)
-            {
-                // Profile 有白名单，使用 Profile 的 Enabled
-                enabled = profileConfig?.Enabled ?? globalConfig?.Enabled ?? false;
-            }
-            else
-            {
-                // 仅全局白名单，使用全局的 Enabled
-                enabled = globalConfig?.Enabled ?? false;
-            }
-        }
-
-        // 合并其他配置（Profile 优先，全局兜底）
-        double minOpacity = profileConfig?.MinOpacity ?? globalConfig?.MinOpacity ?? 0.3;
-        int intervalMs = profileConfig?.CheckIntervalMs ?? globalConfig?.CheckIntervalMs ?? 200;
-        bool debugLog = profileConfig?.EnableDebugLog ?? globalConfig?.EnableDebugLog ?? false;
-
-        return (enabled, minOpacity, intervalMs, debugLog, whitelist);
-    }
-
-    /// <summary>
-    /// 初始化鼠标检测
-    /// </summary>
-    private void InitializeCursorDetection()
-    {
-        var (enabled, minOpacity, intervalMs, debugLog, whitelist) = ResolveCursorDetectionConfig();
-
-        if (enabled && whitelist.Count > 0)
-        {
-            StartCursorDetection(minOpacity, intervalMs, debugLog, whitelist);
-        }
-    }
-
-    /// <summary>
-    /// 启动鼠标检测
-    /// </summary>
-    private void StartCursorDetection(double minOpacity, int intervalMs, bool debugLog, HashSet<string> whitelist)
-    {
-        // 保存配置
-        _cursorDetectionMinOpacity = minOpacity;
-        _cursorDetectionWhitelist = whitelist;
-
-        // 订阅事件
-        _cursorDetectionService.CursorShown += OnCursorShown;
-        _cursorDetectionService.CursorHidden += OnCursorHidden;
-
-        // 启动检测（传入白名单，由检测服务内部判断前台进程）
-        _cursorDetectionService.StartWithWhitelist(whitelist, intervalMs, debugLog);
-    }
-
-    /// <summary>
-    /// 停止鼠标检测
-    /// </summary>
-    private void StopCursorDetection()
-    {
-        _cursorDetectionService.CursorShown -= OnCursorShown;
-        _cursorDetectionService.CursorHidden -= OnCursorHidden;
-        _cursorDetectionService.Stop();
-
-        // 如果之前因鼠标检测降低了透明度，恢复
-        if (_isOpacityReducedByCursorDetection)
-        {
-            _windowBehavior.SetInitialOpacity(_opacityBeforeCursorDetection);
-            Win32Helper.SetWindowOpacity(this, _opacityBeforeCursorDetection);
-            _isOpacityReducedByCursorDetection = false;
-        }
-    }
-
-    /// <summary>
-    /// Profile 切换事件处理
-    /// </summary>
-    private void OnProfileChanged(object? sender, GameProfile profile)
-    {
-        // 停止当前鼠标检测
-        StopCursorDetection();
-
-        // 重新解析配置并启动（如果启用）
-        var (enabled, minOpacity, intervalMs, debugLog, whitelist) = ResolveCursorDetectionConfig();
-        if (enabled && whitelist.Count > 0)
-        {
-            StartCursorDetection(minOpacity, intervalMs, debugLog, whitelist);
-        }
-    }
-
-    /// <summary>
-    /// 鼠标显示事件处理
-    /// </summary>
-    private void OnCursorShown(object? sender, EventArgs e)
-    {
-        // 在 UI 线程执行
-        Dispatcher.BeginInvoke(() =>
-                               {
-                                   // 如果处于穿透模式，不处理
-                                   if (_windowBehavior.IsClickThrough)
-                                       return;
-
-                                   // 保存当前透明度并降低
-                                   if (!_isOpacityReducedByCursorDetection)
-                                   {
-                                       _opacityBeforeCursorDetection = _windowBehavior.WindowOpacity;
-                                       _isOpacityReducedByCursorDetection = true;
-                                   }
-
-                                   Win32Helper.SetWindowOpacity(this, _cursorDetectionMinOpacity);
-                               });
-    }
-
-    /// <summary>
-    /// 鼠标隐藏事件处理
-    /// </summary>
-    private void OnCursorHidden(object? sender, EventArgs e)
-    {
-        // 在 UI 线程执行
-        Dispatcher.BeginInvoke(() =>
-                               {
-                                   // 如果处于穿透模式，不处理
-                                   if (_windowBehavior.IsClickThrough)
-                                       return;
-
-                                   // 恢复之前的透明度
-                                   if (_isOpacityReducedByCursorDetection)
-                                   {
-                                       _windowBehavior.SetInitialOpacity(_opacityBeforeCursorDetection);
-                                       Win32Helper.SetWindowOpacity(this, _opacityBeforeCursorDetection);
-                                       _isOpacityReducedByCursorDetection = false;
-                                   }
-                               });
-    }
-
-#endregion
-
 #region Window Closing
 
     /// <summary>
@@ -1271,14 +1110,8 @@ public partial class PlayerWindow : Window
         // 停止穿透模式定时器
         _windowBehavior.StopClickThroughTimer();
 
-        // 停止鼠标检测
-        StopCursorDetection();
-
         // 停止视频时间同步
         StopVideoTimeSync();
-
-        // 取消 Profile 事件订阅
-        _profileManager.ProfileChanged -= OnProfileChanged;
 
         // 取消事件订阅
         if (WebView.CoreWebView2 != null)

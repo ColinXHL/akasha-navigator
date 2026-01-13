@@ -20,8 +20,7 @@ public class ConfigService : IConfigService
     /// </summary>
     public static IConfigService Instance
     {
-        get
-        {
+        get {
             if (_instance == null)
             {
                 _instance = new ConfigService(LogService.Instance);
@@ -89,7 +88,7 @@ public class ConfigService : IConfigService
 
         // 记录错误并返回默认配置
         _logService.Warn(nameof(ConfigService), "加载配置失败，将使用默认配置: {ErrorMessage}",
-            result.Error?.Message ?? "未知错误");
+                         result.Error?.Message ?? "未知错误");
         return new AppConfig();
     }
 
@@ -98,24 +97,12 @@ public class ConfigService : IConfigService
     /// </summary>
     public void Save()
     {
-        // 调试日志
-        System.Diagnostics.Debug.WriteLine($"[ConfigService] Saving config to: {ConfigFilePath}");
-        if (Config?.CursorDetection != null)
-        {
-            System.Diagnostics.Debug.WriteLine($"[ConfigService] CursorDetection.Enabled={Config.CursorDetection.Enabled}");
-            System.Diagnostics.Debug.WriteLine($"[ConfigService] CursorDetection.ProcessWhitelist.Count={Config.CursorDetection.ProcessWhitelist?.Count ?? 0}");
-        }
-
         var result = JsonHelper.SaveToFile(ConfigFilePath, Config);
 
         if (result.IsFailure)
         {
             _logService.Debug(nameof(ConfigService), "保存配置失败: {ErrorMessage}",
-                result.Error?.Message ?? "未知错误");
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"[ConfigService] Config saved successfully");
+                              result.Error?.Message ?? "未知错误");
         }
     }
 

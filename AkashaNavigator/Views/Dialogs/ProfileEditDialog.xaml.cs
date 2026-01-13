@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Models.Profile;
 using AkashaNavigator.ViewModels.Dialogs;
 
 namespace AkashaNavigator.Views.Dialogs
@@ -45,7 +44,6 @@ public partial class ProfileEditDialog : AnimatedWindow
 
         // 订阅 ViewModel 的关闭请求
         _viewModel.RequestClose += OnRequestClose;
-        _viewModel.RequestClosePopup += OnRequestClosePopup;
     }
 
 #endregion
@@ -106,23 +104,6 @@ public partial class ProfileEditDialog : AnimatedWindow
         IsConfirmed = dialogResult == true;
         DialogResult = dialogResult;
         CloseWithAnimation();
-    }
-
-    /// <summary>
-    /// 选取窗口按钮点击
-    /// </summary>
-    private void SelectWindowButton_Click(object sender, RoutedEventArgs e)
-    {
-        _viewModel.RefreshProcessListCommand.Execute(null);
-        ProcessSelectorPopup.IsOpen = true;
-    }
-
-    /// <summary>
-    /// 关闭进程选择 Popup
-    /// </summary>
-    private void OnRequestClosePopup(object? sender, System.EventArgs e)
-    {
-        ProcessSelectorPopup.IsOpen = false;
     }
 
 #endregion

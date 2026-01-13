@@ -20,16 +20,5 @@ public class ProfileUpdateData
     /// 默认设置（null 表示不更新）
     /// </summary>
     public ProfileDefaults? Defaults { get; set; }
-
-    /// <summary>
-    /// 鼠标检测配置（null 表示不更新）
-    /// </summary>
-    public CursorDetectionConfig? CursorDetection { get; set; }
-
-    /// <summary>
-    /// 是否清除鼠标检测配置（设为 true 时将 CursorDetection 设为 null）
-    /// 当用户禁用 Profile 级别的鼠标检测覆盖时使用
-    /// </summary>
-    public bool ClearCursorDetection { get; set; }
 }
 }

@@ -15,11 +15,11 @@
     {
       "id": "genshin",
       "name": "原神",
-      "description": "原神游戏配置，包含方向标记插件，帮助玩家在观看攻略视频时快速定位方向",
+      "description": "原神游戏配置，包含方向标记和智能鼠标检测插件，帮助玩家在观看攻略视频时快速定位方向并自动切换点击穿透模式",
       "author": "AkashaNavigator",
       "targetGame": "原神",
       "version": "1.0.0",
-      "pluginIds": ["genshin-direction-marker"]
+      "pluginIds": ["genshin-direction-marker", "smart-cursor-detection"]
     }
   ]
 }

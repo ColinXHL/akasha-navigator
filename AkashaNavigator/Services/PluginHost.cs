@@ -28,8 +28,7 @@ public class PluginHost : IPluginHost, IDisposable
     /// </summary>
     public static PluginHost Instance
     {
-        get
-        {
+        get {
             if (_instance == null)
             {
                 lock (_lock)
@@ -38,20 +37,19 @@ public class PluginHost : IPluginHost, IDisposable
                     {
                         // 使用 DI 容器中的实例，确保与注入的实例一致
                         var logService = App.Services?.GetRequiredService<ILogService>() ?? LogService.Instance;
-                        var pluginAssociationManager = App.Services?.GetRequiredService<IPluginAssociationManager>() ?? PluginAssociationManager.Instance;
-                        var pluginLibrary = App.Services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance;
+                        var pluginAssociationManager = App.Services?.GetRequiredService<IPluginAssociationManager>() ??
+                                                       PluginAssociationManager.Instance;
+                        var pluginLibrary =
+                            App.Services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance;
 
-                        _instance = new PluginHost(
-                            logService,
-                            pluginAssociationManager,
-                            pluginLibrary
-                        );
+                        _instance = new PluginHost(logService, pluginAssociationManager, pluginLibrary);
                     }
                 }
             }
             return _instance;
         }
-        internal set => _instance = value;
+    internal
+        set => _instance = value;
     }
 
 #endregion
@@ -86,6 +84,23 @@ public class PluginHost : IPluginHost, IDisposable
     private string? _currentProfileId;
     private bool _disposed;
 
+    // 全局 PlayerWindow 获取器
+    private static Func<Views.Windows.PlayerWindow?>? _globalWindowGetter;
+
+#endregion
+
+#region Static Methods
+
+    /// <summary>
+    /// 设置全局 PlayerWindow 获取器
+    /// 应在应用启动时调用
+    /// </summary>
+    /// <param name="windowGetter">获取 PlayerWindow 的委托</param>
+    public static void SetGlobalWindowGetter(Func<Views.Windows.PlayerWindow?> windowGetter)
+    {
+        _globalWindowGetter = windowGetter;
+    }
+
 #endregion
 
 #region Properties
@@ -107,7 +122,8 @@ public class PluginHost : IPluginHost, IDisposable
     /// <summary>
     /// 私有构造函数（单例模式 + DI）
     /// </summary>
-    public PluginHost(ILogService logService, IPluginAssociationManager pluginAssociationManager, IPluginLibrary pluginLibrary)
+    public PluginHost(ILogService logService, IPluginAssociationManager pluginAssociationManager,
+                      IPluginLibrary pluginLibrary)
     {
         _logService = logService;
         _pluginAssociationManager = pluginAssociationManager;
@@ -123,10 +139,12 @@ public class PluginHost : IPluginHost, IDisposable
     /// <summary>
     /// 用于测试的内部构造函数
     /// </summary>
-    internal PluginHost(bool forTesting, ILogService logService, IPluginAssociationManager pluginAssociationManager, IPluginLibrary? pluginLibrary = null)
+    internal PluginHost(bool forTesting, ILogService logService, IPluginAssociationManager pluginAssociationManager,
+                        IPluginLibrary? pluginLibrary = null)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
-        _pluginAssociationManager = pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
+        _pluginAssociationManager =
+            pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
         _pluginLibrary = pluginLibrary ?? PluginLibrary.Instance;
         // 测试用构造函数，不订阅事件
     }
@@ -594,7 +612,8 @@ public class PluginHost : IPluginHost, IDisposable
         // 创建引擎选项
         var engineOptions = new PluginEngineOptions {
             ProfileId = _currentProfileId ?? string.Empty, ProfileName = _currentProfileId ?? string.Empty,
-            ProfileDirectory = GetPluginConfigDirectory(_currentProfileId ?? string.Empty, pluginId)
+            ProfileDirectory = GetPluginConfigDirectory(_currentProfileId ?? string.Empty, pluginId),
+            GetPlayerWindow = _globalWindowGetter
         };
 
         // 创建插件上下文

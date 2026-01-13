@@ -27,6 +27,7 @@ public class WindowBehaviorHelper
     // 透明度相关
     private double _windowOpacity = 1.0;
     private bool _isClickThrough;
+    private bool _isAutoClickThrough; // 自动点击穿透状态（插件控制）
     private double _opacityBeforeClickThrough = 1.0;
     private bool _isCursorInWindowWhileClickThrough;
     private DispatcherTimer? _clickThroughTimer;
@@ -60,9 +61,19 @@ public class WindowBehaviorHelper
     public double WindowOpacity => _windowOpacity;
 
     /// <summary>
-    /// 是否处于鼠标穿透模式
+    /// 是否处于鼠标穿透模式（手动）
     /// </summary>
     public bool IsClickThrough => _isClickThrough;
+
+    /// <summary>
+    /// 是否处于自动鼠标穿透模式（插件控制）
+    /// </summary>
+    public bool IsAutoClickThrough => _isAutoClickThrough;
+
+    /// <summary>
+    /// 有效的点击穿透状态（手动 OR 自动）
+    /// </summary>
+    public bool IsEffectiveClickThrough => _isClickThrough || _isAutoClickThrough;
 
     /// <summary>
     /// 获取当前透明度百分比
@@ -176,35 +187,27 @@ public class WindowBehaviorHelper
 #region Public Methods - Click Through
 
     /// <summary>
-    /// 切换鼠标穿透模式
+    /// 切换鼠标穿透模式（手动）
     /// </summary>
-    /// <returns>是否处于穿透模式</returns>
+    /// <returns>是否处于手动穿透模式</returns>
     public bool ToggleClickThrough()
     {
         _isClickThrough = !_isClickThrough;
-        Logger.Debug("ToggleClickThrough: _isClickThrough={IsClickThrough}", _isClickThrough);
+        Logger.Debug("ToggleClickThrough: _isClickThrough={IsClickThrough}, _isAutoClickThrough={IsAutoClickThrough}",
+                     _isClickThrough, _isAutoClickThrough);
 
         if (_isClickThrough)
         {
-            // 保存当前透明度
-            _opacityBeforeClickThrough = _windowOpacity;
-
-            // 启动定时器检测鼠标位置
-            StartClickThroughTimer();
-        }
-        else
-        {
-            // 停止定时器
-            StopClickThroughTimer();
-
-            // 恢复之前的透明度
-            _windowOpacity = _opacityBeforeClickThrough;
-            Logger.Debug("ToggleClickThrough: restoring opacity to {Opacity}", _windowOpacity);
-            Win32Helper.SetWindowOpacity(_window, _windowOpacity);
+            // 手动穿透启用，保存当前透明度（如果自动穿透未启用）
+            if (!_isAutoClickThrough)
+            {
+                _opacityBeforeClickThrough = _windowOpacity;
+            }
         }
 
-        Logger.Debug("ToggleClickThrough: calling SetClickThrough with enable={Enable}", _isClickThrough);
-        Win32Helper.SetClickThrough(_window, _isClickThrough);
+        // 根据有效穿透状态更新窗口
+        UpdateEffectiveClickThrough();
+
         return _isClickThrough;
     }
 
@@ -222,39 +225,107 @@ public class WindowBehaviorHelper
         _isCursorInWindowWhileClickThrough = false;
     }
 
+    /// <summary>
+    /// 全屏时暂停的自动穿透状态
+    /// </summary>
+    private bool _autoClickThroughSuspendedByMaximize;
+
+    /// <summary>
+    /// 全屏前保存的透明度（用于恢复后重新检测）
+    /// </summary>
+    private double _opacityBeforeMaximize = 1.0;
+
+    /// <summary>
+    /// 全屏时暂停穿透和透明度控制
+    /// </summary>
     public void SuspendClickThroughForMaximize()
     {
-        if (!_isClickThrough)
-            return;
+        Logger.Debug("SuspendClickThroughForMaximize: manual={Manual}, auto={Auto}", _isClickThrough,
+                     _isAutoClickThrough);
 
-        _clickThroughSuspendedByMaximize = true;
+        // 保存当前状态
+        _clickThroughSuspendedByMaximize = _isClickThrough;
+        _autoClickThroughSuspendedByMaximize = _isAutoClickThrough;
+        _opacityBeforeMaximize = _opacityBeforeClickThrough;
 
         // 停止定时器
         StopClickThroughTimer();
 
-        // 恢复透明度
-        _windowOpacity = _opacityBeforeClickThrough;
-        Win32Helper.SetWindowOpacity(_window, _windowOpacity);
+        // 禁用自动穿透（不触发 UpdateEffectiveClickThrough）
+        _isAutoClickThrough = false;
+
+        // 恢复透明度为 1
+        _windowOpacity = 1.0;
+        Win32Helper.SetWindowOpacity(_window, 1.0);
 
         // 禁用穿透
-        Win32Helper.SetClickThrough(_window, false);
+        if (_isClickThrough || _autoClickThroughSuspendedByMaximize)
+        {
+            Win32Helper.SetClickThrough(_window, false);
+        }
+
+        Logger.Debug("SuspendClickThroughForMaximize: opacity set to 1.0, click-through disabled");
     }
 
     /// <summary>
     /// 还原窗口时恢复穿透模式
+    /// 注意：自动穿透的恢复由 CursorDetectionService.Resume() 触发
     /// </summary>
     public void ResumeClickThroughAfterRestore()
     {
-        if (!_clickThroughSuspendedByMaximize)
+        Logger.Debug("ResumeClickThroughAfterRestore: savedManual={Manual}, savedAuto={Auto}",
+                     _clickThroughSuspendedByMaximize, _autoClickThroughSuspendedByMaximize);
+
+        // 恢复保存的透明度设置
+        _opacityBeforeClickThrough = _opacityBeforeMaximize;
+
+        // 只恢复手动穿透模式
+        // 自动穿透由 CursorDetectionService.Resume() -> CheckInitialState() -> 插件事件 -> SetAutoClickThrough 恢复
+        if (_clickThroughSuspendedByMaximize)
+        {
+            // 重新启用手动穿透
+            Win32Helper.SetClickThrough(_window, true);
+
+            // 启动定时器
+            StartClickThroughTimer();
+        }
+
+        // 重置暂停标记
+        _clickThroughSuspendedByMaximize = false;
+        _autoClickThroughSuspendedByMaximize = false;
+
+        Logger.Debug("ResumeClickThroughAfterRestore: manual click-through restored={Restored}", _isClickThrough);
+    }
+
+    /// <summary>
+    /// 设置自动点击穿透状态（由插件控制）
+    /// </summary>
+    /// <param name="enabled">是否启用自动穿透</param>
+    public void SetAutoClickThrough(bool enabled)
+    {
+        if (_isAutoClickThrough == enabled)
             return;
 
-        _clickThroughSuspendedByMaximize = false;
+        _isAutoClickThrough = enabled;
+        Logger.Debug("SetAutoClickThrough: _isAutoClickThrough={IsAutoClickThrough}", _isAutoClickThrough);
 
-        // 重新启用穿透
-        Win32Helper.SetClickThrough(_window, true);
+        // 根据有效穿透状态更新窗口
+        UpdateEffectiveClickThrough();
+    }
 
-        // 启动定时器
-        StartClickThroughTimer();
+    /// <summary>
+    /// 重置自动点击穿透状态（插件卸载或禁用时调用）
+    /// </summary>
+    public void ResetAutoClickThrough()
+    {
+        if (!_isAutoClickThrough)
+            return;
+
+        _isAutoClickThrough = false;
+        Logger.Debug("ResetAutoClickThrough: _isAutoClickThrough reset to false");
+
+        // 根据有效穿透状态更新窗口
+        UpdateEffectiveClickThrough();
     }
 
 #endregion
@@ -419,9 +490,16 @@ public class WindowBehaviorHelper
 
     /// <summary>
     /// 更新穿透模式下的透明度
+    /// 注意：自动穿透模式下由插件控制透明度，此方法不做处理
     /// </summary>
     private void UpdateClickThroughOpacity()
     {
+        // 自动穿透模式下，透明度由插件控制，不在这里处理
+        if (_isAutoClickThrough)
+        {
+            return;
+        }
+
         bool cursorInWindow = Win32Helper.IsCursorInWindow(_window);
 
         // 只有状态变化时才更新透明度
@@ -439,6 +517,53 @@ public class WindowBehaviorHelper
                 // 鼠标离开窗口，恢复正常透明度
                 Win32Helper.SetWindowOpacity(_window, _opacityBeforeClickThrough);
             }
+        }
+    }
+
+    /// <summary>
+    /// 根据有效穿透状态更新窗口
+    /// </summary>
+    private void UpdateEffectiveClickThrough()
+    {
+        bool effectiveClickThrough = IsEffectiveClickThrough;
+        Logger.Debug("UpdateEffectiveClickThrough: effective={Effective}, manual={Manual}, auto={Auto}",
+                     effectiveClickThrough, _isClickThrough, _isAutoClickThrough);
+
+        if (effectiveClickThrough)
+        {
+            // 如果之前没有穿透，需要保存透明度
+            if (!_isClickThrough && _isAutoClickThrough)
+            {
+                // 自动穿透刚启用，保存当前透明度
+                _opacityBeforeClickThrough = _windowOpacity;
+            }
+
+            // 只有手动穿透模式才启动定时器（根据鼠标位置调整透明度）
+            // 自动穿透模式由插件完全控制透明度
+            if (_isClickThrough && _clickThroughTimer == null)
+            {
+                StartClickThroughTimer();
+            }
+
+            // 启用穿透
+            Win32Helper.SetClickThrough(_window, true);
+        }
+        else
+        {
+            // 停止定时器
+            StopClickThroughTimer();
+
+            // 只有手动穿透模式关闭时才恢复透明度
+            // 自动穿透模式关闭时由插件控制透明度
+            if (!_isAutoClickThrough)
+            {
+                _windowOpacity = _opacityBeforeClickThrough;
+                Logger.Debug("UpdateEffectiveClickThrough: restoring opacity to {Opacity}", _windowOpacity);
+                Win32Helper.SetWindowOpacity(_window, _windowOpacity);
+            }
+
+            // 禁用穿透
+            Win32Helper.SetClickThrough(_window, false);
         }
     }
 
