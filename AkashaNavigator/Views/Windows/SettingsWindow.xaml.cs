@@ -58,6 +58,9 @@ public partial class SettingsWindow : AnimatedWindow
         // 订阅搜索结果变化
         _viewModel.SearchResults.CollectionChanged += SearchResults_CollectionChanged;
 
+        // 刷新设置（确保透明度等值是最新的）
+        _viewModel.RefreshSettings();
+
         // 加载 Profile 列表（通过 GeneralPage）
         _viewModel.RefreshProfileList();
     }

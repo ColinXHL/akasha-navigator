@@ -46,9 +46,6 @@ public partial class ProfileEditDialog : AnimatedWindow
         // 订阅 ViewModel 的关闭请求
         _viewModel.RequestClose += OnRequestClose;
         _viewModel.RequestClosePopup += OnRequestClosePopup;
-
-        // 注册粘贴事件处理（阻止粘贴非数字内容）
-        DataObject.AddPastingHandler(TxtSeekSeconds, TxtSeekSeconds_Pasting);
     }
 
 #endregion
@@ -99,35 +96,6 @@ public partial class ProfileEditDialog : AnimatedWindow
     private void BtnClose_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.CloseCommand.Execute(null);
-    }
-
-    /// <summary>
-    /// 快进秒数输入框只允许数字输入
-    /// </summary>
-    private void TxtSeekSeconds_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        // 只允许数字输入
-        e.Handled = !int.TryParse(e.Text, out _);
-    }
-
-    /// <summary>
-    /// 快进秒数输入框粘贴事件处理（阻止粘贴非数字内容）
-    /// </summary>
-    private void TxtSeekSeconds_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (e.DataObject.GetDataPresent(typeof(string)))
-        {
-            var text = (string?)e.DataObject.GetData(typeof(string));
-            if (!int.TryParse(text, out _))
-            {
-                // 粘贴内容不是有效数字，取消粘贴
-                e.CancelCommand();
-            }
-        }
-        else
-        {
-            e.CancelCommand();
-        }
     }
 
     /// <summary>

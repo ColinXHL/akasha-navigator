@@ -66,7 +66,6 @@ public class ConfigServiceTests : IDisposable
         // Assert
         Assert.NotNull(config);
         Assert.Equal(AppConstants.DefaultSeekSeconds, config.SeekSeconds);
-        Assert.Equal(AppConstants.MaxOpacity, config.DefaultOpacity);
         Assert.Equal(AppConstants.DefaultProfileId, config.CurrentProfileId);
         Assert.True(config.IsFirstLaunch);
         Assert.False(config.EnableDebugLog);
@@ -80,10 +79,14 @@ public class ConfigServiceTests : IDisposable
     public void Load_WithValidConfigFile_ReturnsCorrectConfig()
     {
         // Arrange - 创建配置文件
-        var expectedConfig =
-            new AppConfig { SeekSeconds = 10,       DefaultOpacity = 0.8,  CurrentProfileId = "custom_profile",
-                            IsFirstLaunch = false,  EnableDebugLog = true, EnablePluginUpdateNotification = false,
-                            EnableEdgeSnap = false, SnapThreshold = 20,    PromptRecordOnExit = true };
+        var expectedConfig = new AppConfig { SeekSeconds = 10,
+                                             CurrentProfileId = "custom_profile",
+                                             IsFirstLaunch = false,
+                                             EnableDebugLog = true,
+                                             EnablePluginUpdateNotification = false,
+                                             EnableEdgeSnap = false,
+                                             SnapThreshold = 20,
+                                             PromptRecordOnExit = true };
         var json = JsonSerializer.Serialize(expectedConfig, JsonHelper.WriteOptions);
         File.WriteAllText(_configFilePath, json);
 
@@ -93,7 +96,6 @@ public class ConfigServiceTests : IDisposable
         // Assert
         Assert.NotNull(config);
         Assert.Equal(10, config.SeekSeconds);
-        Assert.Equal(0.8, config.DefaultOpacity);
         Assert.Equal("custom_profile", config.CurrentProfileId);
         Assert.False(config.IsFirstLaunch);
         Assert.True(config.EnableDebugLog);
@@ -108,7 +110,6 @@ public class ConfigServiceTests : IDisposable
     {
         // Arrange
         _configService.Config.SeekSeconds = 15;
-        _configService.Config.DefaultOpacity = 0.5;
         _configService.Config.CurrentProfileId = "test_profile";
 
         // Act
@@ -123,7 +124,6 @@ public class ConfigServiceTests : IDisposable
 
         Assert.NotNull(savedConfig);
         Assert.Equal(15, savedConfig.SeekSeconds);
-        Assert.Equal(0.5, savedConfig.DefaultOpacity);
         Assert.Equal("test_profile", savedConfig.CurrentProfileId);
     }
 
@@ -154,7 +154,6 @@ public class ConfigServiceTests : IDisposable
     {
         // Arrange
         _configService.Config.SeekSeconds = 12;
-        _configService.Config.DefaultOpacity = 0.7;
         _configService.Config.CurrentProfileId = "preserved_profile";
         _configService.Config.IsFirstLaunch = false;
         _configService.Config.EnableDebugLog = true;
@@ -166,7 +165,6 @@ public class ConfigServiceTests : IDisposable
 
         // Assert
         Assert.Equal(12, loadedConfig.SeekSeconds);
-        Assert.Equal(0.7, loadedConfig.DefaultOpacity);
         Assert.Equal("preserved_profile", loadedConfig.CurrentProfileId);
         Assert.False(loadedConfig.IsFirstLaunch);
         Assert.True(loadedConfig.EnableDebugLog);
@@ -184,7 +182,6 @@ public class ConfigServiceTests : IDisposable
 
         // Assert - 验证属性名为 camelCase
         Assert.Contains("seekSeconds", json);
-        Assert.Contains("defaultOpacity", json);
         Assert.Contains("currentProfileId", json);
     }
 
@@ -207,7 +204,6 @@ public class ConfigServiceTests : IDisposable
         // Assert - 验证所有默认值
         var config = service.Config;
         Assert.Equal(AppConstants.DefaultSeekSeconds, config.SeekSeconds);
-        Assert.Equal(AppConstants.MaxOpacity, config.DefaultOpacity);
 
         // 热键默认值
         Assert.Equal(Win32Helper.VK_6, config.HotkeySeekForward);
@@ -248,7 +244,6 @@ public class ConfigServiceTests : IDisposable
     {
         // Arrange - 修改配置
         _configService.Config.SeekSeconds = 99;
-        _configService.Config.DefaultOpacity = 0.3;
         _configService.Config.CurrentProfileId = "modified";
         _configService.Config.IsFirstLaunch = false;
         _configService.Config.EnableDebugLog = true;
@@ -259,7 +254,6 @@ public class ConfigServiceTests : IDisposable
 
         // Assert
         Assert.Equal(AppConstants.DefaultSeekSeconds, _configService.Config.SeekSeconds);
-        Assert.Equal(AppConstants.MaxOpacity, _configService.Config.DefaultOpacity);
         Assert.Equal(AppConstants.DefaultProfileId, _configService.Config.CurrentProfileId);
         Assert.True(_configService.Config.IsFirstLaunch);
         Assert.False(_configService.Config.EnableDebugLog);
@@ -285,19 +279,14 @@ public class ConfigServiceTests : IDisposable
     {
         // Arrange
         _configService.Config.SeekSeconds = 10;
-        _configService.Config.DefaultOpacity = 0.8;
 
-        var newConfig = new AppConfig {
-            SeekSeconds = 20,
-            DefaultOpacity = 0.8 // 保持原值
-        };
+        var newConfig = new AppConfig { SeekSeconds = 20 };
 
         // Act
         _configService.UpdateConfig(newConfig);
 
         // Assert
         Assert.Equal(20, _configService.Config.SeekSeconds);
-        Assert.Equal(0.8, _configService.Config.DefaultOpacity);
     }
 
 #endregion
@@ -310,7 +299,6 @@ public class ConfigServiceTests : IDisposable
         // Arrange - 创建使用 PascalCase 属性名的旧格式配置文件
         var pascalCaseJson = @"{
             ""SeekSeconds"": 25,
-            ""DefaultOpacity"": 0.6,
             ""CurrentProfileId"": ""old_format"",
             ""IsFirstLaunch"": false
         }";
@@ -322,7 +310,6 @@ public class ConfigServiceTests : IDisposable
         // Assert - JsonHelper.ReadOptions 设置了 PropertyNameCaseInsensitive = true
         Assert.NotNull(config);
         Assert.Equal(25, config.SeekSeconds);
-        Assert.Equal(0.6, config.DefaultOpacity);
         Assert.Equal("old_format", config.CurrentProfileId);
         Assert.False(config.IsFirstLaunch);
     }
@@ -342,7 +329,6 @@ public class ConfigServiceTests : IDisposable
         // Assert
         Assert.Equal(30, config.SeekSeconds);
         // 缺失的属性使用默认值
-        Assert.Equal(AppConstants.MaxOpacity, config.DefaultOpacity);
         Assert.Equal(AppConstants.DefaultProfileId, config.CurrentProfileId);
         Assert.True(config.IsFirstLaunch);
     }
@@ -353,7 +339,6 @@ public class ConfigServiceTests : IDisposable
         // Arrange - 创建包含额外属性的配置文件（未来版本兼容性）
         var jsonWithExtras = @"{
             ""seekSeconds"": 10,
-            ""defaultOpacity"": 0.9,
             ""futureProperty"": ""some value"",
             ""anotherFutureProp"": 123
         }";

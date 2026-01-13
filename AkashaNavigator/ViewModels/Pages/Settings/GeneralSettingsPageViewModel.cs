@@ -1,6 +1,8 @@
 using System;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Profile;
@@ -9,12 +11,14 @@ namespace AkashaNavigator.ViewModels.Pages.Settings;
 
 /// <summary>
 /// 通用设置页面 ViewModel
-/// 包含：Profile 选择、基础设置（快进/倒退秒数、默认透明度）、打开文件夹、插件中心
+/// 包含：Profile 选择、基础设置（快进/倒退秒数、透明度）、打开文件夹、插件中心
 /// </summary>
 public partial class GeneralSettingsPageViewModel : ObservableObject
 {
     private readonly IConfigService _configService;
     private readonly IProfileManager _profileManager;
+    private readonly IWindowStateService _windowStateService;
+    private readonly IEventBus _eventBus;
     private AppConfig _config;
 
     /// <summary>
@@ -40,14 +44,33 @@ public partial class GeneralSettingsPageViewModel : ObservableObject
     [ObservableProperty]
     private GameProfile? _selectedProfile;
 
-    public GeneralSettingsPageViewModel(IConfigService configService, IProfileManager profileManager)
+    public GeneralSettingsPageViewModel(IConfigService configService, IProfileManager profileManager,
+                                        IWindowStateService windowStateService, IEventBus eventBus)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+        _windowStateService = windowStateService ?? throw new ArgumentNullException(nameof(windowStateService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
 
         _config = _configService.Config;
+
+        // 订阅透明度变化事件（来自快捷键操作）
+        _eventBus.Subscribe<OpacityChangedEvent>(OnOpacityChanged);
+
         LoadSettings();
         LoadProfileList();
+    }
+
+    /// <summary>
+    /// 处理透明度变化事件（来自 PlayerWindow）
+    /// </summary>
+    private void OnOpacityChanged(OpacityChangedEvent e)
+    {
+        // 忽略来自设置界面的事件，避免循环
+        if (e.Source == OpacityChangeSource.Settings)
+            return;
+
+        OpacityPercent = (int)(e.Opacity * 100);
     }
 
     /// <summary>
@@ -56,7 +79,11 @@ public partial class GeneralSettingsPageViewModel : ObservableObject
     private void LoadSettings()
     {
         SeekSeconds = _config.SeekSeconds;
-        OpacityPercent = (int)(_config.DefaultOpacity * 100);
+
+        // 通过事件查询 PlayerWindow 的当前透明度
+        double currentOpacity = 1.0;
+        _eventBus.Publish(new OpacityQueryEvent { Callback = opacity => currentOpacity = opacity });
+        OpacityPercent = (int)(currentOpacity * 100);
     }
 
     /// <summary>
@@ -94,6 +121,9 @@ public partial class GeneralSettingsPageViewModel : ObservableObject
             if (!value.Id.Equals(currentProfile.Id, StringComparison.OrdinalIgnoreCase))
             {
                 _profileManager.SwitchProfile(value.Id);
+                // 切换 Profile 后清除缓存并重新加载透明度
+                _windowStateService.ClearCache();
+                LoadSettings();
             }
         }
     }
@@ -108,12 +138,26 @@ public partial class GeneralSettingsPageViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 刷新设置（设置窗口打开时调用）
+    /// </summary>
+    public void RefreshSettings()
+    {
+        LoadSettings();
+    }
+
+    /// <summary>
     /// 保存设置到配置对象
     /// </summary>
     public void SaveSettings(AppConfig config)
     {
         config.SeekSeconds = SeekSeconds;
-        config.DefaultOpacity = OpacityPercent / 100.0;
+
+        // 透明度保存到 WindowState
+        var opacity = OpacityPercent / 100.0;
+        _windowStateService.Update(state => state.Opacity = opacity);
+
+        // 发布事件通知 PlayerWindow 更新透明度
+        _eventBus.Publish(new OpacityChangedEvent { Opacity = opacity, Source = OpacityChangeSource.Settings });
     }
 
     /// <summary>
@@ -122,6 +166,10 @@ public partial class GeneralSettingsPageViewModel : ObservableObject
     public void ResetSettings(AppConfig config)
     {
         SeekSeconds = config.SeekSeconds;
-        OpacityPercent = (int)(config.DefaultOpacity * 100);
+
+        // 通过事件查询当前透明度
+        double currentOpacity = 1.0;
+        _eventBus.Publish(new OpacityQueryEvent { Callback = opacity => currentOpacity = opacity });
+        OpacityPercent = (int)(currentOpacity * 100);
     }
 }

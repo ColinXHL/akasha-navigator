@@ -368,7 +368,7 @@ public class ProfileManager : IProfileManager
             // 创建 Profile 对象
             var profile =
                 new GameProfile { Id = profileId, Name = name.Trim(), Icon = icon, Version = 1,
-                                  Defaults = new ProfileDefaults { Url = AppConstants.DefaultHomeUrl, Opacity = 1.0,
+                                  Defaults = new ProfileDefaults { Url = AppConstants.DefaultHomeUrl,
                                                                    SeekSeconds = AppConstants.DefaultSeekSeconds } };
 
             // 创建 Profile 目录和配置文件
@@ -1327,7 +1327,7 @@ public class ProfileManager : IProfileManager
         var newProfile =
             new GameProfile { Id = AppConstants.DefaultProfileId, Name = AppConstants.DefaultProfileName, Icon = "🌐",
                               Version = 1,
-                              Defaults = new ProfileDefaults { Url = AppConstants.DefaultHomeUrl, Opacity = 1.0,
+                              Defaults = new ProfileDefaults { Url = AppConstants.DefaultHomeUrl,
                                                                SeekSeconds = AppConstants.DefaultSeekSeconds } };
 
         // 保存到文件

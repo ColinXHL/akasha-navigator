@@ -86,11 +86,6 @@ public class ProfileDefaults
     public string? Url { get; set; }
 
     /// <summary>
-    /// 默认透明度
-    /// </summary>
-    public double Opacity { get; set; } = 1.0;
-
-    /// <summary>
     /// 快进/倒退秒数
     /// </summary>
     public int SeekSeconds { get; set; } = 5;

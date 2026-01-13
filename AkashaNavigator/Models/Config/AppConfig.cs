@@ -17,15 +17,6 @@ public class AppConfig
 
 #endregion
 
-#region Opacity
-
-    /// <summary>
-    /// 默认透明度
-    /// </summary>
-    public double DefaultOpacity { get; set; } = AppConstants.MaxOpacity;
-
-#endregion
-
 #region Hotkeys
 
     // 快进键
@@ -174,8 +165,7 @@ public class AppConfig
                                 Action = "DecreaseOpacity" },
             new HotkeyBinding { Key = HotkeyIncreaseOpacity, Modifiers = HotkeyIncreaseOpacityMod,
                                 Action = "IncreaseOpacity" },
-            new HotkeyBinding { Key = HotkeyResetOpacity, Modifiers = HotkeyResetOpacityMod,
-                                Action = "ResetOpacity" },
+            new HotkeyBinding { Key = HotkeyResetOpacity, Modifiers = HotkeyResetOpacityMod, Action = "ResetOpacity" },
             new HotkeyBinding { Key = HotkeyToggleClickThrough, Modifiers = HotkeyToggleClickThroughMod,
                                 Action = "ToggleClickThrough" },
             new HotkeyBinding { Key = HotkeyDecreasePlaybackRate, Modifiers = HotkeyDecreasePlaybackRateMod,

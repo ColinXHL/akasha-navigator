@@ -91,42 +91,20 @@
                                Visibility="{Binding UrlError, Converter={StaticResource NullToVisibilityConverter}}"
                                Text="{Binding UrlError}"/>
 
-                    <!-- 默认透明度 -->
+                    <!-- 快进秒数 -->
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="80"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="45"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="默认透明度" Style="{StaticResource SettingsLabelStyle}"/>
-                        <Slider Grid.Column="1" Style="{StaticResource DarkSliderStyle}"
-                                Minimum="0.2" Maximum="1.0" 
-                                Value="{Binding DefaultOpacity, Mode=TwoWay}"
-                                SmallChange="0.05" LargeChange="0.1"/>
-                        <TextBlock Grid.Column="2" Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right">
-                            <TextBlock.Text>
-                                <MultiBinding StringFormat="{}{0:P0}">
-                                    <Binding Path="DefaultOpacity"/>
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
-                    </Grid>
-
-                    <!-- 快进秒数 -->
-                    <Grid Margin="0,0,0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="快进秒数" Style="{StaticResource SettingsLabelStyle}"/>
-                        <TextBox Grid.Column="1" x:Name="TxtSeekSeconds" Style="{StaticResource DarkTextBoxStyle}"
-                                 Tag="1-60"
-                                 Text="{Binding SeekSeconds, UpdateSourceTrigger=PropertyChanged}"
-                                 PreviewTextInput="TxtSeekSeconds_PreviewTextInput"/>
+                        <Slider Grid.Column="1" Style="{StaticResource DarkSliderStyle}"
+                                Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True"
+                                Value="{Binding SeekSeconds, Mode=TwoWay}"/>
+                        <TextBlock Grid.Column="2" Text="{Binding SeekSeconds, StringFormat={}{0}s}"
+                                   Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
                     </Grid>
-                    <TextBlock Foreground="#F87171" FontSize="11" Margin="80,0,0,12"
-                               Visibility="{Binding SeekSecondsError, Converter={StaticResource NullToVisibilityConverter}}"
-                               Text="{Binding SeekSecondsError}"/>
 
                     <!-- 鼠标检测 -->
                     <TextBlock Text="鼠标检测" Style="{StaticResource SettingsGroupHeaderStyle}"/>

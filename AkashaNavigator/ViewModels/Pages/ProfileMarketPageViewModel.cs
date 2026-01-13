@@ -7,6 +7,8 @@ using System.Windows;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Profile;
@@ -91,6 +93,7 @@ public partial class ProfileMarketPageViewModel : ObservableObject
     private readonly ProfileMarketplaceService _profileMarketplaceService;
     private readonly IPluginLibrary _pluginLibrary;
     private readonly INotificationService _notificationService;
+    private readonly IEventBus _eventBus;
 
     /// <summary>
     /// Profile 列表
@@ -143,12 +146,30 @@ public partial class ProfileMarketPageViewModel : ObservableObject
     /// 构造函数
     /// </summary>
     public ProfileMarketPageViewModel(ProfileMarketplaceService profileMarketplaceService, IPluginLibrary pluginLibrary,
-                                      INotificationService notificationService)
+                                      INotificationService notificationService, IEventBus eventBus)
     {
         _profileMarketplaceService =
             profileMarketplaceService ?? throw new ArgumentNullException(nameof(profileMarketplaceService));
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+
+        // 订阅 Profile 列表变化事件（其他页面删除 Profile 时刷新安装状态）
+        _eventBus.Subscribe<ProfileListChangedEvent>(OnProfileListChanged);
+    }
+
+    /// <summary>
+    /// Profile 列表变化事件处理
+    /// </summary>
+    private void OnProfileListChanged(ProfileListChangedEvent e)
+    {
+        // 刷新所有 Profile 的安装状态
+        foreach (var vm in _allProfiles)
+        {
+            vm.IsInstalled = _profileMarketplaceService.ProfileExists(vm.Id);
+        }
+        // 重新过滤以更新 UI
+        FilterProfiles();
     }
 
     /// <summary>
@@ -357,6 +378,15 @@ public partial class ProfileMarketPageViewModel : ObservableObject
             // 刷新列表以更新 UI 状态
             FilterProfiles();
 
+            // 通过 EventBus 通知其他页面刷新
+            _eventBus.Publish(new ProfileListChangedEvent());
+
+            // 如果卸载了插件，也通知插件列表刷新
+            if (result.UninstalledPlugins.Count > 0)
+            {
+                _eventBus.Publish(new PluginListChangedEvent());
+            }
+
             // 构建成功消息
             var message = $"Profile \"{profileName}\" 已成功卸载。";
 
@@ -436,6 +466,9 @@ public partial class ProfileMarketPageViewModel : ObservableObject
 
             // 刷新列表显示
             FilterProfiles();
+
+            // 通过 EventBus 通知其他页面刷新
+            _eventBus.Publish(new ProfileListChangedEvent());
 
             var successMessage = $"Profile \"{profile.Name}\" 安装成功！";
             if (installResult.MissingPlugins.Count > 0)

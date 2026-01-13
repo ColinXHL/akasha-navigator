@@ -6,6 +6,8 @@ using System.Linq;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Profile;
@@ -24,6 +26,7 @@ public partial class MyProfilesPageViewModel : ObservableObject
     private readonly IPluginLibrary _pluginLibrary;
     private readonly IPluginHost _pluginHost;
     private readonly INotificationService _notificationService;
+    private readonly IEventBus _eventBus;
 
     /// <summary>
     /// Profile 列表
@@ -88,7 +91,7 @@ public partial class MyProfilesPageViewModel : ObservableObject
     /// </summary>
     public MyProfilesPageViewModel(IProfileManager profileManager, IPluginAssociationManager pluginAssociationManager,
                                    IPluginLibrary pluginLibrary, IPluginHost pluginHost,
-                                   INotificationService notificationService)
+                                   INotificationService notificationService, IEventBus eventBus)
     {
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
         _pluginAssociationManager =
@@ -96,6 +99,18 @@ public partial class MyProfilesPageViewModel : ObservableObject
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _pluginHost = pluginHost ?? throw new ArgumentNullException(nameof(pluginHost));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+
+        // 订阅 Profile 列表变化事件
+        _eventBus.Subscribe<ProfileListChangedEvent>(OnProfileListChanged);
+    }
+
+    /// <summary>
+    /// Profile 列表变化事件处理
+    /// </summary>
+    private void OnProfileListChanged(ProfileListChangedEvent e)
+    {
+        RefreshProfileList();
     }
 
     /// <summary>
@@ -112,6 +127,9 @@ public partial class MyProfilesPageViewModel : ObservableObject
     /// </summary>
     public void RefreshProfileList()
     {
+        // 重新加载 Profile 数据
+        _profileManager.ReloadProfiles();
+
         var profiles = _profileManager.Profiles;
         var currentProfile = _profileManager.CurrentProfile;
 
@@ -504,6 +522,9 @@ public partial class MyProfilesPageViewModel : ObservableObject
         }
 
         RefreshPluginList();
+
+        // 通知其他页面刷新插件列表
+        _eventBus.Publish(new PluginListChangedEvent());
 
         // 检查补全的 Profile 是否是当前正在使用的 Profile
         var isCurrentProfile =

@@ -45,7 +45,6 @@ public partial class ProfileEditDialogViewModel : ObservableObject
     private string _originalName = string.Empty;
     private string _originalIcon = string.Empty;
     private string _originalDefaultUrl = string.Empty;
-    private double _originalDefaultOpacity = 1.0;
     private int _originalSeekSeconds = 5;
     private bool _originalCursorDetectionEnabled;
     private double _originalCursorDetectionMinOpacity = 0.3;
@@ -85,13 +84,6 @@ public partial class ProfileEditDialogViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private string _defaultUrl = string.Empty;
-
-    /// <summary>
-    /// 默认透明度 (0.2 - 1.0)
-    /// </summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
-    private double _defaultOpacity = 1.0;
 
     /// <summary>
     /// 快进/倒退秒数 (1 - 60)
@@ -156,17 +148,9 @@ public partial class ProfileEditDialogViewModel : ObservableObject
     private string? _urlError;
 
     /// <summary>
-    /// SeekSeconds 验证错误消息
-    /// </summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasValidationErrors))]
-    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
-    private string? _seekSecondsError;
-
-    /// <summary>
     /// 是否存在验证错误
     /// </summary>
-    public bool HasValidationErrors => !string.IsNullOrEmpty(UrlError) || !string.IsNullOrEmpty(SeekSecondsError);
+    public bool HasValidationErrors => !string.IsNullOrEmpty(UrlError);
 
 #endregion
 
@@ -217,11 +201,9 @@ public partial class ProfileEditDialogViewModel : ObservableObject
         // 默认设置
         var defaults = profile.Defaults;
         _originalDefaultUrl = defaults?.Url ?? string.Empty;
-        _originalDefaultOpacity = ClampOpacity(defaults?.Opacity ?? 1.0, 0.2, 1.0);
         _originalSeekSeconds = defaults?.SeekSeconds ?? 5;
 
         DefaultUrl = _originalDefaultUrl;
-        DefaultOpacity = _originalDefaultOpacity;
         SeekSeconds = _originalSeekSeconds;
 
         // 鼠标检测配置
@@ -275,15 +257,9 @@ public partial class ProfileEditDialogViewModel : ObservableObject
         }
     }
 
-    private void ValidateSeekSeconds()
-    {
-        SeekSecondsError = SeekSeconds < 1 || SeekSeconds > 60 ? "快进秒数必须在 1-60 之间" : null;
-    }
-
     private void ClearValidationErrors()
     {
         UrlError = null;
-        SeekSecondsError = null;
     }
 
 #endregion
@@ -292,15 +268,6 @@ public partial class ProfileEditDialogViewModel : ObservableObject
 
     partial void OnProfileNameChanged(string value) => ClearError();
     partial void OnDefaultUrlChanged(string value) => ValidateUrl();
-    partial void OnSeekSecondsChanged(int value) => ValidateSeekSeconds();
-
-    partial void OnDefaultOpacityChanged(double value)
-    {
-        if (value < 0.2)
-            DefaultOpacity = 0.2;
-        else if (value > 1.0)
-            DefaultOpacity = 1.0;
-    }
 
     partial void OnCursorDetectionMinOpacityChanged(double value)
     {
@@ -326,7 +293,7 @@ public partial class ProfileEditDialogViewModel : ObservableObject
         var updateData = new ProfileUpdateData {
             Name = ProfileName.Trim(), Icon = SelectedIcon,
             Defaults = new ProfileDefaults { Url = string.IsNullOrWhiteSpace(DefaultUrl) ? null : DefaultUrl.Trim(),
-                                             Opacity = DefaultOpacity, SeekSeconds = SeekSeconds }
+                                             SeekSeconds = SeekSeconds }
         };
 
         // 鼠标检测配置 - 直接保存，有设置就覆盖全局
@@ -376,8 +343,6 @@ public partial class ProfileEditDialogViewModel : ObservableObject
         if (SelectedIcon != _originalIcon)
             return true;
         if ((DefaultUrl?.Trim() ?? string.Empty) != _originalDefaultUrl)
-            return true;
-        if (Math.Abs(DefaultOpacity - _originalDefaultOpacity) > 0.001)
             return true;
         if (SeekSeconds != _originalSeekSeconds)
             return true;
@@ -536,7 +501,6 @@ public partial class ProfileEditDialogViewModel : ObservableObject
         }
 
         ValidateUrl();
-        ValidateSeekSeconds();
 
         if (HasValidationErrors)
             return false;

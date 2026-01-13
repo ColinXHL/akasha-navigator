@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
@@ -20,6 +22,7 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
 {
     private readonly IPluginLibrary _pluginLibrary;
     private readonly INotificationService _notificationService;
+    private readonly IEventBus _eventBus;
 
     /// <summary>
     /// 插件列表
@@ -47,10 +50,23 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     /// <summary>
     /// 构造函数
     /// </summary>
-    public AvailablePluginsPageViewModel(IPluginLibrary pluginLibrary, INotificationService notificationService)
+    public AvailablePluginsPageViewModel(IPluginLibrary pluginLibrary, INotificationService notificationService,
+                                         IEventBus eventBus)
     {
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+
+        // 订阅插件列表变化事件
+        _eventBus.Subscribe<PluginListChangedEvent>(OnPluginListChanged);
+    }
+
+    /// <summary>
+    /// 插件列表变化事件处理
+    /// </summary>
+    private void OnPluginListChanged(PluginListChangedEvent e)
+    {
+        RefreshPluginList();
     }
 
     /// <summary>

@@ -171,6 +171,43 @@ public partial class PlayerWindow : Window
 
         // 订阅导航控制事件（由 ViewModel 发布，Code-behind 执行 WebView 操作）
         SubscribeToNavigationControlEvents();
+
+        // 订阅透明度相关事件
+        SubscribeToOpacityEvents();
+    }
+
+    /// <summary>
+    /// 订阅透明度相关事件
+    /// </summary>
+    private void SubscribeToOpacityEvents()
+    {
+        // 订阅透明度查询事件（设置界面查询当前透明度）
+        _eventBus.Subscribe<OpacityQueryEvent>(OnOpacityQuery);
+
+        // 订阅透明度变化事件（设置界面修改透明度）
+        _eventBus.Subscribe<OpacityChangedEvent>(OnOpacityChangedFromSettings);
+    }
+
+    /// <summary>
+    /// 处理透明度查询事件
+    /// </summary>
+    private void OnOpacityQuery(OpacityQueryEvent e)
+    {
+        e.Callback?.Invoke(_windowBehavior.WindowOpacity);
+    }
+
+    /// <summary>
+    /// 处理来自设置界面的透明度变化事件
+    /// </summary>
+    private void OnOpacityChangedFromSettings(OpacityChangedEvent e)
+    {
+        // 只处理来自设置界面的事件
+        if (e.Source != OpacityChangeSource.Settings)
+            return;
+
+        // 在 UI 线程执行
+        Dispatcher.BeginInvoke(() =>
+                               { _windowBehavior.SetOpacity(e.Opacity); });
     }
 
     /// <summary>
@@ -670,7 +707,10 @@ public partial class PlayerWindow : Window
     /// <returns>当前透明度</returns>
     public double DecreaseOpacity()
     {
-        return _windowBehavior.DecreaseOpacity();
+        var opacity = _windowBehavior.DecreaseOpacity();
+        // 发布透明度变化事件
+        _eventBus.Publish(new OpacityChangedEvent { Opacity = opacity, Source = OpacityChangeSource.Hotkey });
+        return opacity;
     }
 
     /// <summary>
@@ -679,7 +719,10 @@ public partial class PlayerWindow : Window
     /// <returns>当前透明度</returns>
     public double IncreaseOpacity()
     {
-        return _windowBehavior.IncreaseOpacity();
+        var opacity = _windowBehavior.IncreaseOpacity();
+        // 发布透明度变化事件
+        _eventBus.Publish(new OpacityChangedEvent { Opacity = opacity, Source = OpacityChangeSource.Hotkey });
+        return opacity;
     }
 
     /// <summary>
@@ -724,6 +767,8 @@ public partial class PlayerWindow : Window
     public void ResetOpacity()
     {
         _windowBehavior.SetOpacity(1.0);
+        // 发布透明度变化事件
+        _eventBus.Publish(new OpacityChangedEvent { Opacity = 1.0, Source = OpacityChangeSource.Hotkey });
     }
 
     /// <summary>
@@ -1004,7 +1049,8 @@ public partial class PlayerWindow : Window
     /// 只检查配置是否启用，不检查前台进程（由检测服务内部持续检查）
     /// </summary>
     /// <returns>元组：是否启用、最低透明度、检测间隔、调试日志、白名单</returns>
-    private (bool enabled, double minOpacity, int intervalMs, bool debugLog, HashSet<string> whitelist) ResolveCursorDetectionConfig()
+    private (bool enabled, double minOpacity, int intervalMs, bool debugLog, HashSet<string> whitelist)
+        ResolveCursorDetectionConfig()
     {
         var profile = _profileManager.CurrentProfile;
         var globalConfig = _configService.Config.CursorDetection;

@@ -35,9 +35,9 @@
             <TextBlock Text="关闭窗口时提示记录当前游戏进度笔记"
                        Foreground="#666" FontSize="11" Margin="0,0,0,24"/>
 
-            <!-- 鼠标检测透明度自动调整 -->
-            <TextBlock Text="鼠标检测透明度自动调整" Style="{StaticResource SettingsGroupHeaderStyle}"/>
-            <TextBlock Text="当游戏 UI 打开（如地图）时自动降低播放器透明度，使用 ClipCursor API 检测"
+            <!-- 鼠标检测 -->
+            <TextBlock Text="鼠标检测" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <TextBlock Text="当前台进程中出现鼠标（如原神打开地图）时自动降低播放器透明度"
                        Foreground="#666" FontSize="11" Margin="0,0,0,12"/>
 
             <CheckBox x:Name="CursorDetectionEnabledCheckBox" Content="启用全局鼠标检测"

@@ -59,14 +59,14 @@
                        Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
         </Grid>
 
-        <!-- 默认透明度 -->
+        <!-- 透明度 -->
         <Grid Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="100"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="45"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="默认透明度" Style="{StaticResource SettingsLabelStyle}"/>
+            <TextBlock Grid.Column="0" Text="透明度" Style="{StaticResource SettingsLabelStyle}"/>
             <Slider x:Name="OpacitySlider" Grid.Column="1"
                     Style="{StaticResource DarkSliderStyle}"
                     Minimum="20" Maximum="100" TickFrequency="10" IsSnapToTickEnabled="True"

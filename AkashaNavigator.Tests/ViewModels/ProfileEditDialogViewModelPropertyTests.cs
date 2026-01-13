@@ -32,8 +32,8 @@ public class ProfileEditDialogViewModelPropertyTests
         return Prop.ForAll(Arb.From<NonEmptyString>(),
                            (url) =>
                            {
-                               var profile = CreateTestProfile(
-                                   defaults: new ProfileDefaults { Url = url.Get, Opacity = 0.8, SeekSeconds = 10 });
+                               var profile =
+                                   CreateTestProfile(defaults: new ProfileDefaults { Url = url.Get, SeekSeconds = 10 });
                                var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
                                viewModel.Initialize(profile);
                                return viewModel.DefaultUrl == url.Get;
@@ -47,9 +47,9 @@ public class ProfileEditDialogViewModelPropertyTests
                            (seekSeconds) =>
                            {
                                var validSeekSeconds = Math.Max(1, Math.Min(60, seekSeconds.Get));
-                               var profile = CreateTestProfile(
-                                   defaults: new ProfileDefaults { Url = "https://test.com", Opacity = 0.8,
-                                                                   SeekSeconds = validSeekSeconds });
+                               var profile =
+                                   CreateTestProfile(defaults: new ProfileDefaults { Url = "https://test.com",
+                                                                                     SeekSeconds = validSeekSeconds });
                                var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
                                viewModel.Initialize(profile);
                                return viewModel.SeekSeconds == validSeekSeconds;
@@ -83,20 +83,6 @@ public class ProfileEditDialogViewModelPropertyTests
 #endregion
 
 #region Property 2 : Opacity Clamping
-
-    [Property(MaxTest = 100)]
-    public Property DefaultOpacity_IsClamped_ToValidRange()
-    {
-        return Prop.ForAll(Arb.From<NormalFloat>(),
-                           (opacity) =>
-                           {
-                               var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-                               var profile = CreateTestProfile();
-                               viewModel.Initialize(profile);
-                               viewModel.DefaultOpacity = opacity.Get;
-                               return viewModel.DefaultOpacity >= 0.2 && viewModel.DefaultOpacity <= 1.0;
-                           });
-    }
 
     [Property(MaxTest = 100)]
     public Property CursorDetectionMinOpacity_IsClamped_ToValidRange()
@@ -200,40 +186,7 @@ public class ProfileEditDialogViewModelPropertyTests
 
 #endregion
 
-#region Property 5 : SeekSeconds Validation
-
-    [Property(MaxTest = 100)]
-    public Property SeekSeconds_OutOfRange_SetsError()
-    {
-        var outOfRangeGen = Gen.OneOf(Gen.Choose(-100, 0), Gen.Choose(61, 200));
-        return Prop.ForAll(outOfRangeGen.ToArbitrary(),
-                           (seekSeconds) =>
-                           {
-                               var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-                               var profile = CreateTestProfile();
-                               viewModel.Initialize(profile);
-                               viewModel.SeekSeconds = seekSeconds;
-                               return !string.IsNullOrEmpty(viewModel.SeekSecondsError);
-                           });
-    }
-
-    [Property(MaxTest = 100)]
-    public Property SeekSeconds_InRange_ClearsError()
-    {
-        return Prop.ForAll(Gen.Choose(1, 60).ToArbitrary(),
-                           (seekSeconds) =>
-                           {
-                               var viewModel = new ProfileEditDialogViewModel(_mockProfileManager.Object);
-                               var profile = CreateTestProfile();
-                               viewModel.Initialize(profile);
-                               viewModel.SeekSeconds = seekSeconds;
-                               return string.IsNullOrEmpty(viewModel.SeekSecondsError);
-                           });
-    }
-
-#endregion
-
-#region Property 6 : CanSave
+#region Property 5 : CanSave
 
     [Fact]
     public void CanSave_WithValidationErrors_ReturnsFalse()
@@ -403,8 +356,8 @@ public class ProfileEditDialogViewModelPropertyTests
                                  Name = name,
                                  Icon = icon,
                                  Version = 1,
-                                 Defaults = defaults ?? new ProfileDefaults { Url = "https://example.com",
-                                                                              Opacity = 1.0, SeekSeconds = 5 },
+                                 Defaults =
+                                     defaults ?? new ProfileDefaults { Url = "https://example.com", SeekSeconds = 5 },
                                  CursorDetection = cursorDetection };
     }
 

@@ -79,8 +79,8 @@ public class ProfileManagerPropertyTests : IDisposable
                                         Name = name,
                                         Icon = icon,
                                         Version = 1,
-                                        Defaults = defaults ?? new ProfileDefaults { Url = "https://example.com",
-                                                                                     Opacity = 1.0, SeekSeconds = 5 },
+                                        Defaults = defaults ??
+                                                   new ProfileDefaults { Url = "https://example.com", SeekSeconds = 5 },
                                         CursorDetection = cursorDetection };
 
         var options =
@@ -121,9 +121,9 @@ public class ProfileManagerPropertyTests : IDisposable
             (originalName, originalIcon) =>
             {
                 // Arrange
-                var profile = new GameProfile { Id = "test-profile", Name = originalName.Get, Icon = originalIcon.Get,
-                                                Defaults = new ProfileDefaults { Url = "https://test.com",
-                                                                                 Opacity = 0.8, SeekSeconds = 10 } };
+                var profile =
+                    new GameProfile { Id = "test-profile", Name = originalName.Get, Icon = originalIcon.Get,
+                                      Defaults = new ProfileDefaults { Url = "https://test.com", SeekSeconds = 10 } };
 
                 var updateData = new ProfileUpdateData {
                     Name = null, // Not updating name
@@ -153,9 +153,9 @@ public class ProfileManagerPropertyTests : IDisposable
             (originalName, originalIcon) =>
             {
                 // Arrange
-                var profile = new GameProfile { Id = "test-profile", Name = originalName.Get, Icon = originalIcon.Get,
-                                                Defaults = new ProfileDefaults { Url = "https://test.com",
-                                                                                 Opacity = 0.8, SeekSeconds = 10 } };
+                var profile =
+                    new GameProfile { Id = "test-profile", Name = originalName.Get, Icon = originalIcon.Get,
+                                      Defaults = new ProfileDefaults { Url = "https://test.com", SeekSeconds = 10 } };
 
                 var updateData = new ProfileUpdateData {
                     Name = "New Name", // Updating name
@@ -180,33 +180,32 @@ public class ProfileManagerPropertyTests : IDisposable
     [Property(MaxTest = 100)]
     public Property UpdateProfile_WithNullDefaults_PreservesOriginalDefaults()
     {
-        return Prop.ForAll(
-            Arb.From<PositiveInt>(),
-            (seekSeconds) =>
-            {
-                // Clamp to valid range
-                var validSeekSeconds = Math.Max(1, Math.Min(60, seekSeconds.Get));
+        return Prop.ForAll(Arb.From<PositiveInt>(),
+                           (seekSeconds) =>
+                           {
+                               // Clamp to valid range
+                               var validSeekSeconds = Math.Max(1, Math.Min(60, seekSeconds.Get));
 
-                // Arrange
-                var originalDefaults = new ProfileDefaults { Url = "https://original.com", Opacity = 0.75,
-                                                             SeekSeconds = validSeekSeconds };
+                               // Arrange
+                               var originalDefaults =
+                                   new ProfileDefaults { Url = "https://original.com", SeekSeconds = validSeekSeconds };
 
-                var profile =
-                    new GameProfile { Id = "test-profile", Name = "Test", Icon = "🎮", Defaults = originalDefaults };
+                               var profile = new GameProfile { Id = "test-profile", Name = "Test", Icon = "🎮",
+                                                               Defaults = originalDefaults };
 
-                var updateData = new ProfileUpdateData {
-                    Name = "Updated Name",
-                    Defaults = null // Not updating defaults
-                };
+                               var updateData = new ProfileUpdateData {
+                                   Name = "Updated Name",
+                                   Defaults = null // Not updating defaults
+                               };
 
-                // Act - Apply partial update logic
-                var updatedProfile = ApplyPartialUpdate(profile, updateData);
+                               // Act - Apply partial update logic
+                               var updatedProfile = ApplyPartialUpdate(profile, updateData);
 
-                // Assert - Defaults should be preserved
-                return updatedProfile.Defaults != null && updatedProfile.Defaults.Url == originalDefaults.Url &&
-                       updatedProfile.Defaults.Opacity == originalDefaults.Opacity &&
-                       updatedProfile.Defaults.SeekSeconds == originalDefaults.SeekSeconds;
-            });
+                               // Assert - Defaults should be preserved
+                               return updatedProfile.Defaults != null &&
+                                      updatedProfile.Defaults.Url == originalDefaults.Url &&
+                                      updatedProfile.Defaults.SeekSeconds == originalDefaults.SeekSeconds;
+                           });
     }
 
     /// <summary>
@@ -290,20 +289,18 @@ public class ProfileManagerPropertyTests : IDisposable
     public Property UpdateProfile_WithNonNullDefaults_UpdatesDefaults()
     {
         return Prop.ForAll(
-            Arb.From<PositiveInt>(), Arb.From<NormalFloat>(),
-            (seekSeconds, opacity) =>
+            Arb.From<PositiveInt>(),
+            (seekSeconds) =>
             {
                 // Clamp to valid ranges
                 var validSeekSeconds = Math.Max(1, Math.Min(60, seekSeconds.Get));
-                var validOpacity = Math.Max(0.2, Math.Min(1.0, Math.Abs(opacity.Get)));
 
                 // Arrange
-                var profile = new GameProfile { Id = "test-profile", Name = "Test", Icon = "🎮",
-                                                Defaults = new ProfileDefaults { Url = "https://old.com", Opacity = 1.0,
-                                                                                 SeekSeconds = 5 } };
+                var profile =
+                    new GameProfile { Id = "test-profile", Name = "Test", Icon = "🎮",
+                                      Defaults = new ProfileDefaults { Url = "https://old.com", SeekSeconds = 5 } };
 
-                var newDefaults = new ProfileDefaults { Url = "https://new.com", Opacity = validOpacity,
-                                                        SeekSeconds = validSeekSeconds };
+                var newDefaults = new ProfileDefaults { Url = "https://new.com", SeekSeconds = validSeekSeconds };
 
                 var updateData = new ProfileUpdateData { Defaults = newDefaults };
 
@@ -312,7 +309,6 @@ public class ProfileManagerPropertyTests : IDisposable
 
                 // Assert - Defaults should be updated
                 return updatedProfile.Defaults != null && updatedProfile.Defaults.Url == newDefaults.Url &&
-                       updatedProfile.Defaults.Opacity == newDefaults.Opacity &&
                        updatedProfile.Defaults.SeekSeconds == newDefaults.SeekSeconds;
             });
     }

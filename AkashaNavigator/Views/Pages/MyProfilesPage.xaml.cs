@@ -8,6 +8,8 @@ using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.Views.Windows;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 using Microsoft.Win32;
 
@@ -25,11 +27,13 @@ public partial class MyProfilesPage : UserControl
     private readonly IPluginHost _pluginHost;
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly INotificationService _notificationService;
+    private readonly IEventBus _eventBus;
 
     // DI构造函数
     public MyProfilesPage(MyProfilesPageViewModel viewModel, IDialogFactory dialogFactory,
                           IProfileManager profileManager, IPluginLibrary pluginLibrary, IPluginHost pluginHost,
-                          IPluginAssociationManager pluginAssociationManager, INotificationService notificationService)
+                          IPluginAssociationManager pluginAssociationManager, INotificationService notificationService,
+                          IEventBus eventBus)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _dialogFactory = dialogFactory ?? throw new ArgumentNullException(nameof(dialogFactory));
@@ -39,6 +43,7 @@ public partial class MyProfilesPage : UserControl
         _pluginAssociationManager =
             pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
 
         InitializeComponent();
         DataContext = _viewModel;
@@ -205,6 +210,9 @@ public partial class MyProfilesPage : UserControl
                     }
                 }
 
+                // 通知其他页面刷新插件列表
+                _eventBus.Publish(new PluginListChangedEvent());
+
                 if (failCount > 0)
                 {
                     _notificationService.Warning(
@@ -219,6 +227,9 @@ public partial class MyProfilesPage : UserControl
             {
                 _notificationService.Success($"Profile \"{profileName}\" 已删除");
             }
+
+            // 通知 Profile 市场页面刷新（更新安装状态）
+            _eventBus.Publish(new ProfileListChangedEvent());
 
             // 刷新 Profile 列表（会自动切换到默认 Profile）
             _viewModel.RefreshProfileList();

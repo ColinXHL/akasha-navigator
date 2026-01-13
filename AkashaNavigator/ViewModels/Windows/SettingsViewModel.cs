@@ -79,13 +79,9 @@ public partial class SettingsViewModel : ObservableObject
     /// </summary>
     public AdvancedSettingsPageViewModel AdvancedPage => _advancedPageVM;
 
-    public SettingsViewModel(IConfigService configService,
-                            IProfileManager profileManager,
-                            IEventBus eventBus,
-                            GeneralSettingsPageViewModel generalPageVM,
-                            WindowSettingsPageViewModel windowPageVM,
-                            HotkeySettingsPageViewModel hotkeysPageVM,
-                            AdvancedSettingsPageViewModel advancedPageVM)
+    public SettingsViewModel(IConfigService configService, IProfileManager profileManager, IEventBus eventBus,
+                             GeneralSettingsPageViewModel generalPageVM, WindowSettingsPageViewModel windowPageVM,
+                             HotkeySettingsPageViewModel hotkeysPageVM, AdvancedSettingsPageViewModel advancedPageVM)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
@@ -98,10 +94,12 @@ public partial class SettingsViewModel : ObservableObject
         var config = _configService.Config;
 
         // 调试日志
-        System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Constructor: Config.CursorDetection is null = {config.CursorDetection == null}");
+        System.Diagnostics.Debug.WriteLine(
+            $"[SettingsViewModel] Constructor: Config.CursorDetection is null = {config.CursorDetection == null}");
         if (config.CursorDetection != null)
         {
-            System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Constructor: CursorDetection.Enabled = {config.CursorDetection.Enabled}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[SettingsViewModel] Constructor: CursorDetection.Enabled = {config.CursorDetection.Enabled}");
         }
 
         // 从各 PageViewModel 加载设置
@@ -132,8 +130,7 @@ public partial class SettingsViewModel : ObservableObject
         _searchableSettings.Clear();
 
         // ===== 通用设置 =====
-        _searchableSettings.AddRange(new[]
-        {
+        _searchableSettings.AddRange(new[] {
             new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "快进秒数", "基础设置"),
             new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "倒退秒数", "基础设置"),
             new SearchableSetting(SettingsPageType.General, "⚙️ 通用", "默认透明度", "基础设置"),
@@ -143,8 +140,7 @@ public partial class SettingsViewModel : ObservableObject
         });
 
         // ===== 窗口设置 =====
-        _searchableSettings.AddRange(new[]
-        {
+        _searchableSettings.AddRange(new[] {
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "边缘吸附", "窗口行为"),
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "吸附阈值", "窗口行为"),
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "退出提示", "窗口行为"),
@@ -152,8 +148,7 @@ public partial class SettingsViewModel : ObservableObject
         });
 
         // ===== 快捷键设置 =====
-        _searchableSettings.AddRange(new[]
-        {
+        _searchableSettings.AddRange(new[] {
             // 全局控制
             new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "禁用快捷键", "全局控制"),
             new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "启用快捷键", "全局控制"),
@@ -181,8 +176,7 @@ public partial class SettingsViewModel : ObservableObject
         });
 
         // ===== 高级设置 =====
-        _searchableSettings.AddRange(new[]
-        {
+        _searchableSettings.AddRange(new[] {
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "插件更新", "高级设置"),
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "更新提示", "高级设置"),
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "调试日志", "高级设置"),
@@ -218,13 +212,10 @@ public partial class SettingsViewModel : ObservableObject
         var results = new List<SearchResult>();
 
         // 1. 搜索页面名称
-        var pageNames = new Dictionary<SettingsPageType, string>
-        {
-            { SettingsPageType.General, "⚙️ 通用" },
-            { SettingsPageType.Window, "🔲 窗口" },
-            { SettingsPageType.Hotkeys, "⌨️ 快捷键" },
-            { SettingsPageType.Advanced, "🔧 高级" }
-        };
+        var pageNames = new Dictionary<SettingsPageType, string> { { SettingsPageType.General, "⚙️ 通用" },
+                                                                   { SettingsPageType.Window, "🔲 窗口" },
+                                                                   { SettingsPageType.Hotkeys, "⌨️ 快捷键" },
+                                                                   { SettingsPageType.Advanced, "🔧 高级" } };
 
         // 匹配页面名称（去除图标后匹配）
         foreach (var page in pageNames)
@@ -255,13 +246,12 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         // 去重并排序（页面优先，然后按名称排序）
-        var uniqueResults = results
-            .GroupBy(r => new { r.PageType, r.SettingDisplayName })
-            .Select(g => g.First())
-            .OrderBy(r => r.ResultType == SearchResultType.Page ? 0 : 1)
-            .ThenBy(r => r.PageType)
-            .ThenBy(r => r.SettingDisplayName)
-            .ToList();
+        var uniqueResults = results.GroupBy(r => new { r.PageType, r.SettingDisplayName })
+                                .Select(g => g.First())
+                                .OrderBy(r => r.ResultType == SearchResultType.Page ? 0 : 1)
+                                .ThenBy(r => r.PageType)
+                                .ThenBy(r => r.SettingDisplayName)
+                                .ToList();
 
         foreach (var result in uniqueResults)
         {
@@ -312,7 +302,8 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void NavigateToSearchResult(SearchResult? result)
     {
-        if (result == null) return;
+        if (result == null)
+            return;
 
         // 跳转到目标页面
         CurrentPage = result.NavigationTarget;
@@ -394,6 +385,14 @@ public partial class SettingsViewModel : ObservableObject
     {
         _generalPageVM.RefreshProfileList();
     }
+
+    /// <summary>
+    /// 刷新设置（设置窗口打开时调用）
+    /// </summary>
+    public void RefreshSettings()
+    {
+        _generalPageVM.RefreshSettings();
+    }
 }
 
 /// <summary>
@@ -403,8 +402,5 @@ public partial class SettingsViewModel : ObservableObject
 /// <param name="PageDisplayName">页面显示名称</param>
 /// <param name="SettingName">设置项名称</param>
 /// <param name="GroupName">分组名称</param>
-internal record SearchableSetting(
-    SettingsPageType PageType,
-    string PageDisplayName,
-    string SettingName,
-    string? GroupName);
+internal record SearchableSetting(SettingsPageType PageType, string PageDisplayName, string SettingName,
+                                  string? GroupName);

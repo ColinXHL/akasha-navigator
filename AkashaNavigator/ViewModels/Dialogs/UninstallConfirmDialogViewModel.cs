@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 
 namespace AkashaNavigator.ViewModels.Dialogs
@@ -17,6 +19,7 @@ public partial class UninstallConfirmDialogViewModel : ObservableObject
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly IPluginLibrary _pluginLibrary;
     private readonly ILogService _logService;
+    private readonly IEventBus _eventBus;
 
     /// <summary>
     /// 引用此插件的 Profile 名称列表
@@ -66,12 +69,13 @@ public partial class UninstallConfirmDialogViewModel : ObservableObject
     /// 创建 UninstallConfirmDialogViewModel
     /// </summary>
     public UninstallConfirmDialogViewModel(IPluginAssociationManager pluginAssociationManager,
-                                           IPluginLibrary pluginLibrary, ILogService logService)
+                                           IPluginLibrary pluginLibrary, ILogService logService, IEventBus eventBus)
     {
         _pluginAssociationManager =
             pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
 
         ReferencingProfiles = new ObservableCollection<string>();
     }
@@ -135,6 +139,10 @@ public partial class UninstallConfirmDialogViewModel : ObservableObject
         {
             _logService.Info(nameof(UninstallConfirmDialogViewModel), "插件 {PluginId} 卸载成功", PluginId);
             ErrorMessage = null;
+
+            // 3. 通知其他页面刷新插件列表
+            _eventBus.Publish(new PluginListChangedEvent());
+
             return true;
         }
         else

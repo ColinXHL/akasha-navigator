@@ -22,8 +22,7 @@ public class WindowStateService : IWindowStateService
     /// </summary>
     public static IWindowStateService Instance
     {
-        get
-        {
+        get {
             if (_instance == null)
             {
                 _instance = new WindowStateService(LogService.Instance, ProfileManager.Instance);
@@ -76,7 +75,7 @@ public class WindowStateService : IWindowStateService
         else
         {
             _logService.Warn(nameof(WindowStateService), "加载窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                     result.Error?.Message ?? "未知错误");
+                             result.Error?.Message ?? "未知错误");
             _cachedState = null;
         }
 
@@ -102,7 +101,7 @@ public class WindowStateService : IWindowStateService
         if (result.IsFailure)
         {
             _logService.Debug(nameof(WindowStateService), "保存窗口状态失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                      result.Error?.Message ?? "未知错误");
+                              result.Error?.Message ?? "未知错误");
         }
     }
 
@@ -114,6 +113,14 @@ public class WindowStateService : IWindowStateService
         var state = Load();
         updateAction(state);
         Save(state);
+    }
+
+    /// <summary>
+    /// 清除缓存，强制下次 Load 时重新从文件读取
+    /// </summary>
+    public void ClearCache()
+    {
+        _cachedState = null;
     }
 
 #endregion
