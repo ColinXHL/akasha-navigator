@@ -26,7 +26,7 @@
 
 AkashaNavigator · A floating web player built with WPF + WebView2 for Windows, designed for watching tutorial/guide videos while gaming.
 
-## Features
+## ✨ Features
 
 * Core Features
   * **Always on Top**: Floating window stays above games and other applications
@@ -58,18 +58,22 @@ AkashaNavigator · A floating web player built with WPF + WebView2 for Windows, 
   <p>Dual-window architecture: Separate player window and control bar window</p>
 </div>
 
-## Screenshots
+## 🎬 Demo Video
 
-> *Coming soon...*
+👉 [Bilibili Demo Video](https://www.bilibili.com/video/BV1CPrEBoESs/)
 
-## Download
+## 📸 Screenshots
+
+![Screenshot](assets/screenshot.png)
+
+## 📥 Download
 
 > [!NOTE]
 > Download: [⚡Github Download](https://github.com/ColinXHL/akasha-navigator/releases)
 >
 > Portable version - all data stored in `User/` folder relative to executable.
 
-## Usage
+## 🚀 Usage
 
 Your system needs to meet the following requirements:
   * Windows 10 or higher (64-bit)
@@ -80,7 +84,7 @@ Your system needs to meet the following requirements:
 1. Administrator privileges required (for global hotkeys in games)
 2. Window position may need adjustment after resizing
 
-## Default Hotkeys
+## ⌨️ Default Hotkeys
 
 | Key | Function |
 |-----|----------|
@@ -98,14 +102,14 @@ Your system needs to meet the following requirements:
 
 > 💡 Hotkeys are fully customizable in Settings. Modifier keys (Ctrl, Alt, Shift) are supported.
 
-## Documentation
+## 📚 Documentation
 
 - [User Guide](docs/user-guide.md) - Installation, usage, FAQ
 - [Plugin Development](docs/plugin-development.md) - Getting started with plugins
 - [API Reference](docs/api/README.md) - Plugin API documentation
 - [Profile Guide](docs/profile-guide.md) - Creating and publishing profiles
 
-## Build from Source
+## 🔧 Build from Source
 
 ```powershell
 # Clone the repository
@@ -122,7 +126,7 @@ dotnet run --project AkashaNavigator
 dotnet test
 ```
 
-## FAQ
+## ❓ FAQ
 
 * Why does it need administrator privileges?
   * Games usually run with administrator privileges. Without admin rights, the software cannot simulate keyboard operations.
@@ -130,7 +134,7 @@ dotnet test
 * Which video sites are supported?
   * Theoretically supports all web videos, primarily optimized for Bilibili.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 This project would not be possible without:
 * [kachina-installer](https://github.com/YuehaiTeam/kachina-installer)
@@ -138,10 +142,10 @@ This project would not be possible without:
 * [Microsoft WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 * [ClearScript](https://github.com/nicksoftware/ClearScript) - V8 JavaScript Engine
 
-## License
+## 📄 License
 
 ![MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## Feedback
+## 💬 Feedback
 
 Submit an [Issue](https://github.com/ColinXHL/akasha-navigator/issues)
