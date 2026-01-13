@@ -27,6 +27,11 @@
     <!-- 用法: IsChecked="{Binding CurrentPage, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=x:Static local:MyEnum.Value}" -->
     <helpers:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
 
+    <!-- Null/空字符串 到 Visibility 转换器 -->
+    <!-- 当值为非空字符串时显示，否则隐藏，用于验证错误消息显示 -->
+    <!-- 用法: Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}" -->
+    <helpers:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+
     <!-- 系统内置 Bool 到 Visibility 转换器 -->
     <!-- 用法: Visibility="{Binding IsVisible, Converter={StaticResource SystemBoolToVisibilityConverter}}" -->
     <BooleanToVisibilityConverter x:Key="SystemBoolToVisibilityConverter"/>

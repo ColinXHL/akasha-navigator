@@ -445,6 +445,75 @@ public class ProfileManager : IProfileManager
     }
 
     /// <summary>
+    /// 更新 Profile（扩展版本，支持更多字段）
+    /// 支持部分更新：只更新 ProfileUpdateData 中非 null 的字段
+    /// </summary>
+    /// <param name="id">Profile ID</param>
+    /// <param name="updateData">更新数据，null 字段表示不更新</param>
+    /// <returns>是否成功更新</returns>
+    public bool UpdateProfile(string id, ProfileUpdateData updateData)
+    {
+        if (updateData == null)
+        {
+            _logService.Warn(nameof(ProfileManager), "更新 Profile 失败: updateData 为空");
+            return false;
+        }
+
+        // 查找 Profile
+        var profile = GetProfileById(id);
+        if (profile == null)
+        {
+            _logService.Warn(nameof(ProfileManager), "更新 Profile 失败: Profile '{ProfileId}' 不存在", id);
+            return false;
+        }
+
+        try
+        {
+            // 部分更新：只更新非 null 的字段
+            if (updateData.Name != null)
+            {
+                if (string.IsNullOrWhiteSpace(updateData.Name))
+                {
+                    _logService.Warn(nameof(ProfileManager), "更新 Profile 失败: 名称不能为空");
+                    return false;
+                }
+                profile.Name = updateData.Name.Trim();
+            }
+
+            if (updateData.Icon != null)
+            {
+                profile.Icon = updateData.Icon;
+            }
+
+            if (updateData.Defaults != null)
+            {
+                profile.Defaults = updateData.Defaults;
+            }
+
+            // 处理 CursorDetection：ClearCursorDetection 优先级高于 CursorDetection
+            if (updateData.ClearCursorDetection)
+            {
+                profile.CursorDetection = null;
+            }
+            else if (updateData.CursorDetection != null)
+            {
+                profile.CursorDetection = updateData.CursorDetection;
+            }
+
+            // 保存到文件
+            SaveProfile(profile);
+
+            _logService.Info(nameof(ProfileManager), "成功更新 Profile '{ProfileId}'（扩展更新）", id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logService.Error(nameof(ProfileManager), ex, "更新 Profile 失败");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 删除 Profile
     /// </summary>
     /// <param name="id">Profile ID</param>

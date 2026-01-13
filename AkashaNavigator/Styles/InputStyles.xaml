@@ -475,4 +475,61 @@
         </Setter>
     </Style>
 
+    <!-- ==================== 折叠面板样式 ==================== -->
+
+    <!-- 深色主题 Expander 样式 (用于对话框分组) -->
+    <Style x:Key="DarkExpanderStyle" TargetType="Expander">
+        <Setter Property="Foreground" Value="#888"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <StackPanel>
+                        <!-- Header -->
+                        <ToggleButton x:Name="HeaderSite"
+                                      IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Cursor="Hand">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="headerBorder" Background="Transparent" Padding="0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="arrow" Grid.Column="0" Text="▶" FontSize="10"
+                                                       Foreground="#888" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <ContentPresenter Grid.Column="1" 
+                                                              Content="{Binding Header, RelativeSource={RelativeSource AncestorType=Expander}}"
+                                                              VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="arrow" Property="Text" Value="▼"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="arrow" Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <!-- Content -->
+                        <Border x:Name="ContentSite" Visibility="Collapsed" Margin="16,0,0,0">
+                            <ContentPresenter Content="{TemplateBinding Content}"/>
+                        </Border>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ContentSite" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

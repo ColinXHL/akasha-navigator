@@ -53,7 +53,7 @@ public class PioneerNoteServiceTests : IDisposable
         }
     }
 
-    #region Folder Tests - 1.3.1
+#region Folder Tests - 1.3.1
 
     [Fact]
     public void CreateFolder_WithValidName_CreatesFolderInRoot()
@@ -366,9 +366,9 @@ public class PioneerNoteServiceTests : IDisposable
         Assert.Equal(3, count);
     }
 
-    #endregion
+#endregion
 
-    #region Note Item Tests - 1.3.2
+#region Note Item Tests - 1.3.2
 
     [Fact]
     public void RecordNote_WithValidData_CreatesNoteInRoot()
@@ -769,9 +769,9 @@ public class PioneerNoteServiceTests : IDisposable
         Assert.False(result2);
     }
 
-    #endregion
+#endregion
 
-    #region Search Tests - 1.3.3
+#region Search Tests - 1.3.3
 
     [Fact]
     public void SearchNotes_WithKeyword_ReturnsMatchingNotes()
@@ -851,9 +851,9 @@ public class PioneerNoteServiceTests : IDisposable
         Assert.Equal("游戏1", results[2].Title);
     }
 
-    #endregion
+#endregion
 
-    #region Sort Tests - 1.3.4
+#region Sort Tests - 1.3.4
 
     [Fact]
     public void GetSortedItems_WithDescending_ReturnsNewestFirst()
@@ -971,9 +971,9 @@ public class PioneerNoteServiceTests : IDisposable
         Assert.Equal("标题1", notes[0].Title);
     }
 
-    #endregion
+#endregion
 
-    #region Persistence Tests - 1.3.5
+#region Persistence Tests - 1.3.5
 
     [Fact]
     public void Data_PersistsToFile_RetainsNotesAndFolders()
@@ -1093,9 +1093,9 @@ public class PioneerNoteServiceTests : IDisposable
         Assert.Equal(1, _noteService.GetItemCount());
     }
 
-    #endregion
+#endregion
 
-    #region Mock Profile Manager
+#region Mock Profile Manager
 
     /// <summary>
     /// 简单的 Mock ProfileManager，用于测试
@@ -1107,12 +1107,7 @@ public class PioneerNoteServiceTests : IDisposable
         public MockProfileManager(string profileDirectory)
         {
             _profileDirectory = profileDirectory;
-            CurrentProfile = new GameProfile
-            {
-                Id = "test",
-                Name = "Test Profile",
-                Icon = "test.png"
-            };
+            CurrentProfile = new GameProfile { Id = "test", Name = "Test Profile", Icon = "test.png" };
         }
 
         public event EventHandler<GameProfile>? ProfileChanged;
@@ -1135,9 +1130,13 @@ public class PioneerNoteServiceTests : IDisposable
 
         public string GetProfileDirectory(string profileId) => _profileDirectory;
 
-        public void SaveCurrentProfile() { }
+        public void SaveCurrentProfile()
+        {
+        }
 
-        public void SaveProfile(GameProfile profile) { }
+        public void SaveProfile(GameProfile profile)
+        {
+        }
 
         public Result DeleteProfile(string id) => Result.Success();
 
@@ -1147,12 +1146,16 @@ public class PioneerNoteServiceTests : IDisposable
 
         public string GenerateProfileId(string name) => name.ToLower().Replace(" ", "_");
 
-        public Result<string> CreateProfile(string? id, string name, string icon, List<string>? pluginIds)
-            => Result<string>.Success("test");
+        public Result<string> CreateProfile(string? id, string name, string icon,
+                                            List<string>? pluginIds) => Result<string>.Success("test");
 
         public bool UpdateProfile(string id, string newName, string newIcon) => true;
 
-        public void ReloadProfiles() { }
+        public bool UpdateProfile(string id, ProfileUpdateData updateData) => true;
+
+        public void ReloadProfiles()
+        {
+        }
 
         public bool SubscribeProfile(string profileId) => true;
 
@@ -1164,14 +1167,13 @@ public class PioneerNoteServiceTests : IDisposable
 
         public bool ExportProfileToFile(string profileId, string filePath) => true;
 
-        public ProfileImportResult ImportProfile(ProfileExportData data, bool overwrite = false)
-            => ProfileImportResult.Success("test");
+        public ProfileImportResult ImportProfile(ProfileExportData data,
+                                                 bool overwrite = false) => ProfileImportResult.Success("test");
 
-        public ProfileImportResult ImportProfileFromFile(string filePath, bool overwrite = false)
-            => ProfileImportResult.Success("test");
+        public ProfileImportResult ImportProfileFromFile(string filePath,
+                                                         bool overwrite = false) => ProfileImportResult.Success("test");
 
-        public ProfileImportResult PreviewImport(ProfileExportData data)
-            => ProfileImportResult.Success("test");
+        public ProfileImportResult PreviewImport(ProfileExportData data) => ProfileImportResult.Success("test");
 
         public List<PluginReference> GetPluginReferences(string profileId) => new();
 
@@ -1193,6 +1195,6 @@ public class PioneerNoteServiceTests : IDisposable
         }
     }
 
-    #endregion
+#endregion
 }
 }

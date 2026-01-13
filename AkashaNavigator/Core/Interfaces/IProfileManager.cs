@@ -99,6 +99,15 @@ public interface IProfileManager
     bool UpdateProfile(string id, string newName, string newIcon);
 
     /// <summary>
+    /// 更新 Profile（扩展版本，支持更多字段）
+    /// 支持部分更新：只更新 ProfileUpdateData 中非 null 的字段
+    /// </summary>
+    /// <param name="id">Profile ID</param>
+    /// <param name="updateData">更新数据，null 字段表示不更新</param>
+    /// <returns>是否成功更新</returns>
+    bool UpdateProfile(string id, ProfileUpdateData updateData);
+
+    /// <summary>
     /// 删除 Profile
     /// </summary>
     /// <returns>成功时返回 Result.Success()，失败时返回错误信息</returns>

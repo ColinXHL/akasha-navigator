@@ -38,13 +38,15 @@
     <!-- 图标按钮样式 (RadioButton) -->
     <Style x:Key="IconButtonStyle" TargetType="RadioButton">
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="White"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="border" Background="#2A2A2A" BorderBrush="#3A3A3A" 
                             BorderThickness="1" CornerRadius="4" Width="36" Height="36"
                             Margin="0,0,6,6">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">

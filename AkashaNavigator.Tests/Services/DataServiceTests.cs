@@ -825,6 +825,8 @@ public class DataServiceTests : IDisposable
 
         public bool UpdateProfile(string id, string newName, string newIcon) => true;
 
+        public bool UpdateProfile(string id, ProfileUpdateData updateData) => true;
+
         public void ReloadProfiles()
         {
         }
