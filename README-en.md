@@ -50,7 +50,7 @@ AkashaNavigator · A floating web player built with WPF + WebView2 for Windows, 
 * Other Features
   * **History**: Automatically track browsing history
   * **Bookmarks**: Save favorite pages
-  * **Archive Management**: Tree-structured archive with folder organization, search and sorting
+  * **Pioneer Notes**: Tree-structured note system for game guides with folder organization, search and sorting
   * **Subtitle Support**: Parse video subtitles for plugin access
   * **Overlay System**: Plugins can create custom UI overlays
 
@@ -89,7 +89,12 @@ Your system needs to meet the following requirements:
 | `6` | Seek Forward (5s) |
 | `7` | Decrease Opacity |
 | `8` | Increase Opacity |
+| `9` | Toggle Window Visibility |
 | `0` | Toggle Click-Through |
+| `-` | Decrease Playback Speed |
+| `=` | Increase Playback Speed |
+| `Alt+Enter` | Toggle Maximize |
+| `Ctrl+`` ` `` | Suspend/Resume Hotkeys |
 
 > 💡 Hotkeys are fully customizable in Settings. Modifier keys (Ctrl, Alt, Shift) are supported.
 

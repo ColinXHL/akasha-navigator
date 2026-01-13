@@ -149,7 +149,7 @@ function onUnload(api) {
 | `storage` | 数据持久化 | api.storage |
 | `network` | HTTP 网络请求 | api.http |
 | `events` | 应用事件监听 | api.event |
-
+| `audio` | 语音识别 API | api.audio |
 
 **无需权限的 API：**
 - `api.core` - 日志、版本信息
