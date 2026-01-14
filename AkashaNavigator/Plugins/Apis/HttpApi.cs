@@ -16,7 +16,7 @@ namespace AkashaNavigator.Plugins.Apis
 /// 提供 HTTP GET/POST 请求功能
 /// 需要 "network" 权限
 /// </summary>
-public class HttpApi
+public class HttpApi : IDisposable
 {
 #region Fields
 
@@ -24,6 +24,7 @@ public class HttpApi
     private readonly HttpClient _httpClient;
     private readonly HttpUrlValidator _urlValidator;
     private const int DefaultTimeout = 30000; // 30 秒
+    private bool _disposed;
 
 #endregion
 
@@ -86,26 +87,57 @@ public class HttpApi
 
 #endregion
 
+#region IDisposable
+
+    /// <summary>
+    /// 释放资源
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// 释放资源的实际实现
+    /// </summary>
+    /// <param name="disposing">是否释放托管资源</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+            return;
+
+        if (disposing)
+        {
+            // 释放 HttpClient 资源
+            try
+            {
+                _httpClient?.Dispose();
+                var pluginId = _context?.PluginId ?? "unknown";
+                Services.LogService.Instance.Debug($"Plugin:{pluginId}", "HttpApi: disposed");
+            }
+            catch (Exception ex)
+            {
+                var pluginId = _context?.PluginId ?? "unknown";
+                Services.LogService.Instance.Error($"Plugin:{pluginId}", "HttpApi dispose failed: {ErrorMessage}",
+                                                   ex.Message);
+            }
+        }
+
+        _disposed = true;
+    }
+
+#endregion
+
 #region Internal Methods
 
     /// <summary>
     /// 清理资源（插件卸载时调用）
     /// </summary>
+    [Obsolete("Use Dispose() instead")]
     internal void Cleanup()
     {
-        // 释放 HttpClient 资源
-        try
-        {
-            _httpClient?.Dispose();
-            var pluginId = _context?.PluginId ?? "unknown";
-            Services.LogService.Instance.Debug($"Plugin:{pluginId}", "HttpApi: cleaned up");
-        }
-        catch (Exception ex)
-        {
-            var pluginId = _context?.PluginId ?? "unknown";
-            Services.LogService.Instance.Error($"Plugin:{pluginId}", "HttpApi cleanup failed: {ErrorMessage}",
-                                               ex.Message);
-        }
+        Dispose();
     }
 
 #endregion

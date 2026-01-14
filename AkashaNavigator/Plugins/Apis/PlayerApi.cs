@@ -31,32 +31,56 @@ public class PlayerApi
     /// <summary>
     /// 当前播放时间（秒）
     /// </summary>
-    public double currentTime => 0; // TODO: 从 WebView 获取
+    /// <remarks>
+    /// 当前版本返回固定值 0。WebView2 不直接暴露视频播放时间，
+    /// 需要通过 JavaScript 注入获取，此功能计划在未来版本实现。
+    /// </remarks>
+    public double currentTime => 0;
 
     /// <summary>
     /// 视频总时长（秒）
     /// </summary>
-    public double duration => 0; // TODO: 从 WebView 获取
+    /// <remarks>
+    /// 当前版本返回固定值 0。WebView2 不直接暴露视频时长信息，
+    /// 需要通过 JavaScript 注入获取，此功能计划在未来版本实现。
+    /// </remarks>
+    public double duration => 0;
 
     /// <summary>
     /// 当前音量（0.0-1.0）
     /// </summary>
-    public double volume => 1.0; // TODO: 从 WebView 获取
+    /// <remarks>
+    /// 当前版本返回固定值 1.0。WebView2 不直接暴露音量控制，
+    /// 需要通过 JavaScript 注入获取，此功能计划在未来版本实现。
+    /// </remarks>
+    public double volume => 1.0;
 
     /// <summary>
     /// 当前播放速度
     /// </summary>
-    public double playbackRate => 1.0; // TODO: 从 WebView 获取
+    /// <remarks>
+    /// 当前版本返回固定值 1.0。WebView2 不直接暴露播放速度信息，
+    /// 需要通过 JavaScript 注入获取，此功能计划在未来版本实现。
+    /// </remarks>
+    public double playbackRate => 1.0;
 
     /// <summary>
     /// 是否静音
     /// </summary>
-    public bool muted => false; // TODO: 从 WebView 获取
+    /// <remarks>
+    /// 当前版本返回固定值 false。WebView2 不直接暴露静音状态，
+    /// 需要通过 JavaScript 注入获取，此功能计划在未来版本实现。
+    /// </remarks>
+    public bool muted => false;
 
     /// <summary>
     /// 是否正在播放
     /// </summary>
-    public bool playing => false; // TODO: 从 WebView 获取
+    /// <remarks>
+    /// 当前版本返回固定值 false。WebView2 不直接暴露播放状态，
+    /// 需要通过 JavaScript 注入获取，此功能计划在未来版本实现。
+    /// </remarks>
+    public bool playing => false;
 
     /// <summary>
     /// 开始播放
@@ -86,24 +110,36 @@ public class PlayerApi
     /// 设置音量
     /// </summary>
     /// <param name="vol">音量（0.0-1.0）</param>
+    /// <remarks>
+    /// 当前版本为空实现。WebView2 不直接暴露音量控制接口，
+    /// 需要通过 JavaScript 注入实现，此功能计划在未来版本实现。
+    /// </remarks>
     public void setVolume(double vol)
-    { /* TODO: 实现音量控制 */
+    {
     }
 
     /// <summary>
     /// 设置播放速度
     /// </summary>
     /// <param name="rate">播放速度</param>
+    /// <remarks>
+    /// 当前版本为空实现。WebView2 不直接暴露播放速度控制接口，
+    /// 需要通过 JavaScript 注入实现，此功能计划在未来版本实现。
+    /// </remarks>
     public void setPlaybackRate(double rate)
-    { /* TODO: 实现播放速度控制 */
+    {
     }
 
     /// <summary>
     /// 设置静音状态
     /// </summary>
     /// <param name="mute">是否静音</param>
+    /// <remarks>
+    /// 当前版本为空实现。WebView2 不直接暴露静音控制接口，
+    /// 需要通过 JavaScript 注入实现，此功能计划在未来版本实现。
+    /// </remarks>
     public void setMuted(bool mute)
-    { /* TODO: 实现静音控制 */
+    {
     }
 
     /// <summary>

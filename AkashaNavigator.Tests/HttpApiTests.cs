@@ -469,5 +469,61 @@ public class HttpApiTests : IDisposable
     }
 
 #endregion
+
+#region IDisposable 测试
+
+    /// <summary>
+    /// **Feature: code-cleanup-2026-01, Property 1: HttpApi IDisposable 正确实现**
+    /// Dispose 方法应该不抛出异常
+    /// **Validates: Requirements 3.1, 3.2**
+    /// </summary>
+    [Fact]
+    public void Dispose_ShouldNotThrow()
+    {
+        var api = new HttpApi("test-plugin", new[] { "https://*" });
+
+        var exception = Record.Exception(() => api.Dispose());
+
+        Assert.Null(exception);
+    }
+
+    /// <summary>
+    /// **Feature: code-cleanup-2026-01, Property 2: HttpApi Dispose 幂等性**
+    /// 多次调用 Dispose 应该不抛出异常
+    /// **Validates: Requirements 3.2**
+    /// </summary>
+    [Fact]
+    public void Dispose_CalledMultipleTimes_ShouldNotThrow()
+    {
+        var api = new HttpApi("test-plugin", new[] { "https://*" });
+
+        var exception = Record.Exception(() =>
+                                         {
+                                             api.Dispose();
+                                             api.Dispose();
+                                             api.Dispose();
+                                         });
+
+        Assert.Null(exception);
+    }
+
+    /// <summary>
+    /// **Feature: code-cleanup-2026-01, Task 3.2: Cleanup 标记为过时**
+    /// Cleanup 方法应该标记为 Obsolete
+    /// **Validates: Requirements 3.3**
+    /// </summary>
+    [Fact]
+    public void Cleanup_ShouldBeObsolete()
+    {
+        var cleanupMethod = typeof(HttpApi).GetMethod("Cleanup", System.Reflection.BindingFlags.Instance |
+                                                                     System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(cleanupMethod);
+
+        var obsoleteAttr = cleanupMethod!.GetCustomAttributes(typeof(ObsoleteAttribute), false);
+        Assert.NotEmpty(obsoleteAttr);
+    }
+
+#endregion
 }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Plugin;
@@ -341,8 +342,10 @@ public class WindowApiTests : IDisposable
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
-        // 使用非空白名单
-        var options = new { processWhitelist = new[] { "TestProcess" }, intervalMs = 200 };
+        // 使用 ExpandoObject 来模拟 JavaScript 对象，避免跨程序集访问匿名对象的问题
+        dynamic options = new ExpandoObject();
+        options.processWhitelist = new List<string> { "TestProcess" };
+        options.intervalMs = 200;
         var result = windowApi.StartCursorDetection(options);
 
         Assert.True(result, "StartCursorDetection should return true");
@@ -366,8 +369,10 @@ public class WindowApiTests : IDisposable
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
-        // 使用只包含空字符串的白名单
-        var options = new { processWhitelist = new[] { "", "  ", "\t" }, intervalMs = 200 };
+        // 使用 ExpandoObject 来模拟 JavaScript 对象
+        dynamic options = new ExpandoObject();
+        options.processWhitelist = new List<string> { "", "  ", "\t" };
+        options.intervalMs = 200;
         var result = windowApi.StartCursorDetection(options);
 
         Assert.False(result);
@@ -387,8 +392,10 @@ public class WindowApiTests : IDisposable
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
-        // 启动检测
-        var options = new { processWhitelist = new[] { "TestProcess" }, intervalMs = 200 };
+        // 使用 ExpandoObject 来模拟 JavaScript 对象
+        dynamic options = new ExpandoObject();
+        options.processWhitelist = new List<string> { "TestProcess" };
+        options.intervalMs = 200;
         windowApi.StartCursorDetection(options);
 
         Assert.True(mockService.IsRunning);

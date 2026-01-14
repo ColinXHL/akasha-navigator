@@ -975,9 +975,8 @@ public partial class PlayerWindow : Window
         if (_videoTimeSyncTimer != null)
             return;
 
-        _videoTimeSyncTimer = new DispatcherTimer {
-            Interval = TimeSpan.FromMilliseconds(200) // 每 200ms 同步一次
-        };
+        _videoTimeSyncTimer =
+            new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AppConstants.VideoTimeSyncIntervalMs) };
         _videoTimeSyncTimer.Tick += VideoTimeSyncTimer_Tick;
         _videoTimeSyncTimer.Start();
 

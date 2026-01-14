@@ -65,6 +65,11 @@ public static class AppConstants
     /// </summary>
     public const int DefaultSeekSeconds = 5;
 
+    /// <summary>
+    /// 视频时间同步间隔（毫秒）
+    /// </summary>
+    public const int VideoTimeSyncIntervalMs = 200;
+
 #endregion
 
 #region OSD
