@@ -5,6 +5,7 @@ using System.Windows.Input;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Data;
+using AkashaNavigator.ViewModels.Common;
 using AkashaNavigator.ViewModels.Windows;
 
 namespace AkashaNavigator.Views.Windows
@@ -37,6 +38,9 @@ public partial class HistoryWindow : AnimatedWindow
 
         // 订阅 ViewModel 的选择事件
         _viewModel.ItemSelected += OnViewModelItemSelected;
+
+        // 订阅 ViewModel 的确认对话框请求事件
+        _viewModel.ConfirmDialogRequested += OnConfirmDialogRequested;
     }
 
 #endregion
@@ -55,6 +59,22 @@ public partial class HistoryWindow : AnimatedWindow
     }
 
     /// <summary>
+    /// 确认对话框请求事件处理
+    /// </summary>
+    private void OnConfirmDialogRequested(object? sender, ConfirmDialogRequest request)
+    {
+        var dialog =
+            _dialogFactory.CreateConfirmDialog(request.Message, request.Title, request.ConfirmText, request.CancelText);
+        dialog.Owner = this;
+        dialog.ShowDialog();
+
+        if (dialog.Result == true)
+        {
+            request.OnConfirmed?.Invoke();
+        }
+    }
+
+    /// <summary>
     /// 搜索框文本变化（已通过绑定处理，此方法保留用于调试或扩展）
     /// </summary>
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -64,18 +84,11 @@ public partial class HistoryWindow : AnimatedWindow
 
     /// <summary>
     /// 清空全部按钮点击事件
+    /// 调用 ViewModel 命令，由 ViewModel 触发确认对话框请求事件
     /// </summary>
     private void BtnClearAll_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = _dialogFactory.CreateConfirmDialog("确定要清空所有历史记录吗？此操作不可撤销。", "确认清空",
-                                                        "清空", "取消");
-        dialog.Owner = this;
-        dialog.ShowDialog();
-
-        if (dialog.Result == true)
-        {
-            _viewModel.ClearAllCommand.Execute(null);
-        }
+        _viewModel.ClearAllCommand.Execute(null);
     }
 
     /// <summary>

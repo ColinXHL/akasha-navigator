@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -30,18 +29,15 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
     private readonly PioneerNoteViewModel _viewModel;
     private readonly IDialogFactory _dialogFactory;
-    private readonly IPioneerNoteService _pioneerNoteService;
 
 #endregion
 
 #region Constructor
 
-    public PioneerNoteWindow(PioneerNoteViewModel viewModel, IDialogFactory dialogFactory,
-                             IPioneerNoteService pioneerNoteService)
+    public PioneerNoteWindow(PioneerNoteViewModel viewModel, IDialogFactory dialogFactory)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _dialogFactory = dialogFactory ?? throw new ArgumentNullException(nameof(dialogFactory));
-        _pioneerNoteService = pioneerNoteService ?? throw new ArgumentNullException(nameof(pioneerNoteService));
 
         InitializeComponent();
         DataContext = _viewModel;
@@ -53,6 +49,7 @@ public partial class PioneerNoteWindow : AnimatedWindow
         _viewModel.ShowNewFolderDialogRequested += OnShowNewFolderDialog;
         _viewModel.ShowMoveDialogRequested += OnShowMoveDialog;
         _viewModel.ShowRecordNoteDialogRequested += OnShowRecordNoteDialog;
+        _viewModel.OperationFailed += OnOperationFailed;
     }
 
 #endregion
@@ -98,6 +95,14 @@ public partial class PioneerNoteWindow : AnimatedWindow
         ShowRecordNoteDialog();
     }
 
+    /// <summary>
+    /// 操作失败事件处理 - 显示错误消息框
+    /// </summary>
+    private void OnOperationFailed(object? sender, string message)
+    {
+        MessageBox.Show(message, "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
 #endregion
 
 #region Private Methods - Dialogs
@@ -118,22 +123,14 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
         if (editDialog.Result == true && !string.IsNullOrWhiteSpace(editDialog.InputText))
         {
-            try
+            // 调用 ViewModel 方法处理结果（错误处理由 ViewModel 通过事件通知）
+            if (node.IsFolder)
             {
-                if (node.IsFolder)
-                {
-                    _pioneerNoteService.UpdateFolder(node.Id!, editDialog.InputText);
-                }
-                else
-                {
-                    // 更新笔记项，包括 URL
-                    _pioneerNoteService.UpdateNote(node.Id!, editDialog.InputText, editDialog.UrlText);
-                }
-                RefreshNoteTree();
+                _viewModel.UpdateFolder(node.Id!, editDialog.InputText);
             }
-            catch (Exception ex)
+            else
             {
-                MessageBox.Show($"编辑失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                _viewModel.UpdateNote(node.Id!, editDialog.InputText, editDialog.UrlText);
             }
         }
     }
@@ -154,24 +151,14 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
         if (confirmDialog.Result == true)
         {
-            try
+            // 调用 ViewModel 方法处理结果（错误处理由 ViewModel 通过事件通知）
+            if (node.IsFolder)
             {
-                if (node.IsFolder)
-                {
-                    _pioneerNoteService.DeleteFolder(node.Id!, true);
-                }
-                else
-                {
-                    _pioneerNoteService.DeleteNote(node.Id!);
-                }
-                RefreshNoteTree();
+                _viewModel.DeleteFolder(node.Id!, true);
             }
-            catch (Exception ex)
+            else
             {
-                var errorDialog =
-                    _dialogFactory.CreateNoteEditDialog("错误", "", $"删除失败: {ex.Message}", false, true);
-                errorDialog.Owner = this;
-                errorDialog.ShowDialog();
+                _viewModel.DeleteNote(node.Id!);
             }
         }
     }
@@ -188,15 +175,8 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
         if (editDialog.Result == true && !string.IsNullOrWhiteSpace(editDialog.InputText))
         {
-            try
-            {
-                _pioneerNoteService.CreateFolder(editDialog.InputText, parentId);
-                RefreshNoteTree();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"创建目录失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            // 调用 ViewModel 方法处理结果（错误处理由 ViewModel 通过事件通知）
+            _viewModel.CreateFolder(editDialog.InputText, parentId);
         }
     }
 
@@ -208,9 +188,8 @@ public partial class PioneerNoteWindow : AnimatedWindow
         if (node.IsFolder)
             return;
 
-        // 获取所有目录用于选择
-        var noteData = _pioneerNoteService.GetNoteTree();
-        var folders = noteData.Folders;
+        // 从 ViewModel 获取所有目录用于选择
+        var folders = _viewModel.GetFolders();
 
         // 创建目录选择对话框（使用 DialogFactory）
         var moveDialog = _dialogFactory.CreateNoteMoveDialog(folders, node.FolderId);
@@ -219,15 +198,8 @@ public partial class PioneerNoteWindow : AnimatedWindow
 
         if (moveDialog.Result)
         {
-            try
-            {
-                _pioneerNoteService.MoveNote(node.Id!, moveDialog.SelectedFolderId);
-                RefreshNoteTree();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"移动失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            // 调用 ViewModel 方法处理结果（错误处理由 ViewModel 通过事件通知）
+            _viewModel.MoveNote(node.Id!, moveDialog.SelectedFolderId);
         }
     }
 
@@ -244,17 +216,8 @@ public partial class PioneerNoteWindow : AnimatedWindow
         if (noteDialog.Result && noteDialog.CreatedNote != null)
         {
             // 笔记已创建，刷新树
-            RefreshNoteTree();
+            _viewModel.LoadNoteTree();
         }
-    }
-
-    /// <summary>
-    /// 刷新笔记树
-    /// </summary>
-    private void RefreshNoteTree()
-    {
-        // 重新加载树
-        _viewModel.LoadNoteTree();
     }
 
     /// <summary>

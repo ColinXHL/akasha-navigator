@@ -41,6 +41,9 @@ public partial class BookmarkPopup : AnimatedWindow
 
         // 订阅 ViewModel 的选择事件，转换为对外的事件
         _viewModel.ItemSelected += OnViewModelItemSelected;
+
+        // 订阅确认对话框请求事件
+        _viewModel.ConfirmDialogRequested += OnConfirmDialogRequested;
     }
 
 #endregion
@@ -58,24 +61,32 @@ public partial class BookmarkPopup : AnimatedWindow
         }
     }
 
-#endregion
-
-#region Event Handlers
-
     /// <summary>
-    /// 清空全部
+    /// 处理确认对话框请求事件
     /// </summary>
-    private void BtnClearAll_Click(object sender, RoutedEventArgs e)
+    private void OnConfirmDialogRequested(object? sender, ViewModels.Common.ConfirmDialogRequest request)
     {
         var dialog =
-            _dialogFactory.CreateConfirmDialog("确定要清空所有收藏吗？此操作不可撤销。", "确认清空", "清空", "取消");
+            _dialogFactory.CreateConfirmDialog(request.Message, request.Title, request.ConfirmText, request.CancelText);
         dialog.Owner = this;
         dialog.ShowDialog();
 
         if (dialog.Result == true)
         {
-            _viewModel.ClearAll();
+            request.OnConfirmed?.Invoke();
         }
+    }
+
+#endregion
+
+#region Event Handlers
+
+    /// <summary>
+    /// 清空全部 - 调用 ViewModel 方法触发确认对话框请求
+    /// </summary>
+    private void BtnClearAll_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ClearAll();
     }
 
     /// <summary>

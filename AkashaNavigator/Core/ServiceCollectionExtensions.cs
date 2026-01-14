@@ -316,8 +316,8 @@ public static class ServiceCollectionExtensions
                 };
             });
 
-        // PioneerNoteWindow（依赖 PioneerNoteViewModel + IDialogFactory + IPioneerNoteService）
-        // 依赖链：PioneerNoteWindow → (PioneerNoteViewModel, IDialogFactory, IPioneerNoteService)
+        // PioneerNoteWindow（依赖 PioneerNoteViewModel + IDialogFactory）
+        // 依赖链：PioneerNoteWindow → (PioneerNoteViewModel, IDialogFactory)
         services.AddTransient<PioneerNoteWindow>();
 
         // ============================================================
