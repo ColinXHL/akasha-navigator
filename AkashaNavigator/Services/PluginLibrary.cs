@@ -311,8 +311,8 @@ public class PluginLibrary : IPluginLibrary
                              $"清单中的ID ({manifest.Id}) 与请求的ID ({pluginId}) 不匹配", pluginId: pluginId));
         }
 
-        // 复制插件文件到全局库
-        var targetDir = GetPluginDirectory(pluginId);
+        // 复制插件文件到用户插件库（不要写入内置 Repos 目录）
+        var targetDir = Path.Combine(LibraryDirectory, pluginId);
         try
         {
             CopyDirectory(sourcePath, targetDir);
@@ -403,8 +403,8 @@ public class PluginLibrary : IPluginLibrary
             }
         }
 
-        // 删除插件目录
-        var pluginDir = GetPluginDirectory(pluginId);
+        // 仅删除用户插件库目录（内置 Repos 目录不应被删除）
+        var pluginDir = Path.Combine(LibraryDirectory, pluginId);
         try
         {
             if (Directory.Exists(pluginDir))
@@ -533,8 +533,8 @@ public class PluginLibrary : IPluginLibrary
         var newVersion = checkResult.AvailableVersion!;
         var sourcePath = checkResult.SourcePath!;
 
-        // 获取目标目录
-        var targetDir = GetPluginDirectory(pluginId);
+        // 获取目标目录（仅更新用户插件库目录）
+        var targetDir = Path.Combine(LibraryDirectory, pluginId);
 
         try
         {

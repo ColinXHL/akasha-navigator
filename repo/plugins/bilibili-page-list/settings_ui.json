@@ -18,8 +18,20 @@
         {
           "type": "hotkey",
           "key": "subtitleHotkey",
-          "label": "字幕开关（预留）",
+          "label": "字幕开关",
           "default": "Alt+S"
+        },
+        {
+          "type": "hotkey",
+          "key": "prevPageHotkey",
+          "label": "上一个分P",
+          "default": "Alt+Left"
+        },
+        {
+          "type": "hotkey",
+          "key": "nextPageHotkey",
+          "label": "下一个分P",
+          "default": "Alt+Right"
         }
       ]
     },

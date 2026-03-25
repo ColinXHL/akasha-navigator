@@ -85,6 +85,14 @@ public partial class PluginPanelWindow : Window
             SubtitleButton.Content = subtitle;
     }
 
+    public void SetNavigationButtonLabels(string? prev, string? next)
+    {
+        if (!string.IsNullOrWhiteSpace(prev))
+            PrevButton.Content = prev;
+        if (!string.IsNullOrWhiteSpace(next))
+            NextButton.Content = next;
+    }
+
     public void SetActionButtonStates(bool? danmakuEnabled, bool? subtitleEnabled)
     {
         if (danmakuEnabled.HasValue)
@@ -92,6 +100,15 @@ public partial class PluginPanelWindow : Window
 
         if (subtitleEnabled.HasValue)
             SubtitleButton.IsChecked = subtitleEnabled.Value;
+    }
+
+    public void SetNavigationButtonStates(bool? prevEnabled, bool? nextEnabled)
+    {
+        if (prevEnabled.HasValue)
+            PrevButton.IsEnabled = prevEnabled.Value;
+
+        if (nextEnabled.HasValue)
+            NextButton.IsEnabled = nextEnabled.Value;
     }
 
     public void SetDrawingMode(bool enabled)
@@ -239,6 +256,16 @@ public partial class PluginPanelWindow : Window
     private void DanmakuButton_Click(object sender, RoutedEventArgs e)
     {
         ActionButtonClicked?.Invoke(this, "danmaku");
+    }
+
+    private void PrevButton_Click(object sender, RoutedEventArgs e)
+    {
+        ActionButtonClicked?.Invoke(this, "prev");
+    }
+
+    private void NextButton_Click(object sender, RoutedEventArgs e)
+    {
+        ActionButtonClicked?.Invoke(this, "next");
     }
 
     private void SubtitleButton_Click(object sender, RoutedEventArgs e)

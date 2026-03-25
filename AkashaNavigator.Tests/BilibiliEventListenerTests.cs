@@ -179,7 +179,9 @@ public class BilibiliEventListenerTests : IDisposable
     public void Plugin_ShouldDeclareHotkeyPermission()
     {
         // 验证插件清单包含 hotkey 权限
-        Assert.Contains("hotkey", _context.Manifest.Permissions);
+        var permissions = _context.Manifest.Permissions;
+        Assert.NotNull(permissions);
+        Assert.Contains("hotkey", permissions!);
     }
 
     /// <summary>
@@ -195,7 +197,9 @@ public class BilibiliEventListenerTests : IDisposable
         var configContent = @"{
             ""toggleHotkey"": ""Ctrl+P"",
             ""danmakuHotkey"": ""Ctrl+D"",
-            ""subtitleHotkey"": ""Ctrl+S""
+            ""subtitleHotkey"": ""Ctrl+S"",
+            ""prevPageHotkey"": ""Ctrl+Left"",
+            ""nextPageHotkey"": ""Ctrl+Right""
         }";
         File.WriteAllText(configPath, configContent);
 
@@ -207,6 +211,8 @@ public class BilibiliEventListenerTests : IDisposable
         Assert.Contains("toggleHotkey", content);
         Assert.Contains("danmakuHotkey", content);
         Assert.Contains("subtitleHotkey", content);
+        Assert.Contains("prevPageHotkey", content);
+        Assert.Contains("nextPageHotkey", content);
     }
 
     /// <summary>
@@ -229,6 +235,8 @@ public class BilibiliEventListenerTests : IDisposable
             Assert.Contains("toggleHotkey", manifestContent);
             Assert.Contains("danmakuHotkey", manifestContent);
             Assert.Contains("subtitleHotkey", manifestContent);
+            Assert.Contains("prevPageHotkey", manifestContent);
+            Assert.Contains("nextPageHotkey", manifestContent);
         }
         else
         {
@@ -291,10 +299,12 @@ public class BilibiliEventListenerTests : IDisposable
     public void Plugin_ShouldHaveAllRequiredPermissions()
     {
         var requiredPermissions = new[] { "overlay", "network", "player", "events", "hotkey" };
+        var permissions = _context.Manifest.Permissions;
+        Assert.NotNull(permissions);
 
         foreach (var permission in requiredPermissions)
         {
-            Assert.Contains(permission, _context.Manifest.Permissions);
+            Assert.Contains(permission, permissions!);
         }
     }
 

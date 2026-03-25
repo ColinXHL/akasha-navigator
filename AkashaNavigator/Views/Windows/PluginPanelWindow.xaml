@@ -101,6 +101,48 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="HeaderMiniButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="#252525"/>
+            <Setter Property="Foreground" Value="#E6E6E6"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="MiniButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="MiniButtonBorder" Property="Background" Value="#313131"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="MiniButtonBorder" Property="Background" Value="#454545"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="MiniButtonBorder" Property="Background" Value="#1F1F1F"/>
+                                <Setter Property="Foreground" Value="#666666"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border x:Name="MainContainer"
@@ -119,6 +161,10 @@
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="6"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="6"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="6"/>
                     <ColumnDefinition Width="Auto"/>
@@ -143,8 +189,26 @@
                            FontSize="11"
                            Margin="0,0,0,6"/>
 
+                <Button x:Name="PrevButton"
+                               Grid.Column="1"
+                               Grid.RowSpan="2"
+                               Click="PrevButton_Click"
+                               Content="◀"
+                               Style="{StaticResource HeaderMiniButtonStyle}"
+                               VerticalAlignment="Top"
+                               shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+                <Button x:Name="NextButton"
+                               Grid.Column="3"
+                               Grid.RowSpan="2"
+                               Click="NextButton_Click"
+                               Content="▶"
+                               Style="{StaticResource HeaderMiniButtonStyle}"
+                               VerticalAlignment="Top"
+                               shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
                 <ToggleButton x:Name="DanmakuButton"
-                              Grid.Column="1"
+                              Grid.Column="5"
                               Grid.RowSpan="2"
                               Click="DanmakuButton_Click"
                               Content="弹"
@@ -153,15 +217,15 @@
                               shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
                 <ToggleButton x:Name="SubtitleButton"
-                              Grid.Column="3"
-                              Grid.RowSpan="2"
-                              Click="SubtitleButton_Click"
-                              Content="字"
-                              Style="{StaticResource HeaderMiniToggleButtonStyle}"
-                              VerticalAlignment="Top"
-                              shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                               Grid.Column="7"
+                               Grid.RowSpan="2"
+                               Click="SubtitleButton_Click"
+                               Content="字"
+                               Style="{StaticResource HeaderMiniToggleButtonStyle}"
+                               VerticalAlignment="Top"
+                               shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
 
-                <Button Grid.Column="5"
+                <Button Grid.Column="9"
                         Grid.RowSpan="2"
                         Style="{StaticResource WindowCloseButtonStyle}"
                         FocusVisualStyle="{x:Null}"

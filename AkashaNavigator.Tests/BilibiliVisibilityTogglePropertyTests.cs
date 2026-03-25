@@ -21,7 +21,7 @@ public class BilibiliVisibilityTogglePropertyTests
     /// <summary>
     /// 切换可见性（与 JavaScript 实现逻辑一致）
     /// </summary>
-    public static void ToggleVisibility(PluginState state)
+    private static void ToggleVisibility(PluginState state)
     {
         state.IsVisible = !state.IsVisible;
     }

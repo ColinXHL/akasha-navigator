@@ -1,4 +1,4 @@
-// main.js - B站分P列表插件 v1.1.0
+// main.js - B站分P列表插件 v1.2.1
 // 显示B站视频分P列表独立窗口，支持快速切换分P
 
 // ============================================================================
@@ -23,8 +23,12 @@ var state = {
     pendingSubtitleEnable: false, // 等待字幕加载后自动开启
     lastToggleAt: 0,           // 面板开关防抖时间戳
     lastSubtitleToggleAt: 0,   // 字幕开关防抖时间戳
-    pendingOpen: false         // 启动阶段延迟打开标记
+    pendingOpen: false,        // 启动阶段延迟打开标记
+    lastPageNavigateAt: 0,     // 分P切换防抖时间戳
+    pendingNavigationPage: 0   // 最近一次导航目标分P（用于快速切换保护）
 };
+
+var PAGE_NAVIGATION_DEBOUNCE_MS = 320;
 
 // ============================================================================
 // URL 解析模块
@@ -525,9 +529,17 @@ function getPreferredSubtitleLanguageFromDom() {
  * 刷新顶部动作按钮状态
  */
 function refreshActionButtons() {
+    var hasMultiplePages = state.pageList && state.pageList.length > 1;
+    var canGoPrev = hasMultiplePages && state.currentPage > 1;
+    var canGoNext = hasMultiplePages && state.currentPage < state.pageList.length;
+    
     panel.setActionButtons({
+        prev: '◀',
+        next: '▶',
         danmaku: '弹',
         subtitle: '字',
+        prevEnabled: canGoPrev,
+        nextEnabled: canGoNext,
         danmakuEnabled: state.danmakuEnabled,
         subtitleEnabled: state.subtitleEnabled
     });
@@ -581,6 +593,116 @@ function renderPageList() {
 }
 
 // ============================================================================
+// 分P导航模块
+// ============================================================================
+
+/**
+ * 导航到指定分P
+ * @param {number} page - 目标分P页码
+ */
+function navigateToPage(page) {
+    if (!state.currentVideoId || !state.currentVideoIdType) {
+        log.warn('无法导航：视频ID未初始化');
+        return;
+    }
+    
+    // 查找分P信息
+    var pageItem = null;
+    for (var i = 0; i < state.pageList.length; i++) {
+        if (state.pageList[i].page === page) {
+            pageItem = state.pageList[i];
+            break;
+        }
+    }
+    
+    if (!pageItem) {
+        log.warn('无法导航：分P ' + page + ' 不存在');
+        return;
+    }
+
+    var now = Date.now();
+    if (now - state.lastPageNavigateAt < PAGE_NAVIGATION_DEBOUNCE_MS) {
+        log.debug('分P切换过快，已忽略: target=' + page);
+        return;
+    }
+    
+    var navUrl = buildNavigationUrl(state.currentVideoId, state.currentVideoIdType, page);
+    
+    log.info('导航到分P ' + page + ': ' + navUrl);
+
+    state.lastPageNavigateAt = now;
+    state.pendingNavigationPage = page;
+
+    // 先更新本地状态，避免在 URL 事件返回前面板仍显示旧分P
+    state.currentPage = page;
+    if (state.isVisible) {
+        renderPageList();
+        refreshActionButtons();
+    }
+    
+    // 显示OSD提示
+    if (typeof osd !== 'undefined') {
+        var title = pageItem.part || ('P' + page);
+        osd.show('P' + page + '/' + state.pageList.length + ': ' + title, '▶️');
+    }
+    
+    // 导航到新页面
+    player.navigate(navUrl);
+}
+
+/**
+ * 跳转到下一个分P
+ */
+function goToNextPage() {
+    if (!state.pageList || state.pageList.length <= 1) {
+        log.info('无分P列表或只有一个分P，无法切换');
+        if (typeof osd !== 'undefined') {
+            osd.show('没有更多分P', '⚠️');
+        }
+        return;
+    }
+    
+    var nextPage = state.currentPage + 1;
+    
+    // 检查是否到达边界
+    if (nextPage > state.pageList.length) {
+        log.info('已经是最后一个分P');
+        if (typeof osd !== 'undefined') {
+            osd.show('已经是最后一个分P', '⚠️');
+        }
+        return;
+    }
+    
+    navigateToPage(nextPage);
+}
+
+/**
+ * 跳转到上一个分P
+ */
+function goToPreviousPage() {
+    if (!state.pageList || state.pageList.length <= 1) {
+        log.info('无分P列表或只有一个分P，无法切换');
+        if (typeof osd !== 'undefined') {
+            osd.show('没有更多分P', '⚠️');
+        }
+        return;
+    }
+    
+    var prevPage = state.currentPage - 1;
+    
+    // 检查是否到达边界
+    if (prevPage < 1) {
+        log.info('已经是第一个分P');
+        if (typeof osd !== 'undefined') {
+            osd.show('已经是第一个分P', '⚠️');
+        }
+        return;
+    }
+    
+    navigateToPage(prevPage);
+}
+
+// ============================================================================
 // 事件处理
 // ============================================================================
 
@@ -608,11 +730,15 @@ function onUrlChanged(url) {
     
     // 更新当前页码
     state.currentPage = parseResult.currentPage;
+    if (state.pendingNavigationPage === parseResult.currentPage) {
+        state.pendingNavigationPage = 0;
+    }
     
     // 如果是同一个视频，只更新页码
     if (state.currentVideoId === parseResult.videoId) {
         if (state.isVisible) {
             renderPageList();
+            refreshActionButtons();
         }
         return;
     }
@@ -636,6 +762,7 @@ function onUrlChanged(url) {
     // 如果面板已显示，刷新渲染
     if (state.isVisible) {
         renderPageList();
+        refreshActionButtons();
     }
 
     if (state.pendingOpen && !state.isVisible && state.pageList.length > 1) {
@@ -670,12 +797,7 @@ function onPanelPageClick(payload) {
         return;
     }
 
-    var navUrl = buildNavigationUrl(state.currentVideoId, state.currentVideoIdType, pageItem.page);
-    
-    log.info('导航到分P ' + pageItem.page + ': ' + navUrl);
-    
-    // 导航到新页面
-    player.navigate(navUrl);
+    navigateToPage(pageItem.page);
     
     // 隐藏面板
     hideOverlay();
@@ -687,6 +809,16 @@ function onPanelPageClick(payload) {
  */
 function onPanelActionClick(payload) {
     if (!payload || !payload.action) {
+        return;
+    }
+
+    if (payload.action === 'prev') {
+        goToPreviousPage();
+        return;
+    }
+
+    if (payload.action === 'next') {
+        goToNextPage();
         return;
     }
 
@@ -913,6 +1045,8 @@ function onLoad() {
     var toggleHotkey = config.get('toggleHotkey', 'Alt+P');
     var danmakuHotkey = config.get('danmakuHotkey', 'Alt+D');
     var subtitleHotkey = config.get('subtitleHotkey', 'Alt+S');
+    var prevPageHotkey = config.get('prevPageHotkey', 'Alt+Left');
+    var nextPageHotkey = config.get('nextPageHotkey', 'Alt+Right');
     if (subtitleHotkey === 'Alt+Shift+S') {
         subtitleHotkey = 'Alt+S';
         config.set('subtitleHotkey', subtitleHotkey);
@@ -928,10 +1062,21 @@ function onLoad() {
         toggleDanmaku();
     });
 
-    // 注册字幕快捷键（预留）
+    // 注册字幕快捷键
     hotkey.register(subtitleHotkey, function() {
         toggleSubtitle();
     });
+    
+    // 注册分P导航快捷键
+    hotkey.register(prevPageHotkey, function() {
+        goToPreviousPage();
+    });
+    log.info('已注册上一个分P快捷键: ' + prevPageHotkey);
+    
+    hotkey.register(nextPageHotkey, function() {
+        goToNextPage();
+    });
+    log.info('已注册下一个分P快捷键: ' + nextPageHotkey);
     
     // 监听URL变化
     player.on('urlChanged', onUrlChanged);

@@ -162,19 +162,29 @@ public class PanelApi
             return;
 
         var dict = JsTypeConverter.ToDictionary(options);
+        dict.TryGetValue("prev", out var prevRaw);
+        dict.TryGetValue("next", out var nextRaw);
         dict.TryGetValue("danmaku", out var danmakuRaw);
         dict.TryGetValue("subtitle", out var subtitleRaw);
+        dict.TryGetValue("prevEnabled", out var prevEnabledRaw);
+        dict.TryGetValue("nextEnabled", out var nextEnabledRaw);
         dict.TryGetValue("danmakuEnabled", out var danmakuEnabledRaw);
         dict.TryGetValue("subtitleEnabled", out var subtitleEnabledRaw);
 
+        var prev = prevRaw?.ToString();
+        var next = nextRaw?.ToString();
         var danmaku = danmakuRaw?.ToString();
         var subtitle = subtitleRaw?.ToString();
+        var prevEnabled = ParseOptionalBool(prevEnabledRaw);
+        var nextEnabled = ParseOptionalBool(nextEnabledRaw);
         var danmakuEnabled = ParseOptionalBool(danmakuEnabledRaw);
         var subtitleEnabled = ParseOptionalBool(subtitleEnabledRaw);
 
         System.Windows.Application.Current?.Dispatcher.Invoke(() =>
         {
+            panel.SetNavigationButtonLabels(prev, next);
             panel.SetActionButtonLabels(danmaku, subtitle);
+            panel.SetNavigationButtonStates(prevEnabled, nextEnabled);
             panel.SetActionButtonStates(danmakuEnabled, subtitleEnabled);
         });
     }

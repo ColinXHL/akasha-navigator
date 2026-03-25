@@ -336,11 +336,14 @@ public partial class App : System.Windows.Application
 
         _hotkeyManager?.Dispose();
 
-        var controlBarWindow = Services.GetRequiredService<Views.Windows.ControlBarWindow>();
-        controlBarWindow?.StopAutoShowHide();
+        if (Services is { } services)
+        {
+            var controlBarWindow = services.GetRequiredService<Views.Windows.ControlBarWindow>();
+            controlBarWindow.StopAutoShowHide();
 
-        var pluginHost = Services.GetRequiredService<IPluginHost>();
-        pluginHost?.UnloadAllPlugins();
+            var pluginHost = services.GetRequiredService<IPluginHost>();
+            pluginHost.UnloadAllPlugins();
+        }
 
         Log.CloseAndFlush();
 
