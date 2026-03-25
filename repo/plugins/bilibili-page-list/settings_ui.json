@@ -1,0 +1,89 @@
+{
+  "sections": [
+    {
+      "title": "快捷键设置",
+      "items": [
+        {
+          "type": "hotkey",
+          "key": "toggleHotkey",
+          "label": "切换分P列表显示",
+          "default": "Alt+P"
+        },
+        {
+          "type": "hotkey",
+          "key": "danmakuHotkey",
+          "label": "弹幕开关（预留）",
+          "default": "Alt+D"
+        },
+        {
+          "type": "hotkey",
+          "key": "subtitleHotkey",
+          "label": "字幕开关（预留）",
+          "default": "Alt+S"
+        }
+      ]
+    },
+    {
+      "title": "窗口位置",
+      "items": [
+        {
+          "type": "number",
+          "key": "panel.x",
+          "label": "X 坐标",
+          "default": 100,
+          "min": 0,
+          "max": 3840,
+          "step": 10
+        },
+        {
+          "type": "number",
+          "key": "panel.y",
+          "label": "Y 坐标",
+          "default": 100,
+          "min": 0,
+          "max": 2160,
+          "step": 10
+        }
+      ]
+    },
+    {
+      "title": "窗口尺寸",
+      "items": [
+        {
+          "type": "number",
+          "key": "panel.width",
+          "label": "宽度",
+          "default": 320,
+          "min": 240,
+          "max": 1600,
+          "step": 10
+        },
+        {
+          "type": "number",
+          "key": "panel.height",
+          "label": "高度",
+          "default": 400,
+          "min": 180,
+          "max": 1200,
+          "step": 10
+        },
+        {
+          "type": "checkbox",
+          "key": "panel.topmost",
+          "label": "始终置顶",
+          "default": false
+        }
+      ]
+    },
+    {
+      "title": "其他",
+      "items": [
+        {
+          "type": "button",
+          "label": "📂 打开插件目录",
+          "action": "openPluginFolder"
+        }
+      ]
+    }
+  ]
+}

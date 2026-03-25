@@ -1,0 +1,27 @@
+{
+  "id": "bilibili-page-list",
+  "name": "B站分P列表",
+  "version": "1.1.0",
+  "main": "main.js",
+  "description": "显示B站视频分P列表独立窗口，支持快速切换分P",
+  "author": "AkashaNavigator",
+  "homepage": "https://github.com/ColinXHL/AkashaNavigator",
+  "permissions": ["panel", "network", "player", "events", "hotkey", "subtitle"],
+  "profiles": [],
+  "library": [],
+  "http_allowed_urls": [
+    "https://api.bilibili.com/*"
+  ],
+  "defaultConfig": {
+    "toggleHotkey": "Alt+P",
+    "danmakuHotkey": "Alt+D",
+    "subtitleHotkey": "Alt+S",
+    "panel": {
+      "x": 100,
+      "y": 100,
+      "width": 320,
+      "height": 400,
+      "topmost": false
+    }
+  }
+}
