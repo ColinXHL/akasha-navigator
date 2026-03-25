@@ -29,6 +29,12 @@ public class PlayerApi
     public string url => _getPlayerWindow?.Invoke()?.CurrentUrl ?? string.Empty;
 
     /// <summary>
+    /// 获取当前 URL（方法形式，兼容旧代码）
+    /// </summary>
+    /// <returns>当前 URL</returns>
+    public string getUrl() => url;
+
+    /// <summary>
     /// 当前播放时间（秒）
     /// </summary>
     /// <remarks>

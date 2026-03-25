@@ -203,7 +203,28 @@ public class PluginLibrary : IPluginLibrary
     /// </summary>
     public string GetPluginDirectory(string pluginId)
     {
-        return Path.Combine(LibraryDirectory, pluginId);
+        var installedPath = Path.Combine(LibraryDirectory, pluginId);
+        var builtInPath = Path.Combine(AppPaths.BuiltInPluginsDirectory, pluginId);
+
+        if (!Directory.Exists(installedPath))
+            return builtInPath;
+
+        if (!Directory.Exists(builtInPath))
+            return installedPath;
+
+        var installedVersion = GetManifestVersion(installedPath);
+        var builtInVersion = GetManifestVersion(builtInPath);
+
+        // 优先使用内置插件目录，确保开发期修改即时生效
+        // 当内置版本 >= 已安装版本时使用内置目录
+        return CompareVersions(builtInVersion, installedVersion) >= 0 ? builtInPath : installedPath;
+    }
+
+    private static string GetManifestVersion(string pluginDirectory)
+    {
+        var manifestPath = Path.Combine(pluginDirectory, "plugin.json");
+        var result = PluginManifest.LoadFromFile(manifestPath);
+        return result.IsSuccess && result.Manifest != null ? (result.Manifest.Version ?? "0.0.0") : "0.0.0";
     }
 
     /// <summary>

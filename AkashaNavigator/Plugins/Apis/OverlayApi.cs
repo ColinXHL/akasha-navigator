@@ -17,11 +17,32 @@ public class OverlayApi
 {
     private readonly PluginContext _context;
     private readonly ConfigApi _configApi;
+    private readonly EventManager _eventManager;
 
     public OverlayApi(PluginContext context, ConfigApi configApi)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _configApi = configApi ?? throw new ArgumentNullException(nameof(configApi));
+        _eventManager = new EventManager();
+    }
+
+    /// <summary>
+    /// 监听覆盖层事件
+    /// </summary>
+    /// <param name="eventName">事件名称（如 "click", "move"）</param>
+    /// <param name="callback">回调函数</param>
+    public void on(string eventName, object callback)
+    {
+        _eventManager.On(eventName, callback);
+    }
+
+    /// <summary>
+    /// 取消监听覆盖层事件
+    /// </summary>
+    /// <param name="eventName">事件名称</param>
+    public void off(string eventName)
+    {
+        _eventManager.Off(eventName);
     }
 
     public void show()
@@ -170,6 +191,24 @@ public class OverlayApi
     public OverlayContext getContext()
     {
         return new OverlayContext(_context.PluginId);
+    }
+
+    /// <summary>
+    /// 获取覆盖层位置
+    /// </summary>
+    /// <returns>包含 x 和 y 属性的对象</returns>
+    public object? getPosition()
+    {
+        var overlay = OverlayManager.Instance.GetOverlay(_context.PluginId);
+        if (overlay == null)
+            return null;
+
+        object? result = null;
+        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            result = new { x = overlay.Left, y = overlay.Top };
+        });
+        return result;
     }
 
     // 动画帧管理

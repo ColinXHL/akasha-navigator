@@ -147,6 +147,7 @@ public class SettingsUiRenderer
                                                      "button" => RenderButton(item),
                                                      "group" => RenderGroupBox(item),
                                                      "processlist" => RenderProcessList(item),
+                                                     "hotkey" => RenderHotkeyBox(item),
                                                      _ => null };
     }
 
@@ -1371,6 +1372,141 @@ public class SettingsUiRenderer
             return true;
         }
         return false;
+    }
+
+#endregion
+
+#region Hotkey Rendering
+
+    private FrameworkElement RenderHotkeyBox(SettingsItem item)
+    {
+        var container = CreateItemContainer(item.Label);
+
+        var hotkeyTextBox = new Controls.HotkeyTextBox { MinWidth = 200 };
+
+        // 尝试应用共享样式
+        if (!ApplyStyleIfExists(hotkeyTextBox, "DarkTextBoxStyle"))
+        {
+            hotkeyTextBox.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+            hotkeyTextBox.Foreground = Brushes.White;
+            hotkeyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+            hotkeyTextBox.BorderThickness = new Thickness(1);
+            hotkeyTextBox.Padding = new Thickness(8, 6, 8, 6);
+            hotkeyTextBox.FontSize = 12;
+        }
+
+        // 从配置加载快捷键字符串（如 "Alt+P"）
+        var currentValue = GetConfigValue<string>(item.Key, item.GetDefaultValue<string>() ?? string.Empty);
+
+        // 解析快捷键字符串为 VkCode 和 Modifiers
+        if (!string.IsNullOrEmpty(currentValue))
+        {
+            var parseResult = Plugins.Apis.HotkeyParser.Parse(currentValue);
+            if (parseResult.IsValid)
+            {
+                hotkeyTextBox.HotkeyValue = parseResult.VkCode;
+                hotkeyTextBox.Modifiers = parseResult.Modifiers;
+            }
+        }
+
+        // 监听失去焦点时保存
+        hotkeyTextBox.LostFocus += (s, e) =>
+        {
+            if (!string.IsNullOrEmpty(item.Key))
+            {
+                // 构建快捷键字符串
+                var newCombo = BuildHotkeyString(hotkeyTextBox.HotkeyValue, hotkeyTextBox.Modifiers);
+                if (!string.IsNullOrEmpty(newCombo))
+                {
+                    OnValueChanged(item.Key, newCombo);
+                }
+            }
+        };
+
+        if (!string.IsNullOrEmpty(item.Key))
+        {
+            _controlMap[item.Key] = hotkeyTextBox;
+            _itemMap[item.Key] = item;
+        }
+
+        container.Children.Add(hotkeyTextBox);
+        return container;
+    }
+
+    /// <summary>
+    /// 构建快捷键字符串（如 "Alt+P"）
+    /// </summary>
+    private string BuildHotkeyString(uint vkCode, Models.Config.ModifierKeys modifiers)
+    {
+        if (vkCode == 0)
+            return string.Empty;
+
+        var parts = new List<string>();
+
+        // 按固定顺序添加修饰键
+        if (modifiers.HasFlag(Models.Config.ModifierKeys.Ctrl))
+            parts.Add("Ctrl");
+        if (modifiers.HasFlag(Models.Config.ModifierKeys.Alt))
+            parts.Add("Alt");
+        if (modifiers.HasFlag(Models.Config.ModifierKeys.Shift))
+            parts.Add("Shift");
+
+        // 添加基础键
+        var keyName = GetKeyName(vkCode);
+        if (!string.IsNullOrEmpty(keyName))
+            parts.Add(keyName);
+
+        return string.Join("+", parts);
+    }
+
+    /// <summary>
+    /// 根据虚拟键码获取键名
+    /// </summary>
+    private string GetKeyName(uint vkCode)
+    {
+        // 字母键
+        if (vkCode >= 0x41 && vkCode <= 0x5A)
+            return ((char)vkCode).ToString();
+
+        // 数字键
+        if (vkCode >= 0x30 && vkCode <= 0x39)
+            return ((char)vkCode).ToString();
+
+        // 功能键
+        if (vkCode >= 0x70 && vkCode <= 0x7B)
+            return $"F{vkCode - 0x6F}";
+
+        // 特殊键映射
+        return vkCode switch
+        {
+            0x20 => "Space",
+            0x0D => "Enter",
+            0x09 => "Tab",
+            0x1B => "Escape",
+            0x08 => "Backspace",
+            0x2E => "Delete",
+            0x2D => "Insert",
+            0x24 => "Home",
+            0x23 => "End",
+            0x21 => "PageUp",
+            0x22 => "PageDown",
+            0x26 => "Up",
+            0x28 => "Down",
+            0x25 => "Left",
+            0x27 => "Right",
+            0xC0 => "`",
+            0xBD => "-",
+            0xBB => "=",
+            0xDB => "[",
+            0xDD => "]",
+            0xDC => "\\",
+            0xBA => ";",
+            0xDE => "'",
+            0xBC => ",",
+            0xBE => ".",
+            0xBF => "/",
+            _ => string.Empty
+        };
     }
 
 #endregion

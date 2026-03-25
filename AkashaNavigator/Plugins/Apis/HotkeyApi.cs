@@ -52,6 +52,16 @@ public class HotkeyApi
     }
 
     /// <summary>
+    /// 设置 HotkeyService（由 PluginHost 调用）
+    /// </summary>
+    internal void SetHotkeyService(HotkeyService hotkeyService)
+    {
+        _hotkeyService = hotkeyService;
+    }
+
+    private HotkeyService? _hotkeyService;
+
+    /// <summary>
     /// 清理所有注册的热键（插件卸载时调用）
     /// </summary>
     internal void Cleanup()
@@ -128,13 +138,16 @@ public class HotkeyApi
             }
             catch (Exception ex)
             {
-                LogService.Instance.Error("Plugin:{PluginId}", "Hotkey callback error: {ErrorMessage}", _pluginId,
+                LogService.Instance.Error("Plugin:{PluginId}", ex, "Hotkey callback error: {ErrorMessage}", _pluginId,
                                           ex.Message);
             }
         };
 
         // 注册到 ActionDispatcher
         _dispatcher?.RegisterAction(actionName, actionHandler);
+
+        // 注册到 HotkeyService（添加到配置绑定列表）
+        _hotkeyService?.RegisterPluginHotkey(parseResult.VkCode, parseResult.Modifiers, actionName);
 
         // 保存注册信息
         var registration = new HotkeyRegistration { Id = id, KeyCombo = normalizedCombo, ActionName = actionName,
@@ -181,6 +194,9 @@ public class HotkeyApi
         // 从 ActionDispatcher 注销
         _dispatcher?.UnregisterAction(registration.ActionName);
 
+        // 从 HotkeyService 注销
+        _hotkeyService?.UnregisterPluginHotkey(registration.ActionName);
+
         // 移除注册信息
         _registrations.Remove(id);
         _keyComboToId.Remove(registration.KeyCombo);
@@ -207,6 +223,27 @@ public class HotkeyApi
         // 检查本插件是否已注册
         return !_keyComboToId.ContainsKey(parseResult.NormalizedCombo);
     }
+
+    /// <summary>
+    /// 注销所有已注册的热键
+    /// </summary>
+    public void UnregisterAll()
+    {
+        foreach (var registration in _registrations.Values.ToList())
+        {
+            _dispatcher?.UnregisterAction(registration.ActionName);
+            _hotkeyService?.UnregisterPluginHotkey(registration.ActionName);
+        }
+        _registrations.Clear();
+        _keyComboToId.Clear();
+
+        LogService.Instance.Debug("Plugin:{PluginId}", "All hotkeys unregistered", _pluginId);
+    }
+
+    /// <summary>
+    /// 注销所有已注册的热键（小写别名，兼容 JavaScript 命名习惯）
+    /// </summary>
+    public void unregisterAll() => UnregisterAll();
 
 #endregion
 

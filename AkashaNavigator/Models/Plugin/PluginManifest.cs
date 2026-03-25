@@ -30,12 +30,16 @@ public static class PluginPermissions
     public const string Network = "network";
     /// <summary>事件权限 - 访问 Event API 监听应用事件</summary>
     public const string Events = "events";
+    /// <summary>热键权限 - 访问 Hotkey API 注册全局热键</summary>
+    public const string Hotkey = "hotkey";
+    /// <summary>面板权限 - 访问 Panel API 创建普通可交互窗口</summary>
+    public const string Panel = "panel";
 
     /// <summary>
     /// 所有支持的权限列表
     /// </summary>
     public static readonly string[] AllPermissions =
-        new[] { Audio, Overlay, Subtitle, Player, Window, Storage, Network, Events };
+        new[] { Audio, Overlay, Subtitle, Player, Window, Storage, Network, Events, Hotkey, Panel };
 
     /// <summary>
     /// 检查权限名称是否有效
@@ -97,7 +101,7 @@ public class PluginManifest
 
     /// <summary>
     /// 权限列表
-    /// 支持的权限：audio、overlay、subtitle、player、window、storage、network、events
+    /// 支持的权限：audio、overlay、subtitle、player、window、storage、network、events、hotkey、panel
     /// </summary>
     public List<string>? Permissions { get; set; }
 

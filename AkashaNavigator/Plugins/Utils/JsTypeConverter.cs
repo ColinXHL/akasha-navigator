@@ -574,7 +574,20 @@ public static class JsTypeConverter
         var array = Array.CreateInstance(elementType, list.Count);
         for (var i = 0; i < list.Count; i++)
         {
-            var convertedValue = list[i] != null ? Convert.ChangeType(list[i], elementType) : null;
+            object? convertedValue;
+            if (list[i] == null)
+            {
+                convertedValue = null;
+            }
+            else if (elementType == typeof(object) || elementType.IsInstanceOfType(list[i]))
+            {
+                convertedValue = list[i];
+            }
+            else
+            {
+                convertedValue = Convert.ChangeType(list[i], elementType);
+            }
+
             array.SetValue(convertedValue, i);
         }
 
@@ -601,7 +614,14 @@ public static class JsTypeConverter
                 var convertedItem = ConvertJsValue(item);
                 if (convertedItem != null)
                 {
-                    list.Add(Convert.ChangeType(convertedItem, elementType));
+                    if (elementType == typeof(object) || elementType.IsInstanceOfType(convertedItem))
+                    {
+                        list.Add(convertedItem);
+                    }
+                    else
+                    {
+                        list.Add(Convert.ChangeType(convertedItem, elementType));
+                    }
                 }
                 else
                 {
@@ -616,7 +636,14 @@ public static class JsTypeConverter
             {
                 if (item != null)
                 {
-                    list.Add(Convert.ChangeType(item, elementType));
+                    if (elementType == typeof(object) || elementType.IsInstanceOfType(item))
+                    {
+                        list.Add(item);
+                    }
+                    else
+                    {
+                        list.Add(Convert.ChangeType(item, elementType));
+                    }
                 }
                 else
                 {

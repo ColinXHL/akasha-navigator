@@ -26,5 +26,10 @@ public class PluginEngineOptions
     /// 获取 PlayerWindow 的委托
     /// </summary>
     public Func<Views.Windows.PlayerWindow?>? GetPlayerWindow { get; set; }
+
+    /// <summary>
+    /// OSD 管理器（用于显示屏幕提示）
+    /// </summary>
+    public AkashaNavigator.Core.OsdManager? OsdManager { get; set; }
 }
 }

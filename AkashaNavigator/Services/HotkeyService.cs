@@ -220,6 +220,58 @@ public class HotkeyService : IDisposable
     public ActionDispatcher GetDispatcher() => _dispatcher;
 
     /// <summary>
+    /// 注册插件快捷键（添加到当前激活的 Profile）
+    /// </summary>
+    /// <param name="vkCode">虚拟键码</param>
+    /// <param name="modifiers">修饰键</param>
+    /// <param name="actionName">动作名称</param>
+    public void RegisterPluginHotkey(uint vkCode, Models.Config.ModifierKeys modifiers, string actionName)
+    {
+        var activeProfile = _config.GetActiveProfile();
+        if (activeProfile == null)
+        {
+            Serilog.Log.Warning("RegisterPluginHotkey: No active profile found");
+            return;
+        }
+
+        // 检查是否已存在相同的绑定
+        var existingBinding = activeProfile.FindMatchingBinding(vkCode, modifiers, null);
+        if (existingBinding != null)
+        {
+            // 已存在，更新动作名称
+            existingBinding.Action = actionName;
+            Serilog.Log.Debug("RegisterPluginHotkey: Updated existing binding for VK={VkCode}, Modifiers={Modifiers}, Action={Action}", vkCode, modifiers, actionName);
+            return;
+        }
+
+        // 添加新绑定
+        var binding = new HotkeyBinding
+        {
+            Key = vkCode,
+            Modifiers = modifiers,
+            Action = actionName,
+            IsEnabled = true
+        };
+        activeProfile.Bindings.Add(binding);
+        Serilog.Log.Information("RegisterPluginHotkey: Added new binding - VK={VkCode}, Modifiers={Modifiers}, Action={Action}, Total bindings={Count}", 
+            vkCode, modifiers, actionName, activeProfile.Bindings.Count);
+    }
+
+    /// <summary>
+    /// 注销插件快捷键
+    /// </summary>
+    /// <param name="actionName">动作名称</param>
+    public void UnregisterPluginHotkey(string actionName)
+    {
+        var activeProfile = _config.GetActiveProfile();
+        if (activeProfile == null)
+            return;
+
+        // 移除匹配的绑定
+        activeProfile.Bindings.RemoveAll(b => b.Action == actionName);
+    }
+
+    /// <summary>
     /// 切换热键暂停状态
     /// </summary>
     public void ToggleSuspend()
@@ -251,6 +303,9 @@ public class HotkeyService : IDisposable
         var profile = _config.FindProfileForProcess(processName);
         var binding = profile?.FindMatchingBinding(vkCode, modifiers, processName);
 
+        Serilog.Log.Debug("OnKeyDown: VK={VkCode}, Modifiers={Modifiers}, Process={Process}, Profile={Profile}, Binding={Binding}", 
+            vkCode, modifiers, processName, profile?.Name, binding?.Action);
+
         if (binding != null)
         {
             // 检查是否暂停（SuspendHotkeys 动作始终可用）
@@ -265,8 +320,12 @@ public class HotkeyService : IDisposable
                                                                        {
                                                                            // 输入模式检测：焦点在输入控件时不触发快捷键
                                                                            if (IsInputMode())
+                                                                           {
+                                                                               Serilog.Log.Debug("OnKeyDown: Skipped due to input mode");
                                                                                return;
+                                                                           }
 
+                                                                           Serilog.Log.Information("OnKeyDown: Dispatching action {Action}", binding.Action);
                                                                            _dispatcher.Dispatch(binding.Action);
                                                                        });
         }

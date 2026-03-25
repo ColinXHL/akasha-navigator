@@ -223,6 +223,14 @@ public static class PluginEngine
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: window");
         }
 
+        // panel API
+        if (permissions.Contains(PluginPermissions.Panel, StringComparer.OrdinalIgnoreCase))
+        {
+            var panelApi = new PanelApi(context, configApi);
+            engine.AddHostObject("panel", panelApi);
+            LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: panel");
+        }
+
         // storage API
         if (permissions.Contains(PluginPermissions.Storage, StringComparer.OrdinalIgnoreCase))
         {
@@ -254,7 +262,7 @@ public static class PluginEngine
         LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: event");
 
         // hotkey API
-        if (permissions.Contains(PluginPermissions.Audio, StringComparer.OrdinalIgnoreCase))
+        if (permissions.Contains(PluginPermissions.Hotkey, StringComparer.OrdinalIgnoreCase))
         {
             var hotkeyApi = new HotkeyApi(pluginId);
             // 注意：ActionDispatcher 需要在 PluginHost 中设置
@@ -268,6 +276,14 @@ public static class PluginEngine
             var webviewApi = new WebViewApi(pluginId, options.GetPlayerWindow);
             engine.AddHostObject("webview", webviewApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: webview");
+        }
+
+        // osd API（始终暴露，用于显示提示）
+        if (options.OsdManager != null)
+        {
+            var osdApi = new OsdApi(pluginId, options.OsdManager);
+            engine.AddHostObject("osd", osdApi);
+            LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: osd");
         }
     }
 

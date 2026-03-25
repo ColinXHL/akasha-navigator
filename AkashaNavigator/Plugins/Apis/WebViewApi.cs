@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using AkashaNavigator.Services;
 using AkashaNavigator.Views.Windows;
 
@@ -22,6 +23,7 @@ public class WebViewApi
 
     private readonly string _pluginId;
     private readonly Func<PlayerWindow?>? _getPlayerWindow;
+    private const int ExecuteScriptSyncTimeoutMs = 350;
 
 #endregion
 
@@ -187,6 +189,80 @@ public class WebViewApi
             LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.ExecuteScript error: {ErrorMessage}", _pluginId,
                                       ex.Message);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 同步执行 JavaScript 脚本并返回结果
+    /// </summary>
+    /// <param name="script">JavaScript 代码</param>
+    /// <returns>执行结果</returns>
+    public object? ExecuteScriptSync(string script)
+    {
+        if (string.IsNullOrWhiteSpace(script))
+        {
+            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScriptSync: script is empty", _pluginId);
+            return null;
+        }
+
+        try
+        {
+            var playerWindow = GetPlayerWindow();
+            if (playerWindow?.WebView?.CoreWebView2 == null)
+            {
+                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScriptSync: WebView not available",
+                                         _pluginId);
+                return null;
+            }
+
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return null;
+
+            if (dispatcher.CheckAccess())
+            {
+                var uiTask = playerWindow.WebView.CoreWebView2.ExecuteScriptAsync(script);
+                if (!WaitTaskOnUiThread(uiTask, dispatcher, ExecuteScriptSyncTimeoutMs))
+                {
+                    LogService.Instance.Warn("Plugin:{PluginId}",
+                                             "WebViewApi.ExecuteScriptSync timeout on UI thread ({TimeoutMs}ms)",
+                                             _pluginId, ExecuteScriptSyncTimeoutMs);
+                    return null;
+                }
+
+                if (uiTask.IsCompletedSuccessfully)
+                {
+                    return ParseScriptResult(uiTask.Result);
+                }
+
+                LogService.Instance.Warn("Plugin:{PluginId}",
+                                         "WebViewApi.ExecuteScriptSync failed on UI thread",
+                                         _pluginId);
+                return null;
+            }
+
+            var executeTask = dispatcher
+                              .InvokeAsync(() => playerWindow.WebView.CoreWebView2.ExecuteScriptAsync(script))
+                              .Task
+                              .Unwrap();
+
+            if (!executeTask.Wait(ExecuteScriptSyncTimeoutMs))
+            {
+                LogService.Instance.Warn("Plugin:{PluginId}",
+                                         "WebViewApi.ExecuteScriptSync timeout ({TimeoutMs}ms)",
+                                         _pluginId, ExecuteScriptSyncTimeoutMs);
+                return null;
+            }
+
+            var result = executeTask.Result;
+
+            return ParseScriptResult(result);
+        }
+        catch (Exception ex)
+        {
+            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.ExecuteScriptSync error: {ErrorMessage}",
+                                      _pluginId, ex.Message);
+            return null;
         }
     }
 
@@ -394,6 +470,35 @@ public class WebViewApi
         default:
             return element.ToString();
         }
+    }
+
+    private static bool WaitTaskOnUiThread(Task task, Dispatcher dispatcher, int timeoutMs)
+    {
+        if (task.IsCompleted)
+            return true;
+
+        var frame = new DispatcherFrame();
+        var timeoutReached = false;
+
+        var timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(timeoutMs)
+        };
+
+        timer.Tick += (_, _) =>
+        {
+            timeoutReached = true;
+            frame.Continue = false;
+            timer.Stop();
+        };
+
+        task.ContinueWith(_ => dispatcher.BeginInvoke(new Action(() => frame.Continue = false)));
+
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+        timer.Stop();
+
+        return !timeoutReached && task.IsCompleted;
     }
 
 #endregion

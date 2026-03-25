@@ -120,6 +120,13 @@ public class SubtitleApi
         return CreateJsArray(entries);
     }
 
+    public string language => SubtitleService.Instance.GetSubtitleData()?.Language ?? string.Empty;
+
+    public void request()
+    {
+        _ = SubtitleService.Instance.RequestSubtitleAsync();
+    }
+
     public int on(string eventName, object callback)
     {
         return _eventManager?.On($"subtitle.{eventName}", callback) ?? -1;

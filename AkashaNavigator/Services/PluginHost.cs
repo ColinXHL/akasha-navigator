@@ -613,7 +613,8 @@ public class PluginHost : IPluginHost, IDisposable
         var engineOptions = new PluginEngineOptions {
             ProfileId = _currentProfileId ?? string.Empty, ProfileName = _currentProfileId ?? string.Empty,
             ProfileDirectory = GetPluginConfigDirectory(_currentProfileId ?? string.Empty, pluginId),
-            GetPlayerWindow = _globalWindowGetter
+            GetPlayerWindow = _globalWindowGetter,
+            OsdManager = App.Services?.GetService<Core.OsdManager>()
         };
 
         // 创建插件上下文
@@ -630,6 +631,9 @@ public class PluginHost : IPluginHost, IDisposable
 
         // 创建 PluginApi（用于事件广播等）
         var pluginApi = new PluginApi(context, config, profileInfo);
+
+        // 设置 HotkeyApi 的 ActionDispatcher（如果插件有 hotkey 权限）
+        SetupHotkeyApi(context, manifest);
 
         // 调用 onLoad
         if (!context.CallOnLoad())
@@ -686,6 +690,61 @@ public class PluginHost : IPluginHost, IDisposable
         _pluginApis.Remove(pluginId);
         PluginUnloaded?.Invoke(this, pluginId);
         Log("插件 {PluginId} 已卸载", pluginId);
+    }
+
+    /// <summary>
+    /// 设置插件的 HotkeyApi（如果插件有 hotkey 权限）
+    /// </summary>
+    /// <param name="context">插件上下文</param>
+    /// <param name="manifest">插件清单</param>
+    private void SetupHotkeyApi(PluginContext context, PluginManifest manifest)
+    {
+        // 检查插件是否有 hotkey 权限
+        var permissions = manifest.Permissions ?? new List<string>();
+        if (!permissions.Contains(PluginPermissions.Hotkey, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // 从 V8 引擎获取 HotkeyApi 实例
+        if (context.Engine == null)
+        {
+            Log("插件 {PluginId} 的引擎为空，无法设置 HotkeyApi", context.PluginId);
+            return;
+        }
+
+        try
+        {
+            // 从引擎中获取 hotkey 全局对象
+            var hotkeyObj = context.Engine.Script.hotkey;
+            if (hotkeyObj == null)
+            {
+                Log("插件 {PluginId} 没有 hotkey API，跳过设置", context.PluginId);
+                return;
+            }
+
+            // 将 ScriptObject 转换为 HotkeyApi
+            if (hotkeyObj is Plugins.Apis.HotkeyApi hotkeyApi)
+            {
+                // 从 DI 容器获取 HotkeyService
+                var hotkeyService = App.Services?.GetService<HotkeyService>();
+                if (hotkeyService != null)
+                {
+                    var dispatcher = hotkeyService.GetDispatcher();
+                    hotkeyApi.SetDispatcher(dispatcher);
+                    hotkeyApi.SetHotkeyService(hotkeyService);
+                    Log("插件 {PluginId} 的 HotkeyApi 已设置 ActionDispatcher 和 HotkeyService", context.PluginId);
+                }
+                else
+                {
+                    Log("无法获取 HotkeyService，插件 {PluginId} 的快捷键功能将不可用", context.PluginId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log("设置插件 {PluginId} 的 HotkeyApi 失败: {ErrorMessage}", context.PluginId, ex.Message);
+        }
     }
 
     /// <summary>
