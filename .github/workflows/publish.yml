@@ -107,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: AkashaNavigator_7z
           path: dist
@@ -183,12 +183,12 @@ jobs:
     if: github.event.inputs.create_release == 'true'
 
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: AkashaNavigator_Installer
           path: release
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: AkashaNavigator_7z
           path: release
