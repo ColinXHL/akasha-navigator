@@ -96,7 +96,7 @@ jobs:
           cd dist
           7z a "AkashaNavigator_v${{ needs.validate.outputs.version }}.7z" AkashaNavigator -t7z -mx=5 -r -y
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: AkashaNavigator_7z
           path: dist/AkashaNavigator_v*.7z
@@ -107,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: AkashaNavigator_7z
           path: dist
@@ -123,28 +123,53 @@ jobs:
           Get-ChildItem -Recurse | ForEach-Object { Write-Host $_.FullName }
 
       - name: 📥 Download kachina-builder
-        uses: robinraju/release-downloader@v1.8
-        with:
-          repository: "YuehaiTeam/kachina-installer"
-          latest: true
-          fileName: "kachina-builder.exe"
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Write-Host "当前目录：$(Get-Location)"
+          gh release download `
+            --repo YuehaiTeam/kachina-installer `
+            --pattern "kachina-builder.exe" `
+            --dir .
+          
+          Write-Host "下载后文件列表："
+          Get-ChildItem -Recurse | Where-Object { $_.Name -like "*kachina-builder*" } | ForEach-Object { Write-Host $_.FullName }
 
       - name: 🧰 Generate hashed directory for packing
+        shell: pwsh
         run: |
           cd dist
+          Write-Host "当前目录：$(Get-Location)"
           Write-Host "生成 hashed 临时目录..."
-          ..\kachina-builder.exe gen -j 4 -i AkashaNavigator -m metadata.json -o hashed -r YourRepo/AkashaNavigator -t ${{ needs.validate.outputs.version }}
+          
+          ..\kachina-builder.exe gen `
+            -j 4 `
+            -i AkashaNavigator `
+            -m metadata.json `
+            -o hashed `
+            -r YourRepo/AkashaNavigator `
+            -t ${{ needs.validate.outputs.version }}
+          
           Write-Host "hashed 目录内容："
           Get-ChildItem hashed -Recurse | ForEach-Object { Write-Host $_.FullName }
 
       - name: 🧰 Pack Installer
+        shell: pwsh
         run: |
           cd dist
           Write-Host "开始打包 installer..."
-          ..\kachina-builder.exe pack -c ..\Build\kachina.config.json -m metadata.json -t ..\assets\installer_left.webp -d hashed -o AkashaNavigator.Install.${{ needs.validate.outputs.version }}.exe
+          
+          ..\kachina-builder.exe pack `
+            -c ..\Build\kachina.config.json `
+            -m metadata.json `
+            -t ..\assets\installer_left.webp `
+            -d hashed `
+            -o AkashaNavigator.Install.${{ needs.validate.outputs.version }}.exe
+          
           Write-Host "打包完成"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: AkashaNavigator_Installer
           path: dist/AkashaNavigator.Install.*.exe
@@ -158,12 +183,12 @@ jobs:
     if: github.event.inputs.create_release == 'true'
 
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: AkashaNavigator_Installer
           path: release
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: AkashaNavigator_7z
           path: release
