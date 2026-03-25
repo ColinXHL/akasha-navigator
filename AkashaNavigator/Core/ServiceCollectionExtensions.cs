@@ -50,6 +50,12 @@ public static class ServiceCollectionExtensions
         // HotkeyService（无依赖，使用Win32钩子）
         services.AddSingleton<HotkeyService>();
 
+        // OsdManager（无依赖，用于显示屏幕提示）
+        services.AddSingleton<OsdManager>();
+
+        // ScriptExecutionQueue（依赖LogService，用于WebView2脚本执行队列化）
+        services.AddSingleton<ScriptExecutionQueue>();
+
         // ============================================================
         // Level 1: 依赖 LogService
         // ============================================================
@@ -78,6 +84,9 @@ public static class ServiceCollectionExtensions
 
         // PluginAssociationManager（依赖LogService + PluginLibrary）
         services.AddSingleton<IPluginAssociationManager, PluginAssociationManager>();
+
+        // CrashRecoveryService（依赖LogService）
+        services.AddSingleton<ICrashRecoveryService, CrashRecoveryService>();
 
         // ============================================================
         // Level 2: 依赖 LogService + ProfileManager（复杂依赖）
@@ -121,6 +130,9 @@ public static class ServiceCollectionExtensions
 
         // OverlayManager（使用现有单例实例，私有构造函数）
         services.AddSingleton<IOverlayManager>(sp => OverlayManager.Instance);
+
+        // PanelManager（使用现有单例实例，私有构造函数）
+        services.AddSingleton<IPanelManager>(sp => PanelManager.Instance);
 
         // ============================================================
         // ViewModels（Pages）- 必须在 PluginCenterViewModel 之前注册

@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Services;
@@ -19,6 +21,14 @@ public class HotkeyManager
     private AppConfig _config = null!;
     private Action<string, string?>? _showOsdAction;
 
+    // 节流相关字段
+    private DateTime _lastSeekTime = DateTime.MinValue;
+    private int _throttledCount = 0;
+    private DateTime _lastThrottleWarningTime = DateTime.MinValue;
+    private const int SeekThrottleMs = 200;
+    private const int ThrottleWarningThreshold = 10; // 1秒内被节流10次时显示警告
+    private const int ThrottleWarningCooldownMs = 3000; // 警告冷却时间3秒
+
     /// <summary>
     /// 初始化 HotkeyManager
     /// </summary>
@@ -31,8 +41,43 @@ public class HotkeyManager
         _config = config;
         _showOsdAction = showOsdAction;
 
-        _hotkeyService = new HotkeyService();
-        _hotkeyService.UpdateConfig(_config.ToHotkeyConfig());
+        // 从 DI 容器获取 HotkeyService（确保与插件使用同一个实例）
+        _hotkeyService = App.Services?.GetService<HotkeyService>();
+        if (_hotkeyService == null)
+        {
+            Logger.Warning("Failed to get HotkeyService from DI container, creating new instance");
+            _hotkeyService = new HotkeyService();
+            _hotkeyService.UpdateConfig(_config.ToHotkeyConfig());
+        }
+        else
+        {
+            // 不要替换整个配置，而是合并内置快捷键到现有配置
+            var currentConfig = _hotkeyService.GetConfig();
+            var newConfig = _config.ToHotkeyConfig();
+            
+            // 将新配置的绑定添加到当前配置（如果不存在）
+            var activeProfile = currentConfig.GetActiveProfile();
+            if (activeProfile != null)
+            {
+                var newProfile = newConfig.GetActiveProfile();
+                if (newProfile != null)
+                {
+                    foreach (var binding in newProfile.Bindings)
+                    {
+                        // 检查是否已存在相同的绑定
+                        var exists = activeProfile.Bindings.Any(b => 
+                            b.Key == binding.Key && 
+                            b.Modifiers == binding.Modifiers && 
+                            b.Action == binding.Action);
+                        
+                        if (!exists)
+                        {
+                            activeProfile.Bindings.Add(binding);
+                        }
+                    }
+                }
+            }
+        }
 
         SetupHotkeyBindings();
         _hotkeyService.Start();
@@ -58,6 +103,18 @@ public class HotkeyManager
         _hotkeyService.SeekBackward += (s, e) =>
         {
             Logger.Debug("SeekBackward event received, _playerWindow is null: {IsNull}", _playerWindow == null);
+            
+            // 节流检查
+            var now = DateTime.Now;
+            if ((now - _lastSeekTime).TotalMilliseconds < SeekThrottleMs)
+            {
+                Logger.Debug("SeekBackward throttled (elapsed={ElapsedMs}ms)", (now - _lastSeekTime).TotalMilliseconds);
+                HandleThrottledOperation(now);
+                return;
+            }
+            _lastSeekTime = now;
+            _throttledCount = 0; // 重置节流计数
+            
             var seconds = _config.SeekSeconds;
             _playerWindow?.SeekAsync(-seconds);
             ShowOsd($"-{seconds}s", "⏪");
@@ -66,6 +123,18 @@ public class HotkeyManager
         _hotkeyService.SeekForward += (s, e) =>
         {
             Logger.Debug("SeekForward event received, _playerWindow is null: {IsNull}", _playerWindow == null);
+            
+            // 节流检查
+            var now = DateTime.Now;
+            if ((now - _lastSeekTime).TotalMilliseconds < SeekThrottleMs)
+            {
+                Logger.Debug("SeekForward throttled (elapsed={ElapsedMs}ms)", (now - _lastSeekTime).TotalMilliseconds);
+                HandleThrottledOperation(now);
+                return;
+            }
+            _lastSeekTime = now;
+            _throttledCount = 0; // 重置节流计数
+            
             var seconds = _config.SeekSeconds;
             _playerWindow?.SeekAsync(seconds);
             ShowOsd($"+{seconds}s", "⏩");
@@ -193,6 +262,27 @@ public class HotkeyManager
     private void ShowOsd(string message, string? icon = null)
     {
         _showOsdAction?.Invoke(message, icon);
+    }
+
+    /// <summary>
+    /// 处理被节流的操作
+    /// </summary>
+    private void HandleThrottledOperation(DateTime now)
+    {
+        _throttledCount++;
+
+        // 如果在短时间内被节流次数过多，显示警告
+        if (_throttledCount >= ThrottleWarningThreshold)
+        {
+            // 检查是否在冷却时间内
+            if ((now - _lastThrottleWarningTime).TotalMilliseconds > ThrottleWarningCooldownMs)
+            {
+                Logger.Warning("操作过快，已触发节流保护 (ThrottledCount={ThrottledCount})", _throttledCount);
+                ShowOsd("操作过快，请稍候", "⚠");
+                _lastThrottleWarningTime = now;
+                _throttledCount = 0; // 重置计数
+            }
+        }
     }
 
     /// <summary>

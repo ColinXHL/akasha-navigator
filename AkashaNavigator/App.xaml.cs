@@ -51,6 +51,8 @@ public partial class App : System.Windows.Application
 
         InitializeServices();
 
+        CheckAndHandleCrash();
+
         ExecuteDataMigration();
 
         InitializeApplication();
@@ -151,6 +153,71 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// 检查并处理崩溃恢复
+    /// </summary>
+    private void CheckAndHandleCrash()
+    {
+        try
+        {
+            var crashRecoveryService = Services.GetRequiredService<ICrashRecoveryService>();
+            var logService = Services.GetRequiredService<ILogService>();
+
+            // 检测是否有崩溃
+            if (crashRecoveryService.DetectCrash())
+            {
+                logService.Warn(nameof(App), "检测到上次程序异常退出");
+
+                // 询问用户是否清理 WebView2 数据
+                var result = MessageBox.Show(
+                    "检测到程序上次异常退出。\n\n" +
+                    "如果您遇到了程序卡死或无响应的问题，建议清理浏览器缓存数据。\n\n" +
+                    "是否清理浏览器缓存？（不会影响您的配置和数据）",
+                    "崩溃恢复",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    logService.Info(nameof(App), "用户选择清理 WebView2 数据");
+                    var cleanResult = crashRecoveryService.CleanWebView2Data();
+
+                    if (cleanResult.IsSuccess)
+                    {
+                        logService.Info(nameof(App), "WebView2 数据清理成功");
+                        MessageBox.Show(
+                            "浏览器缓存已清理完成。",
+                            "清理成功",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        var errorMsg = cleanResult.Error?.Message ?? "未知错误";
+                        logService.Error(nameof(App), "WebView2 数据清理失败: {ErrorMessage}", errorMsg);
+                        MessageBox.Show(
+                            $"清理失败：{errorMsg}\n\n您可以手动删除以下目录：\n{crashRecoveryService.WebView2DataPath}",
+                            "清理失败",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                }
+                else
+                {
+                    logService.Info(nameof(App), "用户选择不清理 WebView2 数据");
+                }
+            }
+
+            // 标记程序正常启动
+            crashRecoveryService.MarkStartup();
+        }
+        catch (Exception ex)
+        {
+            var logService = Services.GetRequiredService<ILogService>();
+            logService?.Error(nameof(App), ex, "崩溃检测过程中发生异常");
+        }
+    }
+
+    /// <summary>
     /// 初始化应用程序（窗口、快捷键、欢迎对话框等）
     /// </summary>
     private void InitializeApplication()
@@ -218,7 +285,8 @@ public partial class App : System.Windows.Application
     /// </summary>
     private void InitializeManagers(Views.Windows.PlayerWindow playerWindow)
     {
-        _osdManager = new OsdManager();
+        // 从 DI 容器获取 OsdManager
+        _osdManager = Services.GetRequiredService<OsdManager>();
 
         _hotkeyManager = new HotkeyManager();
         _hotkeyManager.Initialize(playerWindow, _config, _osdManager.ShowMessage);
@@ -255,6 +323,17 @@ public partial class App : System.Windows.Application
     /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
+        try
+        {
+            // 标记程序正常关闭
+            var crashRecoveryService = Services?.GetService<ICrashRecoveryService>();
+            crashRecoveryService?.MarkShutdown();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "标记程序关闭时发生异常");
+        }
+
         _hotkeyManager?.Dispose();
 
         var controlBarWindow = Services.GetRequiredService<Views.Windows.ControlBarWindow>();

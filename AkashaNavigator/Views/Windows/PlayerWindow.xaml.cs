@@ -48,6 +48,7 @@ public partial class PlayerWindow : Window
     private readonly IEventBus _eventBus;
     private readonly IDialogFactory _dialogFactory;
     private readonly Func<PioneerNoteWindow> _pioneerNoteWindowFactory;
+    private readonly ScriptExecutionQueue _scriptQueue;
 
     /// <summary>
     /// 是否最大化
@@ -107,7 +108,8 @@ public partial class PlayerWindow : Window
                         IWindowStateService windowStateService, ISubtitleService subtitleService,
                         IDataService dataService, IPluginHost pluginHost, ILogService logService,
                         ICursorDetectionService cursorDetectionService, IEventBus eventBus,
-                        IDialogFactory dialogFactory, Func<PioneerNoteWindow> pioneerNoteWindowFactory)
+                        IDialogFactory dialogFactory, Func<PioneerNoteWindow> pioneerNoteWindowFactory,
+                        ScriptExecutionQueue scriptQueue)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
@@ -123,6 +125,7 @@ public partial class PlayerWindow : Window
         _dialogFactory = dialogFactory ?? throw new ArgumentNullException(nameof(dialogFactory));
         _pioneerNoteWindowFactory =
             pioneerNoteWindowFactory ?? throw new ArgumentNullException(nameof(pioneerNoteWindowFactory));
+        _scriptQueue = scriptQueue ?? throw new ArgumentNullException(nameof(scriptQueue));
 
         InitializeComponent();
         _config = _configService.Config;
@@ -662,11 +665,11 @@ public partial class PlayerWindow : Window
 
         try
         {
-            await WebView.CoreWebView2.ExecuteScriptAsync(script);
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "TogglePlay");
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略脚本执行错误
+            _logService.Error(nameof(PlayerWindow), ex, "TogglePlayAsync failed");
         }
     }
 
@@ -692,11 +695,11 @@ public partial class PlayerWindow : Window
 
         try
         {
-            await WebView.CoreWebView2.ExecuteScriptAsync(script);
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, $"Seek({seconds}s)");
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略脚本执行错误
+            _logService.Error(nameof(PlayerWindow), ex, "SeekAsync failed (seconds={Seconds})", seconds);
         }
     }
 
@@ -818,11 +821,11 @@ public partial class PlayerWindow : Window
 
         try
         {
-            await WebView.CoreWebView2.ExecuteScriptAsync(script);
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, $"SetPlaybackRate({rate})");
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略脚本执行错误
+            _logService.Error(nameof(PlayerWindow), ex, "SetPlaybackRateAsync failed (rate={Rate})", rate);
         }
     }
 
@@ -1022,7 +1025,7 @@ public partial class PlayerWindow : Window
                     })();
                 ";
 
-            var result = await WebView.CoreWebView2.ExecuteScriptAsync(script);
+            var result = await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "VideoTimeSync", 2000);
 
             // 解析结果（去除 JSON 字符串的引号）
             if (!string.IsNullOrEmpty(result) && result != "\"null\"" && result != "null")
@@ -1049,9 +1052,9 @@ public partial class PlayerWindow : Window
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略脚本执行错误
+            _logService.Error(nameof(PlayerWindow), ex, "VideoTimeSyncTimer_Tick failed");
         }
     }
 
