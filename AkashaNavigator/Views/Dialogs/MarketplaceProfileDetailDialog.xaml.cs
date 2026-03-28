@@ -19,6 +19,8 @@ namespace AkashaNavigator.Views.Dialogs
         /// </summary>
         public bool ShouldInstall { get; private set; }
 
+        public MarketplaceProfileDetailAction Action => _viewModel.Action;
+
         /// <summary>
         /// 构造函数
         /// </summary>

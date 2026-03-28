@@ -94,6 +94,7 @@ public partial class App : System.Windows.Application
         var logService = serviceProvider.GetRequiredService<ILogService>();
         _configService = serviceProvider.GetRequiredService<IConfigService>();
         _dataMigration = serviceProvider.GetRequiredService<DataMigration>();
+        _ = serviceProvider.GetRequiredService<PluginStateCoordinator>();
 
         _config = _configService.Config;
     }
@@ -298,10 +299,12 @@ public partial class App : System.Windows.Application
     private void SetupPluginUpdateCheck(Views.Windows.PlayerWindow playerWindow)
     {
         var pluginLibrary = Services.GetRequiredService<IPluginLibrary>();
+        var profileMarketplaceService = Services.GetRequiredService<ProfileMarketplaceService>();
         var notificationService = Services.GetRequiredService<INotificationService>();
         var eventBus = Services.GetRequiredService<Core.Events.IEventBus>();
 
-        var checker = new PluginUpdateChecker(pluginLibrary, notificationService, Services, eventBus, playerWindow, _config);
+        var checker = new PluginUpdateChecker(pluginLibrary, profileMarketplaceService, notificationService, Services,
+                                              eventBus, playerWindow, _config);
         checker.SetupUpdateCheck();
     }
 

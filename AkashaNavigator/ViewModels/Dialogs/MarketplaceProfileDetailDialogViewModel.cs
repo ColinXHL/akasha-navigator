@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Profile;
+using AkashaNavigator.Services;
 
 namespace AkashaNavigator.ViewModels.Dialogs
 {
@@ -16,6 +17,7 @@ namespace AkashaNavigator.ViewModels.Dialogs
     public partial class MarketplaceProfileDetailDialogViewModel : ObservableObject
     {
         private readonly IPluginLibrary _pluginLibrary;
+        private readonly IProfileManager _profileManager;
 
         /// <summary>
         /// Profile 名称
@@ -66,9 +68,17 @@ namespace AkashaNavigator.ViewModels.Dialogs
         private string _pluginCount = string.Empty;
 
         /// <summary>
+        /// 主操作按钮文本。
+        /// </summary>
+        [ObservableProperty]
+        private string _primaryActionText = "安装";
+
+        /// <summary>
         /// 对话框结果：true=安装，false=取消
         /// </summary>
         public bool? DialogResult { get; private set; }
+
+        public MarketplaceProfileDetailAction Action { get; private set; } = MarketplaceProfileDetailAction.Cancel;
 
         /// <summary>
         /// 插件列表
@@ -83,9 +93,10 @@ namespace AkashaNavigator.ViewModels.Dialogs
         /// <summary>
         /// 构造函数
         /// </summary>
-        public MarketplaceProfileDetailDialogViewModel(IPluginLibrary pluginLibrary)
+        public MarketplaceProfileDetailDialogViewModel(IPluginLibrary pluginLibrary, IProfileManager profileManager)
         {
             _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
+            _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
         }
 
         /// <summary>
@@ -111,6 +122,10 @@ namespace AkashaNavigator.ViewModels.Dialogs
             Author = string.IsNullOrWhiteSpace(profile.Author) ? "未知" : profile.Author;
             UpdatedAt = profile.UpdatedAt.ToString("yyyy-MM-dd HH:mm");
             PluginCount = $"{profile.PluginCount} 个";
+            var installedProfile = _profileManager.GetProfileById(profile.Id);
+            var hasUpdate = installedProfile != null &&
+                            PluginLibrary.CompareVersions(installedProfile.Version.ToString(), profile.Version) < 0;
+            PrimaryActionText = hasUpdate ? "更新" : installedProfile != null ? "覆盖" : "安装";
 
             // 插件列表
             LoadPluginList(profile.PluginIds);
@@ -135,6 +150,7 @@ namespace AkashaNavigator.ViewModels.Dialogs
         [RelayCommand]
         private void Install()
         {
+            Action = PrimaryActionText == "更新" ? MarketplaceProfileDetailAction.Update : MarketplaceProfileDetailAction.Install;
             DialogResult = true;
             RequestClose?.Invoke(this, DialogResult);
         }
@@ -145,6 +161,7 @@ namespace AkashaNavigator.ViewModels.Dialogs
         [RelayCommand]
         private void Cancel()
         {
+            Action = MarketplaceProfileDetailAction.Cancel;
             DialogResult = false;
             RequestClose?.Invoke(this, DialogResult);
         }
@@ -155,9 +172,17 @@ namespace AkashaNavigator.ViewModels.Dialogs
         [RelayCommand]
         private void Close()
         {
+            Action = MarketplaceProfileDetailAction.Cancel;
             DialogResult = false;
             RequestClose?.Invoke(this, DialogResult);
         }
+    }
+
+    public enum MarketplaceProfileDetailAction
+    {
+        Cancel,
+        Install,
+        Update
     }
 
     /// <summary>

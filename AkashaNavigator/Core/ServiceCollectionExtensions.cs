@@ -85,6 +85,9 @@ public static class ServiceCollectionExtensions
         // PluginAssociationManager（依赖LogService + PluginLibrary）
         services.AddSingleton<IPluginAssociationManager, PluginAssociationManager>();
 
+        // PluginStateCoordinator（桥接底层插件状态变化到 UI 刷新事件）
+        services.AddSingleton<PluginStateCoordinator>();
+
         // CrashRecoveryService（依赖LogService）
         services.AddSingleton<ICrashRecoveryService, CrashRecoveryService>();
 
@@ -291,6 +294,9 @@ public static class ServiceCollectionExtensions
 
         // PluginUpdatePromptDialog（依赖PluginUpdatePromptDialogViewModel）
         services.AddTransient<PluginUpdatePromptDialogViewModel>();
+
+        // ProfileUpdatePromptDialog（依赖ProfileUpdatePromptDialogViewModel）
+        services.AddTransient<ProfileUpdatePromptDialogViewModel>();
 
         // RecordNoteDialog（依赖RecordNoteDialogViewModel）
         services.AddTransient<RecordNoteDialogViewModel>();

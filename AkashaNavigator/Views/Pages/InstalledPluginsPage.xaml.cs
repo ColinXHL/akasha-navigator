@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using AkashaNavigator.ViewModels.Pages;
@@ -9,11 +10,12 @@ namespace AkashaNavigator.Views.Pages
 /// <summary>
 /// 已安装插件页面 - 显示全局插件库中的所有插件
 /// </summary>
-public partial class InstalledPluginsPage : UserControl
+public partial class InstalledPluginsPage : UserControl, IDisposable
 {
     private readonly InstalledPluginsPageViewModel _viewModel;
     private readonly IPluginLibrary _pluginLibrary;
     private readonly IDialogFactory _dialogFactory;
+    private bool _disposed;
 
     // DI 构造函数
     public InstalledPluginsPage(InstalledPluginsPageViewModel viewModel, IPluginLibrary pluginLibrary,
@@ -91,6 +93,17 @@ public partial class InstalledPluginsPage : UserControl
         {
             RefreshPluginList();
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _viewModel.AddToProfileRequested -= OnAddToProfileRequested;
+        _viewModel.UninstallRequested -= OnUninstallRequested;
+        _viewModel.Dispose();
+        _disposed = true;
     }
 }
 }

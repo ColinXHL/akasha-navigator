@@ -104,9 +104,15 @@
                                             <TextBlock Text="📦" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                             <TextBlock Text="{Binding Name}" Foreground="White"
                                                        FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}"
-                                                       Foreground="#666" FontSize="11"
-                                                       VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                             <TextBlock Text="{Binding Version, StringFormat=' v{0}'}"
+                                                        Foreground="#666" FontSize="11"
+                                                        VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                            <Border Margin="8,0,0,0" VerticalAlignment="Center"
+                                                    Background="#3A3218" CornerRadius="3" Padding="6,2"
+                                                    Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="{Binding UpdateTagText}"
+                                                           Foreground="#FACC15" FontSize="10"/>
+                                            </Border>
                                             <!-- 目标游戏标签 -->
                                             <Border Margin="8,0,0,0" VerticalAlignment="Center"
                                                     Background="#1A3A5A" CornerRadius="3" Padding="6,2"
@@ -139,12 +145,16 @@
                                         <Button Content="安装" Style="{StaticResource PrimaryActionButtonStyle}"
                                                 Command="{Binding DataContext.InstallCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding}"
-                                                Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                                Visibility="{Binding ShowInstallButton, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <Button Content="更新" Style="{StaticResource PrimaryActionButtonStyle}"
+                                                Command="{Binding DataContext.UpdateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}" Margin="0,0,8,0"
+                                                Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <!-- 卸载按钮：已安装且非默认 Profile 时显示 -->
                                         <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
                                                 Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 CommandParameter="{Binding}"
-                                                Visibility="{Binding CanUninstall, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                Visibility="{Binding ShowUninstallButton, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <!-- 已安装标签：已安装但是默认 Profile 时显示 -->
                                         <Border Background="#2A3A2A" CornerRadius="4" Padding="12,6"
                                                 Visibility="{Binding IsDefaultAndInstalled, Converter={StaticResource BoolToVisibilityConverter}}">

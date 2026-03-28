@@ -42,6 +42,12 @@ namespace AkashaNavigator.Core.Interfaces
         PluginUpdatePromptDialog CreatePluginUpdatePromptDialog(List<UpdateCheckResult> updates);
 
         /// <summary>
+        /// 创建 Profile 更新提示对话框
+        /// </summary>
+        /// <param name="updates">可用更新列表</param>
+        ProfileUpdatePromptDialog CreateProfileUpdatePromptDialog(List<Models.Profile.ProfileUpdateCheckResult> updates);
+
+        /// <summary>
         /// 创建 BookmarkPopup（带 ViewModel）
         /// </summary>
         BookmarkPopup CreateBookmarkPopup();

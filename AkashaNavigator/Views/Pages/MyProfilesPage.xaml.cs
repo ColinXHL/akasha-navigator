@@ -18,7 +18,7 @@ namespace AkashaNavigator.Views.Pages
 /// <summary>
 /// 我的 Profile 页面 - 显示 Profile 详情和插件清单
 /// </summary>
-public partial class MyProfilesPage : UserControl
+public partial class MyProfilesPage : UserControl, IDisposable
 {
     private readonly MyProfilesPageViewModel _viewModel;
     private readonly IDialogFactory _dialogFactory;
@@ -28,6 +28,7 @@ public partial class MyProfilesPage : UserControl
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly INotificationService _notificationService;
     private readonly IEventBus _eventBus;
+    private bool _disposed;
 
     // DI构造函数
     public MyProfilesPage(MyProfilesPageViewModel viewModel, IDialogFactory dialogFactory,
@@ -271,6 +272,22 @@ public partial class MyProfilesPage : UserControl
         {
             _viewModel.RefreshPluginList();
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _viewModel.NewProfileRequested -= OnNewProfileRequested;
+        _viewModel.EditProfileRequested -= OnEditProfileRequested;
+        _viewModel.DeleteProfileRequested -= OnDeleteProfileRequested;
+        _viewModel.AddPluginRequested -= OnAddPluginRequested;
+        _viewModel.ExportRequested -= OnExportRequested;
+        _viewModel.ImportRequested -= OnImportRequested;
+        _viewModel.OpenPluginSettingsRequested -= OnOpenPluginSettingsRequested;
+        _viewModel.Dispose();
+        _disposed = true;
     }
 
     /// <summary>

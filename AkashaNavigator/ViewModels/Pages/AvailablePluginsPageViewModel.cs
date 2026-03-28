@@ -199,5 +199,10 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     /// 卸载请求事件（由 Code-behind 订阅以显示对话框）
     /// </summary>
     public event EventHandler<AvailablePluginItemModel>? UninstallRequested;
+
+    public void Dispose()
+    {
+        _eventBus.Unsubscribe<PluginListChangedEvent>(OnPluginListChanged);
+    }
 }
 }

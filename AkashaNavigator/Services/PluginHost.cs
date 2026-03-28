@@ -132,6 +132,9 @@ public class PluginHost : IPluginHost, IDisposable
         // 订阅插件启用状态变化事件
         _pluginAssociationManager.PluginEnabledChanged += OnPluginEnabledChanged;
 
+        // 订阅插件关联变化事件（用于当前 Profile 动态加载/卸载）
+        _pluginAssociationManager.AssociationChanged += OnAssociationChanged;
+
         // 订阅插件库变化事件（用于插件更新后自动重新加载）
         _pluginLibrary.PluginChanged += OnPluginLibraryChanged;
     }
@@ -801,12 +804,102 @@ public class PluginHost : IPluginHost, IDisposable
     /// </summary>
     private void OnPluginLibraryChanged(object? sender, PluginLibraryChangedEventArgs e)
     {
-        // 当插件更新时，重新加载正在运行的插件
-        if (e.ChangeType == PluginLibraryChangeType.Updated)
+        switch (e.ChangeType)
         {
+        case PluginLibraryChangeType.Installed:
+            if (!string.IsNullOrWhiteSpace(_currentProfileId) &&
+                _pluginAssociationManager.ProfileContainsPlugin(_currentProfileId, e.PluginId) &&
+                _pluginAssociationManager.GetPluginEnabled(_currentProfileId, e.PluginId) != false)
+            {
+                Log("检测到插件 {PluginId} 已安装，尝试为当前 Profile 动态加载...", e.PluginId);
+                EnablePlugin(_currentProfileId, e.PluginId);
+            }
+            break;
+        case PluginLibraryChangeType.Uninstalled:
+            Log("检测到插件 {PluginId} 已卸载，尝试从运行态移除...", e.PluginId);
+            DisablePlugin(e.PluginId);
+            break;
+        case PluginLibraryChangeType.Updated:
             Log("检测到插件 {PluginId} 已更新，尝试重新加载...", e.PluginId);
             ReloadPlugin(e.PluginId);
+            break;
         }
+    }
+
+    /// <summary>
+    /// 处理插件关联变化事件
+    /// </summary>
+    private void OnAssociationChanged(object? sender, AssociationChangedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentProfileId))
+            return;
+
+        switch (e.ChangeType)
+        {
+        case AssociationChangeType.Added:
+            HandleAssociationAdded(e.ProfileId, e.PluginId);
+            break;
+        case AssociationChangeType.Removed:
+            HandleAssociationRemoved(e.ProfileId, e.PluginId);
+            break;
+        case AssociationChangeType.BatchAdded:
+            if (string.Equals(_currentProfileId, e.ProfileId, StringComparison.OrdinalIgnoreCase) && e.PluginIds != null)
+            {
+                foreach (var pluginId in e.PluginIds)
+                {
+                    HandleAssociationAdded(e.ProfileId, pluginId);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(e.PluginId) && e.ProfileIds != null)
+            {
+                foreach (var profileId in e.ProfileIds)
+                {
+                    HandleAssociationAdded(profileId, e.PluginId);
+                }
+            }
+            break;
+        case AssociationChangeType.BatchRemoved:
+            if (!string.IsNullOrWhiteSpace(e.PluginId) && e.ProfileIds != null)
+            {
+                foreach (var profileId in e.ProfileIds)
+                {
+                    HandleAssociationRemoved(profileId, e.PluginId);
+                }
+            }
+            break;
+        }
+    }
+
+    private void HandleAssociationAdded(string profileId, string pluginId)
+    {
+        if (string.IsNullOrWhiteSpace(profileId) || string.IsNullOrWhiteSpace(pluginId) ||
+            string.IsNullOrWhiteSpace(_currentProfileId) ||
+            !string.Equals(_currentProfileId, profileId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (_pluginAssociationManager.GetPluginEnabled(profileId, pluginId) == false)
+        {
+            Log("插件 {PluginId} 已关联到当前 Profile，但处于禁用状态，跳过动态加载", pluginId);
+            return;
+        }
+
+        Log("检测到插件 {PluginId} 已关联到当前 Profile，尝试动态加载...", pluginId);
+        EnablePlugin(profileId, pluginId);
+    }
+
+    private void HandleAssociationRemoved(string profileId, string pluginId)
+    {
+        if (string.IsNullOrWhiteSpace(profileId) || string.IsNullOrWhiteSpace(pluginId) ||
+            string.IsNullOrWhiteSpace(_currentProfileId) ||
+            !string.Equals(_currentProfileId, profileId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Log("检测到插件 {PluginId} 已从当前 Profile 移除，尝试动态卸载...", pluginId);
+        DisablePlugin(pluginId);
     }
 
 #endregion
@@ -833,6 +926,7 @@ public class PluginHost : IPluginHost, IDisposable
         if (disposing)
         {
             // 取消订阅事件
+            _pluginAssociationManager.AssociationChanged -= OnAssociationChanged;
             _pluginAssociationManager.PluginEnabledChanged -= OnPluginEnabledChanged;
             _pluginLibrary.PluginChanged -= OnPluginLibraryChanged;
 

@@ -869,6 +869,37 @@ public class ProfileMarketplaceService
     }
 
     /// <summary>
+    /// 检查所有已安装 Profile 的可用更新。
+    /// </summary>
+    public async Task<List<ProfileUpdateCheckResult>> CheckAllUpdatesAsync()
+    {
+        var availableProfiles = await FetchAvailableProfilesAsync();
+        var results = new List<ProfileUpdateCheckResult>();
+
+        foreach (var profile in availableProfiles)
+        {
+            var installedProfile = _profileManager.GetProfileById(profile.Id);
+            if (installedProfile == null)
+                continue;
+
+            var currentVersion = installedProfile.Version.ToString();
+            if (PluginLibrary.CompareVersions(currentVersion, profile.Version) >= 0)
+                continue;
+
+            results.Add(new ProfileUpdateCheckResult {
+                ProfileId = profile.Id,
+                ProfileName = profile.Name,
+                CurrentVersion = currentVersion,
+                AvailableVersion = profile.Version,
+                HasUpdate = true,
+                Profile = profile
+            });
+        }
+
+        return results;
+    }
+
+    /// <summary>
     /// 安装市场 Profile
     /// </summary>
     /// <param name="profile">市场 Profile</param>

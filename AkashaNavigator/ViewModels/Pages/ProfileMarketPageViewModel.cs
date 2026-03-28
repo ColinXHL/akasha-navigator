@@ -23,20 +23,25 @@ namespace AkashaNavigator.ViewModels.Pages
 public partial class MarketplaceProfileViewModel : ObservableObject
 {
     private readonly ProfileMarketplaceService _profileMarketplaceService;
+    private readonly IProfileManager _profileManager;
 
     public MarketplaceProfile Profile { get; }
     private bool _isInstalled;
+    private bool _hasUpdate;
+    private string? _availableVersion;
 
     /// <summary>
     /// DI容器注入的构造函数
     /// </summary>
-    public MarketplaceProfileViewModel(MarketplaceProfile profile, ProfileMarketplaceService profileMarketplaceService)
+    public MarketplaceProfileViewModel(MarketplaceProfile profile, ProfileMarketplaceService profileMarketplaceService,
+                                       IProfileManager profileManager)
     {
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
         _profileMarketplaceService =
             profileMarketplaceService ?? throw new ArgumentNullException(nameof(profileMarketplaceService));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
         // 初始化时检查安装状态
-        _isInstalled = _profileMarketplaceService.ProfileExists(profile.Id);
+        RefreshInstallState();
     }
 
     public string Id => Profile.Id;
@@ -82,16 +87,68 @@ public partial class MarketplaceProfileViewModel : ObservableObject
     /// 是否是已安装的默认 Profile（用于显示"已安装"标签）
     /// </summary>
     public bool IsDefaultAndInstalled => IsInstalled && IsDefaultProfile;
+
+    public bool HasUpdate
+    {
+        get => _hasUpdate;
+        set {
+            if (_hasUpdate != value)
+            {
+                _hasUpdate = value;
+                OnPropertyChanged(nameof(HasUpdate));
+                OnPropertyChanged(nameof(ShowInstallButton));
+                OnPropertyChanged(nameof(ShowUninstallButton));
+                OnPropertyChanged(nameof(UpdateTagText));
+            }
+        }
+    }
+
+    public string? AvailableVersion
+    {
+        get => _availableVersion;
+        set {
+            if (_availableVersion != value)
+            {
+                _availableVersion = value;
+                OnPropertyChanged(nameof(AvailableVersion));
+                OnPropertyChanged(nameof(UpdateTagText));
+            }
+        }
+    }
+
+    public bool ShowInstallButton => !IsInstalled;
+
+    public bool ShowUninstallButton => CanUninstall && !HasUpdate;
+
+    public string UpdateTagText => string.IsNullOrWhiteSpace(AvailableVersion) ? "可更新" : $"可更新 v{AvailableVersion}";
+
+    public void RefreshInstallState()
+    {
+        IsInstalled = _profileMarketplaceService.ProfileExists(Profile.Id);
+
+        var installedProfile = _profileManager.GetProfileById(Profile.Id);
+        if (installedProfile == null)
+        {
+            HasUpdate = false;
+            AvailableVersion = null;
+            return;
+        }
+
+        var hasUpdate = PluginLibrary.CompareVersions(installedProfile.Version.ToString(), Profile.Version) < 0;
+        HasUpdate = hasUpdate;
+        AvailableVersion = hasUpdate ? Profile.Version : null;
+    }
 }
 
 /// <summary>
 /// Profile 市场页面的 ViewModel
 /// 使用 CommunityToolkit.Mvvm 源生成器
 /// </summary>
-public partial class ProfileMarketPageViewModel : ObservableObject
+public partial class ProfileMarketPageViewModel : ObservableObject, IDisposable
 {
     private readonly ProfileMarketplaceService _profileMarketplaceService;
     private readonly IPluginLibrary _pluginLibrary;
+    private readonly IProfileManager _profileManager;
     private readonly INotificationService _notificationService;
     private readonly IEventBus _eventBus;
 
@@ -146,11 +203,13 @@ public partial class ProfileMarketPageViewModel : ObservableObject
     /// 构造函数
     /// </summary>
     public ProfileMarketPageViewModel(ProfileMarketplaceService profileMarketplaceService, IPluginLibrary pluginLibrary,
+                                      IProfileManager profileManager,
                                       INotificationService notificationService, IEventBus eventBus)
     {
         _profileMarketplaceService =
             profileMarketplaceService ?? throw new ArgumentNullException(nameof(profileMarketplaceService));
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
+        _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
 
@@ -166,7 +225,7 @@ public partial class ProfileMarketPageViewModel : ObservableObject
         // 刷新所有 Profile 的安装状态
         foreach (var vm in _allProfiles)
         {
-            vm.IsInstalled = _profileMarketplaceService.ProfileExists(vm.Id);
+            vm.RefreshInstallState();
         }
         // 重新过滤以更新 UI
         FilterProfiles();
@@ -233,7 +292,7 @@ public partial class ProfileMarketPageViewModel : ObservableObject
 
             // 转换为视图模型
             _allProfiles =
-                profiles.Select(p => new MarketplaceProfileViewModel(p, _profileMarketplaceService)).ToList();
+                profiles.Select(p => new MarketplaceProfileViewModel(p, _profileMarketplaceService, _profileManager)).ToList();
 
             // 应用过滤
             FilterProfiles();
@@ -301,7 +360,19 @@ public partial class ProfileMarketPageViewModel : ObservableObject
         if (vm == null)
             return;
 
-        await InstallProfileAsync(vm.Profile);
+        await InstallProfileAsync(vm.Profile, overwrite: false);
+    }
+
+    /// <summary>
+    /// 更新 Profile 命令（自动生成 UpdateCommand）
+    /// </summary>
+    [RelayCommand]
+    private async Task UpdateAsync(MarketplaceProfileViewModel? vm)
+    {
+        if (vm == null)
+            return;
+
+        await InstallProfileAsync(vm.Profile, overwrite: true);
     }
 
     /// <summary>
@@ -418,22 +489,32 @@ public partial class ProfileMarketPageViewModel : ObservableObject
     /// <summary>
     /// 安装 Profile
     /// </summary>
-    private async Task InstallProfileAsync(MarketplaceProfile profile)
+    private async Task InstallProfileAsync(MarketplaceProfile profile, bool overwrite)
     {
         // 检测缺失插件
         var missingPlugins = _profileMarketplaceService.GetMissingPlugins(profile);
 
         // 检查是否已存在
-        bool overwrite = false;
         if (_profileMarketplaceService.ProfileExists(profile.Id))
         {
-            var confirmed = await _notificationService.ConfirmAsync(
-                $"Profile \"{profile.Name}\" 已存在。\n\n是否覆盖现有 Profile？", "Profile 已存在");
+            if (!overwrite)
+            {
+                var confirmed = await _notificationService.ConfirmAsync(
+                    $"Profile \"{profile.Name}\" 已存在。\n\n是否覆盖现有 Profile？", "Profile 已存在");
 
-            if (!confirmed)
-                return;
+                if (!confirmed)
+                    return;
 
-            overwrite = true;
+                overwrite = true;
+            }
+            else
+            {
+                var confirmed = await _notificationService.ConfirmAsync(
+                    $"检测到 Profile \"{profile.Name}\" 有新版本 v{profile.Version}。\n\n是否立即覆盖更新现有 Profile？", "确认更新");
+
+                if (!confirmed)
+                    return;
+            }
         }
         else if (missingPlugins.Count > 0)
         {
@@ -461,7 +542,7 @@ public partial class ProfileMarketPageViewModel : ObservableObject
             var vm = _allProfiles.FirstOrDefault(p => p.Id == profile.Id);
             if (vm != null)
             {
-                vm.IsInstalled = _profileMarketplaceService.ProfileExists(profile.Id);
+                vm.RefreshInstallState();
             }
 
             // 刷新列表显示
@@ -470,18 +551,21 @@ public partial class ProfileMarketPageViewModel : ObservableObject
             // 通过 EventBus 通知其他页面刷新
             _eventBus.Publish(new ProfileListChangedEvent());
 
-            var successMessage = $"Profile \"{profile.Name}\" 安装成功！";
+            var successMessage = overwrite
+                ? $"Profile \"{profile.Name}\" 更新成功！"
+                : $"Profile \"{profile.Name}\" 安装成功！";
             if (installResult.MissingPlugins.Count > 0)
             {
                 successMessage +=
                     $"\n\n有 {installResult.MissingPlugins.Count} 个插件缺失，可以在「我的 Profile」页面点击「一键安装缺失插件」进行安装。";
             }
 
-            _notificationService.Success(successMessage, "安装成功");
+            _notificationService.Success(successMessage, overwrite ? "更新成功" : "安装成功");
         }
         else
         {
-            _notificationService.Error($"安装失败: {installResult.ErrorMessage}", "安装失败");
+            _notificationService.Error($"{(overwrite ? "更新" : "安装")}失败: {installResult.ErrorMessage}",
+                                       overwrite ? "更新失败" : "安装失败");
         }
     }
 
@@ -506,6 +590,11 @@ public partial class ProfileMarketPageViewModel : ObservableObject
     public InstalledPluginInfo? GetInstalledPluginInfo(string pluginId)
     {
         return _pluginLibrary.GetInstalledPluginInfo(pluginId);
+    }
+
+    public void Dispose()
+    {
+        _eventBus.Unsubscribe<ProfileListChangedEvent>(OnProfileListChanged);
     }
 }
 

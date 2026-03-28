@@ -19,7 +19,7 @@ namespace AkashaNavigator.ViewModels.Pages
 /// 我的 Profile 页面的 ViewModel
 /// 使用 CommunityToolkit.Mvvm 源生成器
 /// </summary>
-public partial class MyProfilesPageViewModel : ObservableObject
+public partial class MyProfilesPageViewModel : ObservableObject, IDisposable
 {
     private readonly IProfileManager _profileManager;
     private readonly IPluginAssociationManager _pluginAssociationManager;
@@ -103,6 +103,7 @@ public partial class MyProfilesPageViewModel : ObservableObject
 
         // 订阅 Profile 列表变化事件
         _eventBus.Subscribe<ProfileListChangedEvent>(OnProfileListChanged);
+        _eventBus.Subscribe<PluginListChangedEvent>(OnPluginListChanged);
     }
 
     /// <summary>
@@ -111,6 +112,14 @@ public partial class MyProfilesPageViewModel : ObservableObject
     private void OnProfileListChanged(ProfileListChangedEvent e)
     {
         RefreshProfileList();
+    }
+
+    /// <summary>
+    /// 插件列表变化事件处理
+    /// </summary>
+    private void OnPluginListChanged(PluginListChangedEvent e)
+    {
+        RefreshPluginList();
     }
 
     /// <summary>
@@ -127,6 +136,8 @@ public partial class MyProfilesPageViewModel : ObservableObject
     /// </summary>
     public void RefreshProfileList()
     {
+        var previouslySelectedProfileId = CurrentProfileId;
+
         // 重新加载 Profile 数据
         _profileManager.ReloadProfiles();
 
@@ -147,9 +158,17 @@ public partial class MyProfilesPageViewModel : ObservableObject
             Profiles.Add(vm);
         }
 
-        // 选中当前 Profile
+        // 尽量保留当前选中的 Profile，避免因插件状态刷新导致页面跳回当前运行中的 Profile
+        var selectedVm = !string.IsNullOrWhiteSpace(previouslySelectedProfileId)
+            ? viewModels.FirstOrDefault(vm => vm.Id.Equals(previouslySelectedProfileId, StringComparison.OrdinalIgnoreCase))
+            : null;
         var currentVm = viewModels.FirstOrDefault(vm => vm.IsCurrent);
-        if (currentVm != null)
+
+        if (selectedVm != null)
+        {
+            SelectedProfile = selectedVm;
+        }
+        else if (currentVm != null)
         {
             SelectedProfile = currentVm;
         }
@@ -741,5 +760,11 @@ public partial class MyProfilesPageViewModel : ObservableObject
     /// 打开插件设置请求事件（由 Code-behind 订阅）
     /// </summary>
     public event EventHandler<string?>? OpenPluginSettingsRequested;
+
+    public void Dispose()
+    {
+        _eventBus.Unsubscribe<ProfileListChangedEvent>(OnProfileListChanged);
+        _eventBus.Unsubscribe<PluginListChangedEvent>(OnPluginListChanged);
+    }
 }
 }

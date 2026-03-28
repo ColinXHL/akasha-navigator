@@ -17,7 +17,7 @@ namespace AkashaNavigator.ViewModels.Pages
 /// 已安装插件页面的 ViewModel
 /// 使用 CommunityToolkit.Mvvm 源生成器
 /// </summary>
-public partial class InstalledPluginsPageViewModel : ObservableObject
+public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposable
 {
     private readonly IPluginLibrary _pluginLibrary;
     private readonly IPluginAssociationManager _pluginAssociationManager;
@@ -67,12 +67,21 @@ public partial class InstalledPluginsPageViewModel : ObservableObject
 
         // 订阅插件列表变化事件
         _eventBus.Subscribe<PluginListChangedEvent>(OnPluginListChanged);
+        _eventBus.Subscribe<ProfileListChangedEvent>(OnProfileListChanged);
     }
 
     /// <summary>
     /// 插件列表变化事件处理
     /// </summary>
     private void OnPluginListChanged(PluginListChangedEvent e)
+    {
+        CheckAndRefreshPluginList();
+    }
+
+    /// <summary>
+    /// Profile 列表变化事件处理
+    /// </summary>
+    private void OnProfileListChanged(ProfileListChangedEvent e)
     {
         RefreshPluginList();
     }
@@ -209,7 +218,7 @@ public partial class InstalledPluginsPageViewModel : ObservableObject
         if (result.IsSuccess)
         {
             _notificationService.Show($"{pluginName} 已更新到 v{result.NewVersion}", NotificationType.Success);
-            RefreshPluginList();
+            CheckAndRefreshPluginList();
         }
         else
         {
@@ -248,5 +257,11 @@ public partial class InstalledPluginsPageViewModel : ObservableObject
     /// 卸载请求事件（由 Code-behind 订阅以显示对话框）
     /// </summary>
     public event EventHandler<string?>? UninstallRequested;
+
+    public void Dispose()
+    {
+        _eventBus.Unsubscribe<PluginListChangedEvent>(OnPluginListChanged);
+        _eventBus.Unsubscribe<ProfileListChangedEvent>(OnProfileListChanged);
+    }
 }
 }

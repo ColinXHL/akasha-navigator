@@ -71,7 +71,7 @@
                                         Padding="8,4"
                                         Width="156"
                                         MaxHeight="250">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer Style="{StaticResource DarkScrollViewer}" VerticalScrollBarVisibility="Auto">
                                         <ItemsControl ItemsSource="{Binding SearchResults}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>

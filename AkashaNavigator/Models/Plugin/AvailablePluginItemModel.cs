@@ -1,4 +1,5 @@
 using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AkashaNavigator.Models.Plugin
 {
@@ -6,7 +7,7 @@ namespace AkashaNavigator.Models.Plugin
     /// 可用插件项数据模型
     /// 用于 AvailablePluginsPage 的 ItemsControl 数据绑定
     /// </summary>
-    public class AvailablePluginItemModel
+    public partial class AvailablePluginItemModel : ObservableObject
     {
         /// <summary>
         /// 插件唯一标识
@@ -61,6 +62,7 @@ namespace AkashaNavigator.Models.Plugin
         /// <summary>
         /// 插件是否已安装
         /// </summary>
-        public bool IsInstalled { get; set; }
+        [ObservableProperty]
+        private bool _isInstalled;
     }
 }

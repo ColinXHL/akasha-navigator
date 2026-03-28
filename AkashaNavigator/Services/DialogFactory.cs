@@ -80,6 +80,16 @@ public class DialogFactory : IDialogFactory
     }
 
     /// <summary>
+    /// 创建 Profile 更新提示对话框（带 ViewModel）
+    /// </summary>
+    public ProfileUpdatePromptDialog CreateProfileUpdatePromptDialog(List<Models.Profile.ProfileUpdateCheckResult> updates)
+    {
+        var viewModel = _serviceProvider.GetRequiredService<ProfileUpdatePromptDialogViewModel>();
+        viewModel.Initialize(updates);
+        return new ProfileUpdatePromptDialog(viewModel);
+    }
+
+    /// <summary>
     /// 创建 BookmarkPopup（带 ViewModel）
     /// </summary>
     public BookmarkPopup CreateBookmarkPopup()

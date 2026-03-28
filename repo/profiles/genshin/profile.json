@@ -2,8 +2,8 @@
   "id": "genshin",
   "name": "原神",
   "icon": "🎮",
-  "version": 1,
-  "recommendedPlugins": ["genshin-direction-marker", "smart-cursor-detection"],
+  "version": 2,
+  "recommendedPlugins": ["genshin-direction-marker", "smart-cursor-detection", "bilibili-page-list"],
   "activation": {
     "processes": ["GenshinImpact", "YuanShen"],
     "autoSwitch": true

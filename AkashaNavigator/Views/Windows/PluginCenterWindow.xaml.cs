@@ -42,6 +42,8 @@ public partial class PluginCenterWindow : AnimatedWindow
                 UpdatePageVisibility(_viewModel.CurrentPage);
             }
         };
+
+        Closed += (_, _) => DisposePages();
     }
 
     /// <summary>
@@ -102,11 +104,27 @@ public partial class PluginCenterWindow : AnimatedWindow
     }
 
     /// <summary>
+    /// 公开方法供外部调用
+    /// </summary>
+    public void NavigateToProfileMarket()
+    {
+        _viewModel.NavigateToProfileMarketCommand.Execute(null);
+    }
+
+    /// <summary>
     /// 刷新当前页面
     /// </summary>
     public void RefreshCurrentPage()
     {
         _viewModel.RefreshCurrentPage();
+    }
+
+    private void DisposePages()
+    {
+        (_myProfilesPage as IDisposable)?.Dispose();
+        (_profileMarketPage as IDisposable)?.Dispose();
+        (_installedPluginsPage as IDisposable)?.Dispose();
+        (_availablePluginsPage as IDisposable)?.Dispose();
     }
 }
 }

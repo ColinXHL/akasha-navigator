@@ -13,11 +13,12 @@ namespace AkashaNavigator.Views.Pages
 /// <summary>
 /// Profile 市场页面 - 浏览和安装市场 Profile
 /// </summary>
-public partial class ProfileMarketPage : System.Windows.Controls.UserControl
+public partial class ProfileMarketPage : System.Windows.Controls.UserControl, IDisposable
 {
     private readonly ProfileMarketPageViewModel _viewModel;
     private readonly IDialogFactory _dialogFactory;
     private readonly Func<MarketplaceProfileDetailDialogViewModel> _detailDialogViewModelFactory;
+    private bool _disposed;
 
     /// <summary>
     /// DI容器注入的构造函数
@@ -70,7 +71,14 @@ public partial class ProfileMarketPage : System.Windows.Controls.UserControl
         dialog.Owner = Window.GetWindow(this);
         if (dialog.ShowDialog() == true && dialog.ShouldInstall)
         {
-            _ = _viewModel.InstallCommand.ExecuteAsync(vm);
+            if (dialog.Action == MarketplaceProfileDetailAction.Update)
+            {
+                _ = _viewModel.UpdateCommand.ExecuteAsync(vm);
+            }
+            else
+            {
+                _ = _viewModel.InstallCommand.ExecuteAsync(vm);
+            }
         }
     }
 
@@ -103,6 +111,18 @@ public partial class ProfileMarketPage : System.Windows.Controls.UserControl
 
         args.Confirmed = true;
         args.SelectedPluginIds = dialog.SelectedPluginIds;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _viewModel.ManageSourcesRequested -= OnManageSourcesRequested;
+        _viewModel.ShowProfileDetailsRequested -= OnShowProfileDetailsRequested;
+        _viewModel.UninstallProfileRequested -= OnUninstallProfileRequested;
+        _viewModel.Dispose();
+        _disposed = true;
     }
 }
 }
