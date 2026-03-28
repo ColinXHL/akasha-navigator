@@ -122,6 +122,9 @@ WebView2Data/
 # Release packages
 *.zip
 
+# Local planning notes
+TODO.md
+
 #kiro
 .kiro/*
 
