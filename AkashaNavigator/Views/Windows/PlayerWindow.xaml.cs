@@ -388,6 +388,26 @@ public partial class PlayerWindow : Window
                         _subtitleService.HandleSubtitleMessage(message);
                         return;
                     }
+
+                    if (type == "playback_state_debug")
+                    {
+                        var debugMessage = doc.RootElement.TryGetProperty("message", out var msgEl)
+                            ? msgEl.GetString() ?? string.Empty
+                            : string.Empty;
+
+                        var debugUrl = doc.RootElement.TryGetProperty("url", out var urlEl)
+                            ? urlEl.GetString() ?? string.Empty
+                            : string.Empty;
+
+                        var debugData = doc.RootElement.TryGetProperty("data", out var dataEl)
+                            ? dataEl.GetRawText()
+                            : "null";
+
+                        _logService.Debug(nameof(PlayerWindow),
+                                          "PlaybackStateDebug: {DebugMessage}, Url={Url}, Data={Data}",
+                                          debugMessage, debugUrl, debugData);
+                        return;
+                    }
                 }
             }
             catch
@@ -425,6 +445,8 @@ public partial class PlayerWindow : Window
     {
         // 通知 ViewModel 导航完成
         _viewModel.OnNavigationCompleted(e.IsSuccess);
+
+        _ = TriggerPlaybackStateRestoreHintAsync();
 
         // 发布导航状态变化事件
         _eventBus.Publish(new NavigationStateChangedEvent { CanGoBack = CanGoBack, CanGoForward = CanGoForward });
@@ -670,6 +692,31 @@ public partial class PlayerWindow : Window
         catch (Exception ex)
         {
             _logService.Error(nameof(PlayerWindow), ex, "TogglePlayAsync failed");
+        }
+    }
+
+    private async Task TriggerPlaybackStateRestoreHintAsync()
+    {
+        if (WebView.CoreWebView2 == null)
+            return;
+
+        const string script = @"
+            (function() {
+                try {
+                    window.dispatchEvent(new CustomEvent('akasha:navigation-completed'));
+                } catch (_) {
+                }
+            })();
+        ";
+
+        try
+        {
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "PlaybackStateRestoreHint", 1200);
+        }
+        catch (Exception ex)
+        {
+            _logService.Debug(nameof(PlayerWindow), "TriggerPlaybackStateRestoreHintAsync failed: {ErrorMessage}",
+                              ex.Message);
         }
     }
 

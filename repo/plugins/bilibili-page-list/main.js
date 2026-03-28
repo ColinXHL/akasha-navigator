@@ -367,6 +367,21 @@ function showOverlay() {
 }
 
 /**
+ * 在需要时根据当前 URL 同步分P信息
+ * @returns {boolean} 是否成功拿到分P列表
+ */
+function ensurePageListReady() {
+    var currentUrl = player.getUrl();
+    if (!currentUrl || currentUrl === 'about:blank') {
+        log.info('播放器尚未就绪，无法同步分P信息');
+        return false;
+    }
+
+    onUrlChanged(currentUrl);
+    return !!(state.pageList && state.pageList.length > 0);
+}
+
+/**
  * 从页面同步弹幕开关状态（最佳努力）
  */
 function syncDanmakuStateFromPage() {
@@ -596,6 +611,14 @@ function renderPageList() {
 // 分P导航模块
 // ============================================================================
 
+function emitGlobalPlaybackSnapshotHint() {
+    try {
+        webview.injectScript("(function(){try{window.dispatchEvent(new CustomEvent('akasha:save-playback-state'));}catch(e){}})();");
+    } catch (e) {
+        log.debug('发送全局播放状态快照提示失败（忽略）: ' + e.message);
+    }
+}
+
 /**
  * 导航到指定分P
  * @param {number} page - 目标分P页码
@@ -645,6 +668,9 @@ function navigateToPage(page) {
         var title = pageItem.part || ('P' + page);
         osd.show('P' + page + '/' + state.pageList.length + ': ' + title, '▶️');
     }
+
+    // 提示全局状态管理器在 URL 切换前先保存一次播放状态
+    emitGlobalPlaybackSnapshotHint();
     
     // 导航到新页面
     player.navigate(navUrl);
@@ -654,7 +680,18 @@ function navigateToPage(page) {
  * 跳转到下一个分P
  */
 function goToNextPage() {
-    if (!state.pageList || state.pageList.length <= 1) {
+    if (!state.pageList || state.pageList.length === 0) {
+        log.info('分P列表为空，尝试在快捷键触发时同步加载');
+        if (!ensurePageListReady()) {
+            log.info('分P列表同步失败，无法切换');
+            if (typeof osd !== 'undefined') {
+                osd.show('无法获取分P信息', '⚠️');
+            }
+            return;
+        }
+    }
+
+    if (state.pageList.length <= 1) {
         log.info('无分P列表或只有一个分P，无法切换');
         if (typeof osd !== 'undefined') {
             osd.show('没有更多分P', '⚠️');
@@ -680,7 +717,18 @@ function goToNextPage() {
  * 跳转到上一个分P
  */
 function goToPreviousPage() {
-    if (!state.pageList || state.pageList.length <= 1) {
+    if (!state.pageList || state.pageList.length === 0) {
+        log.info('分P列表为空，尝试在快捷键触发时同步加载');
+        if (!ensurePageListReady()) {
+            log.info('分P列表同步失败，无法切换');
+            if (typeof osd !== 'undefined') {
+                osd.show('无法获取分P信息', '⚠️');
+            }
+            return;
+        }
+    }
+
+    if (state.pageList.length <= 1) {
         log.info('无分P列表或只有一个分P，无法切换');
         if (typeof osd !== 'undefined') {
             osd.show('没有更多分P', '⚠️');
@@ -736,6 +784,11 @@ function onUrlChanged(url) {
     
     // 如果是同一个视频，只更新页码
     if (state.currentVideoId === parseResult.videoId) {
+        if (!state.pageList || state.pageList.length === 0) {
+            log.info('同一视频但分P列表为空，尝试重新获取');
+            state.pageList = fetchPageList(parseResult.videoId, parseResult.videoIdType);
+        }
+
         if (state.isVisible) {
             renderPageList();
             refreshActionButtons();

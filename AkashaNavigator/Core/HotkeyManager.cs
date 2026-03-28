@@ -5,6 +5,7 @@ using AkashaNavigator.Models.Config;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Services;
 using Serilog;
+using System.Windows.Threading;
 
 namespace AkashaNavigator.Core
 {
@@ -21,13 +22,16 @@ public class HotkeyManager
     private AppConfig _config = null!;
     private Action<string, string?>? _showOsdAction;
 
-    // 节流相关字段
     private DateTime _lastSeekTime = DateTime.MinValue;
-    private int _throttledCount = 0;
-    private DateTime _lastThrottleWarningTime = DateTime.MinValue;
+    private int _pendingSeekDeltaSeconds;
+    private readonly DispatcherTimer _seekFlushTimer;
     private const int SeekThrottleMs = 200;
-    private const int ThrottleWarningThreshold = 10; // 1秒内被节流10次时显示警告
-    private const int ThrottleWarningCooldownMs = 3000; // 警告冷却时间3秒
+
+    public HotkeyManager()
+    {
+        _seekFlushTimer = new DispatcherTimer();
+        _seekFlushTimer.Tick += OnSeekFlushTimerTick;
+    }
 
     /// <summary>
     /// 初始化 HotkeyManager
@@ -103,41 +107,17 @@ public class HotkeyManager
         _hotkeyService.SeekBackward += (s, e) =>
         {
             Logger.Debug("SeekBackward event received, _playerWindow is null: {IsNull}", _playerWindow == null);
-            
-            // 节流检查
-            var now = DateTime.Now;
-            if ((now - _lastSeekTime).TotalMilliseconds < SeekThrottleMs)
-            {
-                Logger.Debug("SeekBackward throttled (elapsed={ElapsedMs}ms)", (now - _lastSeekTime).TotalMilliseconds);
-                HandleThrottledOperation(now);
-                return;
-            }
-            _lastSeekTime = now;
-            _throttledCount = 0; // 重置节流计数
-            
+
             var seconds = _config.SeekSeconds;
-            _playerWindow?.SeekAsync(-seconds);
-            ShowOsd($"-{seconds}s", "⏪");
+            HandleSeekRequest(-seconds);
         };
 
         _hotkeyService.SeekForward += (s, e) =>
         {
             Logger.Debug("SeekForward event received, _playerWindow is null: {IsNull}", _playerWindow == null);
-            
-            // 节流检查
-            var now = DateTime.Now;
-            if ((now - _lastSeekTime).TotalMilliseconds < SeekThrottleMs)
-            {
-                Logger.Debug("SeekForward throttled (elapsed={ElapsedMs}ms)", (now - _lastSeekTime).TotalMilliseconds);
-                HandleThrottledOperation(now);
-                return;
-            }
-            _lastSeekTime = now;
-            _throttledCount = 0; // 重置节流计数
-            
+
             var seconds = _config.SeekSeconds;
-            _playerWindow?.SeekAsync(seconds);
-            ShowOsd($"+{seconds}s", "⏩");
+            HandleSeekRequest(seconds);
         };
 
         _hotkeyService.TogglePlay += (s, e) =>
@@ -264,25 +244,54 @@ public class HotkeyManager
         _showOsdAction?.Invoke(message, icon);
     }
 
-    /// <summary>
-    /// 处理被节流的操作
-    /// </summary>
-    private void HandleThrottledOperation(DateTime now)
+    private void HandleSeekRequest(int deltaSeconds)
     {
-        _throttledCount++;
+        if (deltaSeconds == 0)
+            return;
 
-        // 如果在短时间内被节流次数过多，显示警告
-        if (_throttledCount >= ThrottleWarningThreshold)
+        _pendingSeekDeltaSeconds += deltaSeconds;
+
+        var now = DateTime.Now;
+        var elapsedMs = (now - _lastSeekTime).TotalMilliseconds;
+
+        if (elapsedMs >= SeekThrottleMs)
         {
-            // 检查是否在冷却时间内
-            if ((now - _lastThrottleWarningTime).TotalMilliseconds > ThrottleWarningCooldownMs)
-            {
-                Logger.Warning("操作过快，已触发节流保护 (ThrottledCount={ThrottledCount})", _throttledCount);
-                ShowOsd("操作过快，请稍候", "⚠");
-                _lastThrottleWarningTime = now;
-                _throttledCount = 0; // 重置计数
-            }
+            FlushPendingSeek(now);
+            return;
         }
+
+        var remainingMs = SeekThrottleMs - elapsedMs;
+        ScheduleSeekFlush(remainingMs);
+    }
+
+    private void ScheduleSeekFlush(double delayMs)
+    {
+        var normalizedDelayMs = Math.Max(1, (int)Math.Ceiling(delayMs));
+        _seekFlushTimer.Interval = TimeSpan.FromMilliseconds(normalizedDelayMs);
+        _seekFlushTimer.Stop();
+        _seekFlushTimer.Start();
+    }
+
+    private void OnSeekFlushTimerTick(object? sender, EventArgs e)
+    {
+        _seekFlushTimer.Stop();
+        FlushPendingSeek(DateTime.Now);
+    }
+
+    private void FlushPendingSeek(DateTime now)
+    {
+        if (_pendingSeekDeltaSeconds == 0)
+            return;
+
+        var deltaSeconds = _pendingSeekDeltaSeconds;
+        _pendingSeekDeltaSeconds = 0;
+        _lastSeekTime = now;
+
+        _playerWindow?.SeekAsync(deltaSeconds);
+
+        var icon = deltaSeconds > 0 ? "⏩" : "⏪";
+        var sign = deltaSeconds > 0 ? "+" : string.Empty;
+        ShowOsd($"{sign}{deltaSeconds}s", icon);
     }
 
     /// <summary>
@@ -290,6 +299,8 @@ public class HotkeyManager
     /// </summary>
     public void Dispose()
     {
+        _seekFlushTimer.Stop();
+        _seekFlushTimer.Tick -= OnSeekFlushTimerTick;
         _hotkeyService?.Dispose();
         _hotkeyService = null;
     }
