@@ -472,11 +472,7 @@ function showOverlay() {
     panel.setHeader('分P列表 (' + state.pageList.length + ')', '单击条目可快速跳转');
     var danmakuSynced = syncDanmakuStateFromPage();
     if (!danmakuSynced) {
-        log.warn('显示面板取消：无法获取弹幕状态');
-        if (typeof osd !== 'undefined') {
-            osd.show('弹幕状态未就绪，请稍后再试', '⚠️');
-        }
-        return;
+        log.warn('无法获取弹幕状态，继续显示分P面板');
     }
 
     syncSubtitleStateFromPage();
