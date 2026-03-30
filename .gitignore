@@ -134,3 +134,8 @@ CLAUDE.md
 
 #dev-docs
 .dev-docs/*
+
+# Python stress scripts
+scripts/__pycache__/
+scripts/*.log
+scripts/stress_log.txt
