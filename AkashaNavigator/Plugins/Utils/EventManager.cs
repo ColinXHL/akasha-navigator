@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using Microsoft.ClearScript;
 
@@ -22,6 +23,9 @@ public class EventManager
 
     // 存储订阅 ID 到事件名的映射，用于快速查找
     private readonly Dictionary<int, string> _subscriptionToEvent;
+    private readonly object _slowLogLock = new object();
+    private readonly Dictionary<string, long> _slowCallbackNextLogAtMs;
+    private const int SlowCallbackLogCooldownMs = 5000;
 
 #endregion
 
@@ -60,6 +64,7 @@ public class EventManager
     {
         _listeners = new Dictionary<string, Dictionary<int, dynamic>>(StringComparer.OrdinalIgnoreCase);
         _subscriptionToEvent = new Dictionary<int, string>();
+        _slowCallbackNextLogAtMs = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
     }
 
 #endregion
@@ -105,7 +110,7 @@ public class EventManager
             _subscriptionToEvent[subscriptionId] = eventName;
 
             Services.LogService.Instance.Debug(
-                "EventManager", "Registered listener for '{EventName}' with subscription ID {SubscriptionId}",
+                nameof(EventManager), "Registered listener for '{EventName}' with subscription ID {SubscriptionId}",
                 eventName, subscriptionId);
 
             return subscriptionId;
@@ -131,7 +136,7 @@ public class EventManager
             if (!_subscriptionToEvent.TryGetValue(subscriptionId, out var eventName))
             {
                 Services.LogService.Instance.Debug(
-                    "EventManager", "Off() called with unknown subscription ID {SubscriptionId}", subscriptionId);
+                    nameof(EventManager), "Off() called with unknown subscription ID {SubscriptionId}", subscriptionId);
                 return false;
             }
 
@@ -142,7 +147,7 @@ public class EventManager
                 {
                     _subscriptionToEvent.Remove(subscriptionId);
                     Services.LogService.Instance.Debug(
-                        "EventManager",
+                        nameof(EventManager),
                         "Removed listener with subscription ID {SubscriptionId} from event '{EventName}'",
                         subscriptionId, eventName);
                     return true;
@@ -223,6 +228,7 @@ public class EventManager
             try
             {
                 var callback = kvp.Value;
+                var callbackStartedAt = Stopwatch.GetTimestamp();
 
                 // 调用回调，传递事件数据
                 if (data != null)
@@ -232,6 +238,15 @@ public class EventManager
                 else
                 {
                     callback();
+                }
+
+                var callbackElapsedMs = Stopwatch.GetElapsedTime(callbackStartedAt).TotalMilliseconds;
+                if (callbackElapsedMs >= AppConstants.PluginEventSlowCallbackWarnMs &&
+                    ShouldLogSlowCallback(eventName, kvp.Key, Environment.TickCount64))
+                {
+                    Services.LogService.Instance.Warn(nameof(EventManager),
+                                                      "Slow event callback detected (Event={EventName}, SubscriptionId={SubscriptionId}, ElapsedMs={ElapsedMs:F1})",
+                                                      eventName, kvp.Key, callbackElapsedMs);
                 }
 
                 invokedCount++;
@@ -249,7 +264,24 @@ public class EventManager
         if (invokedCount > 0)
         {
             Services.LogService.Instance.Debug(
-                "EventManager", "Emitted event '{EventName}' to {InvokedCount} listeners", eventName, invokedCount);
+                nameof(EventManager), "Emitted event '{EventName}' to {InvokedCount} listeners", eventName,
+                invokedCount);
+        }
+    }
+
+    private bool ShouldLogSlowCallback(string eventName, int subscriptionId, long nowMs)
+    {
+        var key = $"{eventName}:{subscriptionId}";
+
+        lock (_slowLogLock)
+        {
+            if (_slowCallbackNextLogAtMs.TryGetValue(key, out var nextLogAtMs) && nowMs < nextLogAtMs)
+            {
+                return false;
+            }
+
+            _slowCallbackNextLogAtMs[key] = nowMs + SlowCallbackLogCooldownMs;
+            return true;
         }
     }
 
@@ -266,6 +298,10 @@ public class EventManager
         {
             _listeners.Clear();
             _subscriptionToEvent.Clear();
+            lock (_slowLogLock)
+            {
+                _slowCallbackNextLogAtMs.Clear();
+            }
             Services.LogService.Instance.Debug(nameof(EventManager), "Cleared all listeners");
         }
     }

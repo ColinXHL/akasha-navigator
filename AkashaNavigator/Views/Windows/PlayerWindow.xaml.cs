@@ -74,6 +74,11 @@ public partial class PlayerWindow : Window
     /// 视频时间同步定时器
     /// </summary>
     private DispatcherTimer? _videoTimeSyncTimer;
+    private bool _isVideoTimeSyncInFlight;
+    private int _videoTimeSyncSkippedCount;
+    private DateTime _lastSeekBurstUtc = DateTime.MinValue;
+    private bool _playbackRestoreHintDeferred;
+    private static readonly TimeSpan SeekBurstWindow = TimeSpan.FromMilliseconds(800);
 
     /// <summary>
     /// 当前播放速率
@@ -664,7 +669,7 @@ public partial class PlayerWindow : Window
     /// <summary>
     /// 切换视频播放/暂停
     /// </summary>
-    public async void TogglePlayAsync()
+    public async Task TogglePlayAsync()
     {
         if (WebView.CoreWebView2 == null)
             return;
@@ -687,7 +692,8 @@ public partial class PlayerWindow : Window
 
         try
         {
-            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "TogglePlay");
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "TogglePlay", 1200,
+                                            priority: ScriptExecutionQueue.ScriptExecutionPriority.High);
         }
         catch (Exception ex)
         {
@@ -696,6 +702,17 @@ public partial class PlayerWindow : Window
     }
 
     private async Task TriggerPlaybackStateRestoreHintAsync()
+    {
+        if (IsSeekBurstActive())
+        {
+            _playbackRestoreHintDeferred = true;
+            return;
+        }
+
+        await TriggerPlaybackStateRestoreHintCoreAsync();
+    }
+
+    private async Task TriggerPlaybackStateRestoreHintCoreAsync()
     {
         if (WebView.CoreWebView2 == null)
             return;
@@ -711,7 +728,9 @@ public partial class PlayerWindow : Window
 
         try
         {
-            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "PlaybackStateRestoreHint", 1200);
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "PlaybackStateRestoreHint", 1200,
+                                            priority: ScriptExecutionQueue.ScriptExecutionPriority.Normal,
+                                            coalesceKey: "playback-restore-hint");
         }
         catch (Exception ex)
         {
@@ -724,10 +743,12 @@ public partial class PlayerWindow : Window
     /// 视频快进/倒退
     /// </summary>
     /// <param name="seconds">秒数，正数前进，负数倒退</param>
-    public async void SeekAsync(int seconds)
+    public async Task SeekAsync(int seconds)
     {
         if (WebView.CoreWebView2 == null)
             return;
+
+        MarkSeekBurst();
 
         string script = $@"
                 (function() {{
@@ -742,7 +763,9 @@ public partial class PlayerWindow : Window
 
         try
         {
-            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, $"Seek({seconds}s)");
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, $"Seek({seconds}s)", 1200,
+                                            priority: ScriptExecutionQueue.ScriptExecutionPriority.High,
+                                            coalesceKey: "seek");
         }
         catch (Exception ex)
         {
@@ -868,7 +891,9 @@ public partial class PlayerWindow : Window
 
         try
         {
-            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, $"SetPlaybackRate({rate})");
+            await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, $"SetPlaybackRate({rate})", 1200,
+                                            priority: ScriptExecutionQueue.ScriptExecutionPriority.High,
+                                            coalesceKey: "playback-rate");
         }
         catch (Exception ex)
         {
@@ -1056,6 +1081,51 @@ public partial class PlayerWindow : Window
         if (WebView.CoreWebView2 == null)
             return;
 
+        if (IsSeekBurstActive())
+        {
+            _videoTimeSyncSkippedCount++;
+            return;
+        }
+
+        if (_playbackRestoreHintDeferred)
+        {
+            _playbackRestoreHintDeferred = false;
+            await TriggerPlaybackStateRestoreHintCoreAsync();
+        }
+
+        // 避免重入：上一次同步未完成时直接跳过
+        if (_isVideoTimeSyncInFlight)
+        {
+            _videoTimeSyncSkippedCount++;
+            if (_videoTimeSyncSkippedCount % 50 == 0)
+            {
+                _logService.Warn(nameof(PlayerWindow),
+                                 "VideoTimeSync skipped due to in-flight execution (SkippedCount={SkippedCount})",
+                                 _videoTimeSyncSkippedCount);
+            }
+            return;
+        }
+
+        // 队列拥塞时主动退避，优先保障用户交互类脚本
+        if (_scriptQueue.IsBacklogged(AppConstants.VideoTimeSyncQueueBackpressureThreshold))
+        {
+            _videoTimeSyncSkippedCount++;
+            if (_videoTimeSyncSkippedCount % 50 == 0)
+            {
+                _logService.Warn(nameof(PlayerWindow),
+                                 "VideoTimeSync skipped due to script queue pressure (SkippedCount={SkippedCount}, Queue={Queued})",
+                                 _videoTimeSyncSkippedCount, _scriptQueue.QueuedCount);
+            }
+            if (_videoTimeSyncTimer != null &&
+                _videoTimeSyncTimer.Interval.TotalMilliseconds < AppConstants.VideoTimeSyncBackoffIntervalMs)
+            {
+                _videoTimeSyncTimer.Interval = TimeSpan.FromMilliseconds(AppConstants.VideoTimeSyncBackoffIntervalMs);
+            }
+            return;
+        }
+
+        _isVideoTimeSyncInFlight = true;
+
         try
         {
             // 使用 JavaScript 获取视频当前时间和总时长
@@ -1072,7 +1142,21 @@ public partial class PlayerWindow : Window
                     })();
                 ";
 
-            var result = await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "VideoTimeSync", 2000);
+            var result = await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "VideoTimeSync", 2000,
+                                                         priority: ScriptExecutionQueue.ScriptExecutionPriority.Low,
+                                                         coalesceKey: "video-time-sync");
+
+            // 同步恢复后回到常规频率
+            if (_videoTimeSyncTimer != null &&
+                _videoTimeSyncTimer.Interval.TotalMilliseconds != AppConstants.VideoTimeSyncIntervalMs)
+            {
+                _videoTimeSyncTimer.Interval = TimeSpan.FromMilliseconds(AppConstants.VideoTimeSyncIntervalMs);
+            }
+
+            if (_videoTimeSyncSkippedCount > 0)
+            {
+                _videoTimeSyncSkippedCount = 0;
+            }
 
             // 解析结果（去除 JSON 字符串的引号）
             if (!string.IsNullOrEmpty(result) && result != "\"null\"" && result != "null")
@@ -1103,6 +1187,20 @@ public partial class PlayerWindow : Window
         {
             _logService.Error(nameof(PlayerWindow), ex, "VideoTimeSyncTimer_Tick failed");
         }
+        finally
+        {
+            _isVideoTimeSyncInFlight = false;
+        }
+    }
+
+    private void MarkSeekBurst()
+    {
+        _lastSeekBurstUtc = DateTime.UtcNow;
+    }
+
+    private bool IsSeekBurstActive()
+    {
+        return DateTime.UtcNow - _lastSeekBurstUtc < SeekBurstWindow;
     }
 
 #endregion

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
@@ -26,6 +27,8 @@ public class HotkeyManager
     private int _pendingSeekDeltaSeconds;
     private readonly DispatcherTimer _seekFlushTimer;
     private const int SeekThrottleMs = 200;
+    private readonly Dictionary<string, DateTime> _lastActionTime = new(StringComparer.OrdinalIgnoreCase);
+    private const int ToggleActionDebounceMs = 180;
 
     public HotkeyManager()
     {
@@ -122,8 +125,11 @@ public class HotkeyManager
 
         _hotkeyService.TogglePlay += (s, e) =>
         {
+            if (IsActionDebounced(ActionDispatcher.ActionTogglePlay, ToggleActionDebounceMs))
+                return;
+
             Logger.Debug("TogglePlay event received, _playerWindow is null: {IsNull}", _playerWindow == null);
-            _playerWindow?.TogglePlayAsync();
+            _ = _playerWindow?.TogglePlayAsync();
             ShowOsd("播放/暂停", "⏯");
         };
 
@@ -173,6 +179,9 @@ public class HotkeyManager
 
         _hotkeyService.ToggleMaximize += (s, e) =>
         {
+            if (IsActionDebounced(ActionDispatcher.ActionToggleMaximize, ToggleActionDebounceMs))
+                return;
+
             _playerWindow?.ToggleMaximize();
             var msg = _playerWindow?.IsMaximized == true ? "窗口: 最大化" : "窗口: 还原";
             ShowOsd(msg, "🔲");
@@ -244,6 +253,21 @@ public class HotkeyManager
         _showOsdAction?.Invoke(message, icon);
     }
 
+    private bool IsActionDebounced(string actionName, int debounceMs)
+    {
+        var now = DateTime.Now;
+        if (_lastActionTime.TryGetValue(actionName, out var lastTime))
+        {
+            if ((now - lastTime).TotalMilliseconds < debounceMs)
+            {
+                return true;
+            }
+        }
+
+        _lastActionTime[actionName] = now;
+        return false;
+    }
+
     private void HandleSeekRequest(int deltaSeconds)
     {
         if (deltaSeconds == 0)
@@ -287,7 +311,7 @@ public class HotkeyManager
         _pendingSeekDeltaSeconds = 0;
         _lastSeekTime = now;
 
-        _playerWindow?.SeekAsync(deltaSeconds);
+        _ = _playerWindow?.SeekAsync(deltaSeconds);
 
         var icon = deltaSeconds > 0 ? "⏩" : "⏪";
         var sign = deltaSeconds > 0 ? "+" : string.Empty;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -27,6 +28,15 @@ public class HotkeyService : IDisposable
 
     private HotkeyConfig _config;
     private readonly ActionDispatcher _dispatcher;
+    private readonly object _pressedLock = new();
+    private readonly HashSet<uint> _pressedKeyboardKeys = new();
+    private readonly HashSet<uint> _pressedMouseButtons = new();
+    private readonly Dictionary<uint, long> _nextKeyboardRepeatAllowed = new();
+    private readonly Dictionary<uint, long> _nextMouseRepeatAllowed = new();
+    private const int DefaultRepeatDispatchIntervalMs = 90;
+    private const int SeekRepeatDispatchIntervalMs = 25;
+    private const int OpacityRepeatDispatchIntervalMs = 60;
+    private const int PlaybackRateRepeatDispatchIntervalMs = 80;
 
     /// <summary>暂停热键的动作名称</summary>
     public const string ActionSuspendHotkeys = "SuspendHotkeys";
@@ -196,6 +206,14 @@ public class HotkeyService : IDisposable
         }
 
         _isStarted = false;
+
+        lock (_pressedLock)
+        {
+            _pressedKeyboardKeys.Clear();
+            _pressedMouseButtons.Clear();
+            _nextKeyboardRepeatAllowed.Clear();
+            _nextMouseRepeatAllowed.Clear();
+        }
     }
 
     /// <summary>
@@ -315,6 +333,11 @@ public class HotkeyService : IDisposable
                 return;
             }
 
+            if (!ShouldDispatchKeyboard(vkCode, binding.Action))
+            {
+                return;
+            }
+
             // 在 UI 线程上执行动作
             System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
                                                                        {
@@ -326,8 +349,8 @@ public class HotkeyService : IDisposable
                                                                            }
 
                                                                            Serilog.Log.Information("OnKeyDown: Dispatching action {Action}", binding.Action);
-                                                                           _dispatcher.Dispatch(binding.Action);
-                                                                       });
+                                                                            _dispatcher.Dispatch(binding.Action);
+                                                                        });
         }
     }
 
@@ -337,7 +360,12 @@ public class HotkeyService : IDisposable
     private void OnKeyUp(object? sender, System.Windows.Forms.KeyEventArgs e)
     {
         // 不设置 Handled，让事件继续传递
-        // 目前不需要处理 KeyUp 事件
+        var vkCode = (uint)e.KeyCode;
+        lock (_pressedLock)
+        {
+            _pressedKeyboardKeys.Remove(vkCode);
+            _nextKeyboardRepeatAllowed.Remove(vkCode);
+        }
     }
 
     /// <summary>
@@ -383,6 +411,11 @@ public class HotkeyService : IDisposable
                 return;
             }
 
+            if (!ShouldDispatchMouse(mouseButton, binding.Action))
+            {
+                return;
+            }
+
             // 在 UI 线程上执行动作
             System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
                                                                        {
@@ -390,8 +423,8 @@ public class HotkeyService : IDisposable
                                                                            if (IsInputMode())
                                                                                return;
 
-                                                                           _dispatcher.Dispatch(binding.Action);
-                                                                       });
+                                                                            _dispatcher.Dispatch(binding.Action);
+                                                                        });
         }
     }
 
@@ -401,7 +434,22 @@ public class HotkeyService : IDisposable
     private void OnMouseUp(object? sender, MouseEventExtArgs e)
     {
         // 不设置 Handled，让事件继续传递
-        // 目前不需要处理 MouseUp 事件
+        if (e.Button == System.Windows.Forms.MouseButtons.XButton1)
+        {
+            lock (_pressedLock)
+            {
+                _pressedMouseButtons.Remove(MouseButtonCodes.XButton1);
+                _nextMouseRepeatAllowed.Remove(MouseButtonCodes.XButton1);
+            }
+        }
+        else if (e.Button == System.Windows.Forms.MouseButtons.XButton2)
+        {
+            lock (_pressedLock)
+            {
+                _pressedMouseButtons.Remove(MouseButtonCodes.XButton2);
+                _nextMouseRepeatAllowed.Remove(MouseButtonCodes.XButton2);
+            }
+        }
     }
 
 #endregion
@@ -419,6 +467,91 @@ public class HotkeyService : IDisposable
         // 检查焦点元素是否为输入控件
         return focusedElement is TextBox || focusedElement is PasswordBox || focusedElement is RichTextBox ||
                focusedElement is TextBoxBase || focusedElement is ComboBox { IsEditable : true };
+    }
+
+    private bool ShouldDispatchKeyboard(uint vkCode, string actionName)
+    {
+        lock (_pressedLock)
+        {
+            return ShouldDispatchCore(vkCode, actionName, _pressedKeyboardKeys, _nextKeyboardRepeatAllowed);
+        }
+    }
+
+    private bool ShouldDispatchMouse(uint mouseButton, string actionName)
+    {
+        lock (_pressedLock)
+        {
+            return ShouldDispatchCore(mouseButton, actionName, _pressedMouseButtons, _nextMouseRepeatAllowed);
+        }
+    }
+
+    private static bool ShouldDispatchCore(uint key, string actionName, HashSet<uint> pressedKeys,
+                                           Dictionary<uint, long> nextRepeatAllowed)
+    {
+        var nowMs = Environment.TickCount64;
+
+        if (!pressedKeys.Contains(key))
+        {
+            pressedKeys.Add(key);
+            nextRepeatAllowed[key] = nowMs + GetRepeatIntervalMs(actionName);
+            return true;
+        }
+
+        if (!IsRepeatableAction(actionName))
+        {
+            return false;
+        }
+
+        if (!nextRepeatAllowed.TryGetValue(key, out var nextAllowedMs) || nowMs >= nextAllowedMs)
+        {
+            nextRepeatAllowed[key] = nowMs + GetRepeatIntervalMs(actionName);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsRepeatableAction(string actionName)
+    {
+        if (string.IsNullOrWhiteSpace(actionName))
+            return false;
+
+        if (actionName.StartsWith("Plugin:", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return !string.Equals(actionName, ActionDispatcher.ActionTogglePlay, StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(actionName, ActionDispatcher.ActionToggleClickThrough,
+                              StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(actionName, ActionDispatcher.ActionToggleMaximize, StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(actionName, ActionDispatcher.ActionResetOpacity, StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(actionName, ActionDispatcher.ActionResetPlaybackRate,
+                              StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(actionName, ActionDispatcher.ActionToggleWindowVisibility,
+                              StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(actionName, ActionDispatcher.ActionSuspendHotkeys, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int GetRepeatIntervalMs(string actionName)
+    {
+        if (string.Equals(actionName, ActionDispatcher.ActionSeekForward, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(actionName, ActionDispatcher.ActionSeekBackward, StringComparison.OrdinalIgnoreCase))
+        {
+            return SeekRepeatDispatchIntervalMs;
+        }
+
+        if (string.Equals(actionName, ActionDispatcher.ActionDecreaseOpacity, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(actionName, ActionDispatcher.ActionIncreaseOpacity, StringComparison.OrdinalIgnoreCase))
+        {
+            return OpacityRepeatDispatchIntervalMs;
+        }
+
+        if (string.Equals(actionName, ActionDispatcher.ActionIncreasePlaybackRate, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(actionName, ActionDispatcher.ActionDecreasePlaybackRate, StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackRateRepeatDispatchIntervalMs;
+        }
+
+        return DefaultRepeatDispatchIntervalMs;
     }
 
 #endregion

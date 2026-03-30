@@ -158,6 +158,10 @@
         const STATE_TTL_MS = 2 * 60 * 60 * 1000;
         const RESTORE_MAX_ATTEMPTS = 20;
         const RESTORE_INTERVAL_MS = 220;
+        const RESTORE_REASON_THROTTLE_MS = {
+            'video-canplay': 700,
+            'video-playing': 700
+        };
 
         // Keep this list short and explicit.
         // Add more entries later when we want to enable state restore for other sites.
@@ -190,6 +194,27 @@
         let lastObservedMode = null;
         let lastObservedRate = null;
         let activeRestoreTarget = null;
+
+        function getRestoreReasonThrottleMs(reason) {
+            if (!reason) {
+                return 0;
+            }
+
+            return Number(RESTORE_REASON_THROTTLE_MS[reason]) || 0;
+        }
+
+        function isSameRestoreTarget(left, right) {
+            if (!left || !right) {
+                return false;
+            }
+
+            const leftMode = String(left.fullscreenMode || 'none');
+            const rightMode = String(right.fullscreenMode || 'none');
+            const leftRate = Number(left.playbackRate) || 1.0;
+            const rightRate = Number(right.playbackRate) || 1.0;
+
+            return leftMode === rightMode && approxEqual(leftRate, rightRate);
+        }
 
         function postPlaybackDebug(message, data) {
             try {
@@ -849,6 +874,27 @@
                 return;
             }
 
+            const reasonText = String(reason || 'unknown');
+            const reasonThrottleMs = getRestoreReasonThrottleMs(reasonText);
+            const nowMs = Date.now();
+            if (reasonThrottleMs > 0) {
+                if (!scheduleRestore._lastReasonTimestamps) {
+                    scheduleRestore._lastReasonTimestamps = Object.create(null);
+                }
+
+                const lastReasonTs = Number(scheduleRestore._lastReasonTimestamps[reasonText]) || 0;
+                if (lastReasonTs > 0 && (nowMs - lastReasonTs) < reasonThrottleMs) {
+                    postPlaybackDebug('scheduleRestore-throttled', {
+                        reason: reasonText,
+                        elapsedMs: nowMs - lastReasonTs,
+                        throttleMs: reasonThrottleMs
+                    });
+                    return;
+                }
+
+                scheduleRestore._lastReasonTimestamps[reasonText] = nowMs;
+            }
+
             let snapshot = activeRestoreTarget || readPendingSnapshot();
             let fallbackToLatestRate = false;
             let applyGlobalRate = false;
@@ -881,11 +927,29 @@
                 return;
             }
 
+            if (restoreTimer && activeRestoreTarget && isSameRestoreTarget(activeRestoreTarget, snapshot)) {
+                postPlaybackDebug('scheduleRestore-reuse-active', {
+                    reason: reasonText,
+                    attempts: restoreAttempts,
+                    mode: activeRestoreTarget.fullscreenMode,
+                    rate: activeRestoreTarget.playbackRate
+                });
+                return;
+            }
+
             if (!activeRestoreTarget) {
                 activeRestoreTarget = snapshot;
                 clearPendingSnapshot();
                 postPlaybackDebug('scheduleRestore-acquire-pending', {
                     reason: reason,
+                    targetMode: snapshot.fullscreenMode,
+                    targetRate: snapshot.playbackRate
+                });
+            }
+            else if (!isSameRestoreTarget(activeRestoreTarget, snapshot)) {
+                activeRestoreTarget = snapshot;
+                postPlaybackDebug('scheduleRestore-replace-target', {
+                    reason: reasonText,
                     targetMode: snapshot.fullscreenMode,
                     targetRate: snapshot.playbackRate
                 });

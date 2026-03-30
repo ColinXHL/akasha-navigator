@@ -2,8 +2,10 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using AkashaNavigator.Helpers;
 using AkashaNavigator.Services;
 using AkashaNavigator.Views.Windows;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Plugins.Apis
 {
@@ -23,6 +25,7 @@ public class WebViewApi
 
     private readonly string _pluginId;
     private readonly Func<PlayerWindow?>? _getPlayerWindow;
+    private ScriptExecutionQueue? _scriptQueue;
     private const int ExecuteScriptSyncTimeoutMs = 350;
 
 #endregion
@@ -175,11 +178,23 @@ public class WebViewApi
                 return null;
             }
 
-            // 在 UI 线程执行
-            string? result = null;
-            await Application.Current.Dispatcher.InvokeAsync(
-                async () =>
-                { result = await playerWindow.WebView.CoreWebView2.ExecuteScriptAsync(script); });
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return null;
+
+            string? result;
+            if (dispatcher.CheckAccess())
+            {
+                result = await ExecuteScriptViaQueueAsync(playerWindow, script, $"PluginExecuteScript:{_pluginId}");
+            }
+            else
+            {
+                result = await dispatcher
+                               .InvokeAsync(() => ExecuteScriptViaQueueAsync(playerWindow, script,
+                                                                             $"PluginExecuteScript:{_pluginId}"))
+                               .Task
+                               .Unwrap();
+            }
 
             // 解析结果
             return ParseScriptResult(result);
@@ -219,34 +234,19 @@ public class WebViewApi
             if (dispatcher == null)
                 return null;
 
+            var executeTask = ExecuteScript(script);
+
             if (dispatcher.CheckAccess())
             {
-                var uiTask = playerWindow.WebView.CoreWebView2.ExecuteScriptAsync(script);
-                if (!WaitTaskOnUiThread(uiTask, dispatcher, ExecuteScriptSyncTimeoutMs))
+                if (!WaitTaskOnUiThread(executeTask, dispatcher, ExecuteScriptSyncTimeoutMs))
                 {
                     LogService.Instance.Warn("Plugin:{PluginId}",
                                              "WebViewApi.ExecuteScriptSync timeout on UI thread ({TimeoutMs}ms)",
                                              _pluginId, ExecuteScriptSyncTimeoutMs);
                     return null;
                 }
-
-                if (uiTask.IsCompletedSuccessfully)
-                {
-                    return ParseScriptResult(uiTask.Result);
-                }
-
-                LogService.Instance.Warn("Plugin:{PluginId}",
-                                         "WebViewApi.ExecuteScriptSync failed on UI thread",
-                                         _pluginId);
-                return null;
             }
-
-            var executeTask = dispatcher
-                              .InvokeAsync(() => playerWindow.WebView.CoreWebView2.ExecuteScriptAsync(script))
-                              .Task
-                              .Unwrap();
-
-            if (!executeTask.Wait(ExecuteScriptSyncTimeoutMs))
+            else if (!executeTask.Wait(ExecuteScriptSyncTimeoutMs))
             {
                 LogService.Instance.Warn("Plugin:{PluginId}",
                                          "WebViewApi.ExecuteScriptSync timeout ({TimeoutMs}ms)",
@@ -254,9 +254,15 @@ public class WebViewApi
                 return null;
             }
 
-            var result = executeTask.Result;
+            if (!executeTask.IsCompletedSuccessfully)
+            {
+                LogService.Instance.Warn("Plugin:{PluginId}",
+                                         "WebViewApi.ExecuteScriptSync failed",
+                                         _pluginId);
+                return null;
+            }
 
-            return ParseScriptResult(result);
+            return executeTask.Result;
         }
         catch (Exception ex)
         {
@@ -366,10 +372,33 @@ public class WebViewApi
                                                         case "immediate":
                                                         default:
                                                             // 立即执行
-                                                            await webView.ExecuteScriptAsync(script);
+                                                            await ExecuteScriptViaQueueAsync(playerWindow, script,
+                                                                                             $"PluginInjectScript:{_pluginId}");
                                                             break;
                                                         }
                                                     });
+    }
+
+    private async Task<string?> ExecuteScriptViaQueueAsync(PlayerWindow playerWindow, string script, string scriptName)
+    {
+        var webView = playerWindow.WebView?.CoreWebView2;
+        if (webView == null)
+            return null;
+
+        var scriptQueue = GetScriptQueue();
+        if (scriptQueue == null)
+        {
+            return await webView.ExecuteScriptAsync(script);
+        }
+
+        return await scriptQueue.ExecuteAsync(webView, script, scriptName,
+                                              priority: ScriptExecutionQueue.ScriptExecutionPriority.Normal);
+    }
+
+    private ScriptExecutionQueue? GetScriptQueue()
+    {
+        _scriptQueue ??= App.Services?.GetService<ScriptExecutionQueue>();
+        return _scriptQueue;
     }
 
     /// <summary>

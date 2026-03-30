@@ -93,7 +93,7 @@ public class PlayerApi
     /// </summary>
     public void play()
     {
-        _getPlayerWindow?.Invoke()?.TogglePlayAsync();
+        _ = _getPlayerWindow?.Invoke()?.TogglePlayAsync();
         _eventManager?.Emit(EventManager.PlayStateChanged, new { playing = true });
     }
 
@@ -102,7 +102,7 @@ public class PlayerApi
     /// </summary>
     public void pause()
     {
-        _getPlayerWindow?.Invoke()?.TogglePlayAsync();
+        _ = _getPlayerWindow?.Invoke()?.TogglePlayAsync();
         _eventManager?.Emit(EventManager.PlayStateChanged, new { playing = false });
     }
 
@@ -110,7 +110,7 @@ public class PlayerApi
     /// 跳转到指定时间
     /// </summary>
     /// <param name="time">目标时间（秒）</param>
-    public void seek(double time) => _getPlayerWindow?.Invoke()?.SeekAsync((int)time);
+    public void seek(double time) => _ = _getPlayerWindow?.Invoke()?.SeekAsync((int)time);
 
     /// <summary>
     /// 设置音量

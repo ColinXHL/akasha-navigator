@@ -68,7 +68,32 @@ public static class AppConstants
     /// <summary>
     /// 视频时间同步间隔（毫秒）
     /// </summary>
-    public const int VideoTimeSyncIntervalMs = 200;
+    public const int VideoTimeSyncIntervalMs = 400;
+
+    /// <summary>
+    /// 视频时间同步在拥塞时的退避间隔（毫秒）
+    /// </summary>
+    public const int VideoTimeSyncBackoffIntervalMs = 800;
+
+    /// <summary>
+    /// 脚本队列拥塞阈值（达到后跳过本次时间同步）
+    /// </summary>
+    public const int VideoTimeSyncQueueBackpressureThreshold = 2;
+
+    /// <summary>
+    /// 向插件广播 timeUpdate 的最小间隔（毫秒）
+    /// </summary>
+    public const int PluginTimeUpdateMinIntervalMs = 300;
+
+    /// <summary>
+    /// timeUpdate 强制广播阈值（秒，超过该跳变值时无视限频）
+    /// </summary>
+    public const double PluginTimeUpdateForceDeltaSeconds = 1.0;
+
+    /// <summary>
+    /// 插件事件回调慢调用告警阈值（毫秒）
+    /// </summary>
+    public const int PluginEventSlowCallbackWarnMs = 30;
 
 #endregion
 

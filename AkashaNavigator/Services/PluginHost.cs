@@ -81,6 +81,9 @@ public class PluginHost : IPluginHost, IDisposable
     private readonly List<PluginContext> _loadedPlugins = new();
     private readonly Dictionary<string, PluginConfig> _pluginConfigs = new();
     private readonly Dictionary<string, PluginApi> _pluginApis = new();
+    private DateTime _lastTimeUpdateBroadcastUtc = DateTime.MinValue;
+    private double _lastBroadcastCurrentTime = double.NaN;
+    private double _lastBroadcastDuration = double.NaN;
     private string? _currentProfileId;
     private bool _disposed;
 
@@ -339,6 +342,24 @@ public class PluginHost : IPluginHost, IDisposable
     /// <param name="duration">总时长（秒）</param>
     public void BroadcastTimeUpdate(double currentTime, double duration)
     {
+        var nowUtc = DateTime.UtcNow;
+        var elapsedMs = (nowUtc - _lastTimeUpdateBroadcastUtc).TotalMilliseconds;
+
+        var hasSignificantJump = double.IsNaN(_lastBroadcastCurrentTime) ||
+                                 Math.Abs(currentTime - _lastBroadcastCurrentTime) >=
+                                 AppConstants.PluginTimeUpdateForceDeltaSeconds ||
+                                 Math.Abs(duration - _lastBroadcastDuration) >=
+                                 AppConstants.PluginTimeUpdateForceDeltaSeconds;
+
+        if (!hasSignificantJump && elapsedMs < AppConstants.PluginTimeUpdateMinIntervalMs)
+        {
+            return;
+        }
+
+        _lastTimeUpdateBroadcastUtc = nowUtc;
+        _lastBroadcastCurrentTime = currentTime;
+        _lastBroadcastDuration = duration;
+
         BroadcastEvent(EventManager.TimeUpdate, new { currentTime, duration });
     }
 
