@@ -154,6 +154,7 @@
     const PlaybackStateManager = (function () {
         const STORAGE_KEY_PREFIX = 'akasha:playback-state:v1';
         const PENDING_STORAGE_KEY_PREFIX = 'akasha:playback-pending:v1';
+        const GLOBAL_RATE_KEY_PREFIX = 'akasha:playback-global-rate:v1';
         const STATE_TTL_MS = 2 * 60 * 60 * 1000;
         const RESTORE_MAX_ATTEMPTS = 20;
         const RESTORE_INTERVAL_MS = 220;
@@ -214,6 +215,92 @@
 
         function getPendingStorageKey() {
             return PENDING_STORAGE_KEY_PREFIX + ':' + window.location.hostname;
+        }
+
+        function getGlobalRateKey() {
+            return GLOBAL_RATE_KEY_PREFIX + ':' + window.location.hostname;
+        }
+
+        function readGlobalRateSnapshot() {
+            const key = getGlobalRateKey();
+
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) {
+                    return null;
+                }
+
+                const parsed = JSON.parse(raw);
+                if (!parsed || typeof parsed !== 'object') {
+                    return null;
+                }
+
+                const rate = Number(parsed.playbackRate) || 1.0;
+                const updatedAt = Number(parsed.updatedAt) || 0;
+                if (rate <= 0 || !updatedAt || Date.now() - updatedAt > STATE_TTL_MS) {
+                    return null;
+                }
+
+                return {
+                    playbackRate: rate,
+                    updatedAt: updatedAt
+                };
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function readGlobalRate() {
+            const snapshot = readGlobalRateSnapshot();
+            return snapshot ? snapshot.playbackRate : 1.0;
+        }
+
+        function shouldSkipGlobalRateOverwrite(targetRate, reason) {
+            const previousRate = readGlobalRate();
+            const isDowngradeToDefault = approxEqual(targetRate, 1.0) && previousRate > 1.0;
+            if (!isDowngradeToDefault) {
+                return false;
+            }
+
+            const transientReasons = {
+                'pushState': true,
+                'replaceState': true,
+                'beforeunload': true,
+                'pagehide': true,
+                'video-loadedmetadata': true,
+                'video-playing': true,
+                'mode-poll': true,
+                'rate-poll': true
+            };
+
+            return !!transientReasons[String(reason || '')];
+        }
+
+        function saveGlobalRate(rate, reason) {
+            const normalizedRate = Number(rate) || 1.0;
+            if (normalizedRate <= 0) {
+                return;
+            }
+
+            if (shouldSkipGlobalRateOverwrite(normalizedRate, reason)) {
+                postPlaybackDebug('skipGlobalRateOverwrite', {
+                    reason: reason,
+                    targetRate: normalizedRate,
+                    currentGlobalRate: readGlobalRate()
+                });
+                return;
+            }
+
+            const payload = {
+                playbackRate: normalizedRate,
+                updatedAt: Date.now()
+            };
+
+            try {
+                localStorage.setItem(getGlobalRateKey(), JSON.stringify(payload));
+            } catch (_) {
+                // Ignore quota/storage failures.
+            }
         }
 
         function isRuleMatched(rule) {
@@ -425,9 +512,33 @@
             return 'none';
         }
 
-        function buildSnapshot(modeOverride) {
+        function pickStablePlaybackRate(currentRate, fallbackSnapshot) {
+            const rate = Number(currentRate) || 1.0;
+            if (!fallbackSnapshot || typeof fallbackSnapshot !== 'object') {
+                return rate;
+            }
+
+            const fallbackRate = Number(fallbackSnapshot.playbackRate) || 1.0;
+            const fallbackUpdatedAt = Number(fallbackSnapshot.updatedAt) || 0;
+            const fallbackIsFresh = fallbackUpdatedAt > 0 && (Date.now() - fallbackUpdatedAt) <= 15000;
+
+            // Some sites briefly reset the next-part video element to 1.0x during route switch.
+            // If we just had a fresh non-1.0 rate, keep that value for the handoff snapshot.
+            if (fallbackIsFresh && approxEqual(rate, 1.0) && fallbackRate > 1.0) {
+                return fallbackRate;
+            }
+
+            return rate;
+        }
+
+        function buildSnapshot(modeOverride, fallbackSnapshot) {
             const video = getVideoElement();
-            const playbackRate = video && typeof video.playbackRate === 'number' ? video.playbackRate : 1.0;
+            const rawPlaybackRate = video && typeof video.playbackRate === 'number' ? video.playbackRate : 1.0;
+            let playbackRate = pickStablePlaybackRate(rawPlaybackRate, fallbackSnapshot);
+            const globalRate = readGlobalRate();
+            if (approxEqual(playbackRate, 1.0) && globalRate > 0) {
+                playbackRate = globalRate;
+            }
             const mode = modeOverride || getFullscreenMode();
 
             return {
@@ -438,27 +549,28 @@
             };
         }
 
-        function saveSnapshot(reason, modeOverride) {
+        function saveSnapshot(reason, modeOverride, fallbackSnapshot) {
             if (!isTargetSite()) {
                 return;
             }
 
             try {
-                const snapshot = buildSnapshot(modeOverride);
+                const snapshot = buildSnapshot(modeOverride, fallbackSnapshot);
                 sessionStorage.setItem(getStorageKey(), JSON.stringify(snapshot));
+                saveGlobalRate(snapshot.playbackRate, reason);
                 console.log('[SandronePlayer] Playback state saved:', reason, snapshot);
             } catch (err) {
                 console.warn('[SandronePlayer] Failed to save playback state:', err);
             }
         }
 
-        function savePendingSnapshot(reason, modeOverride) {
+        function savePendingSnapshot(reason, modeOverride, fallbackSnapshot) {
             if (!isTargetSite()) {
                 return;
             }
 
             try {
-                const snapshot = buildSnapshot(modeOverride);
+                const snapshot = buildSnapshot(modeOverride, fallbackSnapshot);
                 sessionStorage.setItem(getPendingStorageKey(), JSON.stringify(snapshot));
                 postPlaybackDebug('savePendingSnapshot', {
                     reason: reason,
@@ -737,7 +849,33 @@
                 return;
             }
 
-            const snapshot = activeRestoreTarget || readPendingSnapshot();
+            let snapshot = activeRestoreTarget || readPendingSnapshot();
+            let fallbackToLatestRate = false;
+            let applyGlobalRate = false;
+            if (!snapshot) {
+                const latestSnapshot = readSnapshot();
+                if (latestSnapshot) {
+                    snapshot = {
+                        playbackRate: latestSnapshot.playbackRate,
+                        fullscreenMode: 'none',
+                        href: latestSnapshot.href,
+                        updatedAt: latestSnapshot.updatedAt
+                    };
+                    fallbackToLatestRate = true;
+                }
+            }
+
+            const globalRate = readGlobalRate();
+            if (snapshot && globalRate > 0 && !approxEqual(snapshot.playbackRate, globalRate)) {
+                snapshot = {
+                    playbackRate: globalRate,
+                    fullscreenMode: snapshot.fullscreenMode,
+                    href: snapshot.href,
+                    updatedAt: snapshot.updatedAt
+                };
+                applyGlobalRate = true;
+            }
+
             if (!snapshot) {
                 postPlaybackDebug('scheduleRestore-skip-no-snapshot', { reason: reason });
                 return;
@@ -755,6 +893,8 @@
 
             postPlaybackDebug('scheduleRestore-start', {
                 reason: reason,
+                fallbackToLatestRate: fallbackToLatestRate,
+                applyGlobalRate: applyGlobalRate,
                 targetMode: snapshot.fullscreenMode,
                 targetRate: snapshot.playbackRate
             });
@@ -829,9 +969,10 @@
             try {
                 const originalPushState = history.pushState;
                 history.pushState = function () {
+                    const previousSnapshot = readSnapshot();
                     const result = originalPushState.apply(this, arguments);
-                    saveSnapshot('pushState');
-                    savePendingSnapshot('pushState');
+                    saveSnapshot('pushState', null, previousSnapshot);
+                    savePendingSnapshot('pushState', null, previousSnapshot);
                     return result;
                 };
 

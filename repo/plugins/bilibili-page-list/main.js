@@ -44,7 +44,8 @@ function parseUrl(url) {
         isBilibili: false,
         videoId: null,
         videoIdType: null,
-        currentPage: 1
+        currentPage: 1,
+        hasPageParam: false
     };
     
     if (!url || typeof url !== 'string') {
@@ -74,7 +75,11 @@ function parseUrl(url) {
     // 提取分P参数
     var pageMatch = url.match(/[?&]p=(\d+)/);
     if (pageMatch) {
-        result.currentPage = parseInt(pageMatch[1], 10);
+        var parsedPage = parseInt(pageMatch[1], 10);
+        if (parsedPage > 0) {
+            result.currentPage = parsedPage;
+            result.hasPageParam = true;
+        }
     }
     
     return result;
@@ -111,6 +116,124 @@ function fetchPageList(videoId, idType) {
     }
     
     return parseApiResponse(response);
+}
+
+/**
+ * 尝试从页面状态/DOM读取当前分P（用于URL未及时更新时兜底）
+ * @returns {number} 当前分P，失败返回 0
+ */
+function detectCurrentPageFromPageState() {
+    try {
+        var result = webview.executeScriptSync("(function(){" +
+            "var readFromUrl=function(){" +
+                "try{" +
+                    "var m=String(location.href||'').match(/[?&]p=(\\d+)/);" +
+                    "if(m&&m[1]){" +
+                        "var n=parseInt(m[1],10);" +
+                        "if(n>0) return n;" +
+                    "}" +
+                "}catch(_){}" +
+                "return 0;" +
+            "};" +
+            "var readFromInitialState=function(){" +
+                "try{" +
+                    "var st=window.__INITIAL_STATE__||null;" +
+                    "if(!st) return 0;" +
+                    "if(typeof st.p==='number'&&st.p>0) return st.p;" +
+                    "if(st.videoData&&typeof st.videoData.p==='number'&&st.videoData.p>0) return st.videoData.p;" +
+                    "var pages=(st.videoData&&st.videoData.pages&&st.videoData.pages.length)?st.videoData.pages:null;" +
+                    "if(!pages) return 0;" +
+                    "var cid=0;" +
+                    "try{" +
+                        "if(window.player&&typeof window.player.getVideoMessage==='function'){" +
+                            "var msg=window.player.getVideoMessage();" +
+                            "cid=msg&&msg.cid?parseInt(msg.cid,10):0;" +
+                        "}" +
+                    "}catch(_){cid=0;}" +
+                    "if(cid>0){" +
+                        "for(var i=0;i<pages.length;i++){" +
+                            "var item=pages[i]||{};" +
+                            "if(parseInt(item.cid,10)===cid){" +
+                                "var page=item.page||item.id||(i+1);" +
+                                "page=parseInt(page,10);" +
+                                "return page>0?page:(i+1);" +
+                            "}" +
+                        "}" +
+                    "}" +
+                "}catch(_){}" +
+                "return 0;" +
+            "};" +
+            "var readFromDom=function(){" +
+                "try{" +
+                    "var activeSelectors=[" +
+                        "'.multi-page .on'," +
+                        "'.multi-page .active'," +
+                        "'.video-pod__list .active'," +
+                        "'.list-box li.on'," +
+                        "'.list-box li.active'," +
+                        "'.video-episode-card__item.active'" +
+                    "];" +
+                    "for(var i=0;i<activeSelectors.length;i++){" +
+                        "var node=document.querySelector(activeSelectors[i]);" +
+                        "if(!node) continue;" +
+                        "var pageAttr=node.getAttribute('data-page')||node.getAttribute('data-index')||'';" +
+                        "if(pageAttr){" +
+                            "var attrNum=parseInt(pageAttr,10);" +
+                            "if(attrNum>0) return attrNum;" +
+                        "}" +
+                        "var text=String(node.textContent||'');" +
+                        "var m=text.match(/(?:^|\\s)P\\s*(\\d+)(?:\\s|$)/i)||text.match(/(\\d+)/);" +
+                        "if(m&&m[1]){" +
+                            "var t=parseInt(m[1],10);" +
+                            "if(t>0) return t;" +
+                        "}" +
+                    "}" +
+                "}catch(_){}" +
+                "return 0;" +
+            "};" +
+            "var v=readFromUrl();" +
+            "if(v>0) return String(v);" +
+            "v=readFromInitialState();" +
+            "if(v>0) return String(v);" +
+            "v=readFromDom();" +
+            "if(v>0) return String(v);" +
+            "return '';" +
+        "})();");
+
+        if (typeof result === 'number') {
+            return result > 0 ? result : 0;
+        }
+
+        if (typeof result === 'string') {
+            var page = parseInt(result, 10);
+            return page > 0 ? page : 0;
+        }
+    } catch (e) {
+        log.debug('从页面状态读取当前分P失败（忽略）: ' + e.message);
+    }
+
+    return 0;
+}
+
+/**
+ * 在 URL 无法准确反映当前播放分P时，尝试同步 currentPage
+ */
+function syncCurrentPageFromPageState() {
+    var detectedPage = detectCurrentPageFromPageState();
+    if (detectedPage <= 0) {
+        return;
+    }
+
+    if (state.pageList && state.pageList.length > 0) {
+        if (detectedPage > state.pageList.length) {
+            detectedPage = state.pageList.length;
+        }
+    }
+
+    if (detectedPage !== state.currentPage) {
+        log.info('同步当前分P: ' + state.currentPage + ' -> ' + detectedPage);
+        state.currentPage = detectedPage;
+    }
 }
 
 /**
@@ -699,6 +822,7 @@ function goToNextPage() {
         return;
     }
     
+    syncCurrentPageFromPageState();
     var nextPage = state.currentPage + 1;
     
     // 检查是否到达边界
@@ -736,6 +860,7 @@ function goToPreviousPage() {
         return;
     }
     
+    syncCurrentPageFromPageState();
     var prevPage = state.currentPage - 1;
     
     // 检查是否到达边界
@@ -776,8 +901,12 @@ function onUrlChanged(url) {
         return;
     }
     
-    // 更新当前页码
-    state.currentPage = parseResult.currentPage;
+    // 更新当前页码（URL 没有 p 参数时，尝试从页面状态兜底）
+    if (parseResult.hasPageParam) {
+        state.currentPage = parseResult.currentPage;
+    } else {
+        syncCurrentPageFromPageState();
+    }
     if (state.pendingNavigationPage === parseResult.currentPage) {
         state.pendingNavigationPage = 0;
     }
