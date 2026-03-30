@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\assets\icons\akasha-navigator.ico</ApplicationIcon>
-    <Version>1.1.0-alpha.8</Version>
+    <Version>1.1.0-alpha.9</Version>
   </PropertyGroup>
 
   <ItemGroup>
