@@ -96,6 +96,30 @@ jobs:
           # 可选：删除无用文件
           Get-ChildItem ".\dist\AkashaNavigator" -Recurse -Include *.pdb,*.lib | Remove-Item -Force
 
+      - name: 📥 Download kachina-builder
+        # 先生成本地 updater，确保便携包内自带 AkashaNavigator.update.exe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download `
+            --repo YuehaiTeam/kachina-installer `
+            --pattern "kachina-builder.exe" `
+            --dir .
+
+      - name: ⚙️ Generate updater executable
+        # 生成 dist/AkashaNavigator/AkashaNavigator.update.exe，然后再打 7z
+        shell: pwsh
+        run: |
+          .\kachina-builder.exe pack `
+            -c .\Build\kachina.config.json `
+            -o .\dist\AkashaNavigator\AkashaNavigator.update.exe
+
+          if (!(Test-Path ".\dist\AkashaNavigator\AkashaNavigator.update.exe")) {
+            Write-Error "AkashaNavigator.update.exe 生成失败"
+            exit 1
+          }
+
       - name: 📦 Pack 7z
         run: |
           cd dist

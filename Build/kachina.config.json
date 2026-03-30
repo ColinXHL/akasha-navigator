@@ -1,6 +1,11 @@
 {
   "source": [
     {
+      "id": "cnb",
+      "name": "CNB",
+      "uri": "https://cnb.cool/AkashaNavigator/akasha-navigator/-/releases/download/v${version}/AkashaNavigator.Install.${version}.exe"
+    },
+    {
       "id": "github",
       "name": "GitHub",
       "uri": "https://github.com/ColinXHL/AkashaNavigator/releases/download/v${version}/AkashaNavigator.Install.${version}.exe"
