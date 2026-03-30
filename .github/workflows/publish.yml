@@ -178,7 +178,8 @@ jobs:
             -m metadata.json `
             -o hashed `
             -r ColinXHL/akasha-navigator `
-            -t ${{ needs.validate.outputs.version }}
+            -t ${{ needs.validate.outputs.version }} `
+            -u .\AkashaNavigator\AkashaNavigator.update.exe
           
           Write-Host "hashed 目录内容："
           Get-ChildItem hashed -Recurse | ForEach-Object { Write-Host $_.FullName }
