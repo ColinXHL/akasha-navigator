@@ -152,6 +152,20 @@ public static class AppConstants
     /// </summary>
     public const string DefaultHomeUrl = "https://www.bilibili.com";
 
+    /// <summary>
+    /// 应用更新公告 URL
+    /// </summary>
+    public const string NoticeJsonUrl = "http://tcpwurlnx.hn-bkt.clouddn.com/notice.json";
+
+#endregion
+
+#region Updater
+
+    /// <summary>
+    /// 更新程序文件名
+    /// </summary>
+    public const string UpdaterFileName = "AkashaNavigator.update.exe";
+
 #endregion
 
 #region File Names

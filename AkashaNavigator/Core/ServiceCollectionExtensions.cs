@@ -63,6 +63,9 @@ public static class ServiceCollectionExtensions
         // ConfigService（依赖LogService）
         services.AddSingleton<IConfigService, ConfigService>();
 
+        // AppUpdateService（依赖LogService）
+        services.AddSingleton<IAppUpdateService, AppUpdateService>();
+
         // NotificationService（依赖LogService + Func<IDialogFactory>延迟解析）
         services.AddSingleton<INotificationService>(
             sp =>
