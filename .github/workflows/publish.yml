@@ -167,21 +167,90 @@ jobs:
           Write-Host "下载后文件列表："
           Get-ChildItem -Recurse | Where-Object { $_.Name -like "*kachina-builder*" } | ForEach-Object { Write-Host $_.FullName }
 
+      - name: 📥 Download previous package for diff
+        id: prepare_diff
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo = "ColinXHL/akasha-navigator"
+          $currentVersion = "${{ needs.validate.outputs.version }}"
+          $currentAssetName = "AkashaNavigator_v${currentVersion}.7z"
+
+          $releases = (gh api "repos/$repo/releases?per_page=30") | ConvertFrom-Json
+          $targetAsset = $null
+
+          foreach ($release in $releases) {
+            if ($release.draft) {
+              continue
+            }
+
+            foreach ($asset in $release.assets) {
+              if ($asset.name -like "AkashaNavigator_v*.7z" -and $asset.name -ne $currentAssetName) {
+                $targetAsset = $asset
+                break
+              }
+            }
+
+            if ($null -ne $targetAsset) {
+              break
+            }
+          }
+
+          if ($null -eq $targetAsset) {
+            Write-Host "未找到可用历史 7z 包，跳过 diff-vers"
+            "diff_dir=" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            exit 0
+          }
+
+          New-Item -ItemType Directory -Path ".\dist\previous" -Force | Out-Null
+          gh release download `
+            --repo $repo `
+            --pattern $targetAsset.name `
+            --dir ".\dist\previous" `
+            --clobber
+
+          Push-Location ".\dist\previous"
+          7z x $targetAsset.name
+          Pop-Location
+
+          if (Test-Path ".\dist\previous\AkashaNavigator") {
+            "diff_dir=.\\previous\\AkashaNavigator" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "使用历史版本做差分：.\\dist\\previous\\AkashaNavigator"
+          }
+          else {
+            Write-Host "历史包解压后未找到 AkashaNavigator 目录，跳过 diff-vers"
+            "diff_dir=" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
       - name: 🧰 Generate hashed directory for packing
         shell: pwsh
         run: |
           cd dist
           Write-Host "当前目录：$(Get-Location)"
           Write-Host "生成 hashed 临时目录..."
-          
-          ..\kachina-builder.exe gen `
-            -j 4 `
-            -i AkashaNavigator `
-            -m metadata.json `
-            -o hashed `
-            -r ColinXHL/akasha-navigator `
-            -t ${{ needs.validate.outputs.version }} `
-            -u .\AkashaNavigator\AkashaNavigator.update.exe
+
+          $args = @(
+            "gen",
+            "-j", "4",
+            "-i", "AkashaNavigator",
+            "-m", "metadata.json",
+            "-o", "hashed",
+            "-r", "ColinXHL/akasha-navigator",
+            "-t", "${{ needs.validate.outputs.version }}",
+            "-u", ".\\AkashaNavigator\\AkashaNavigator.update.exe"
+          )
+
+          $diffDir = "${{ steps.prepare_diff.outputs.diff_dir }}"
+          if (-not [string]::IsNullOrWhiteSpace($diffDir)) {
+            Write-Host "启用差分基线目录：$diffDir"
+            $args += @("--diff-vers", $diffDir)
+          }
+          else {
+            Write-Host "未启用差分基线目录，进行全量生成"
+          }
+
+          & ..\kachina-builder.exe @args
           
           Write-Host "hashed 目录内容："
           Get-ChildItem hashed -Recurse | ForEach-Object { Write-Host $_.FullName }
