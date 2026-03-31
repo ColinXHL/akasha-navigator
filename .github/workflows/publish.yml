@@ -115,7 +115,7 @@ jobs:
             -c .\Build\kachina.config.json `
             -o .\dist\AkashaNavigator\AkashaNavigator.update.exe `
             --icon .\assets\icons\akasha-navigator.ico `
-            -m .\assets\installer_left.webp
+            -t .\assets\installer_left.webp
 
           if (!(Test-Path ".\dist\AkashaNavigator\AkashaNavigator.update.exe")) {
             Write-Error "AkashaNavigator.update.exe 生成失败"
