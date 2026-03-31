@@ -113,12 +113,18 @@ jobs:
         run: |
           .\kachina-builder.exe pack `
             -c .\Build\kachina.config.json `
-            -o .\dist\AkashaNavigator\AkashaNavigator.update.exe
+            -o .\dist\AkashaNavigator\AkashaNavigator.update.exe `
+            --icon .\assets\icons\akasha-navigator.ico `
+            -m .\assets\installer_left.webp
 
           if (!(Test-Path ".\dist\AkashaNavigator\AkashaNavigator.update.exe")) {
             Write-Error "AkashaNavigator.update.exe 生成失败"
             exit 1
           }
+
+          $updaterHash = (Get-FileHash ".\dist\AkashaNavigator\AkashaNavigator.update.exe" -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path ".\dist\updater.sha256" -Value $updaterHash -NoNewline
+          Write-Host "Updater SHA256: $updaterHash"
 
       - name: 📦 Pack 7z
         run: |
@@ -129,6 +135,11 @@ jobs:
         with:
           name: AkashaNavigator_7z
           path: dist/AkashaNavigator_v*.7z
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: AkashaNavigator_UpdaterHash
+          path: dist/updater.sha256
 
   build_installer:
     runs-on: windows-latest
@@ -141,6 +152,11 @@ jobs:
           name: AkashaNavigator_7z
           path: dist
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: AkashaNavigator_UpdaterHash
+          path: dist
+
       - name: 📦 Unpack
         run: |
           cd dist
@@ -150,6 +166,20 @@ jobs:
           7z x "AkashaNavigator_v${{ needs.validate.outputs.version }}.7z"
           Write-Host "Unpack 后文件列表："
           Get-ChildItem -Recurse | ForEach-Object { Write-Host $_.FullName }
+
+      - name: ✅ Verify updater consistency
+        shell: pwsh
+        run: |
+          $expected = (Get-Content ".\dist\updater.sha256" -Raw).Trim().ToLower()
+          $actual = (Get-FileHash ".\dist\AkashaNavigator\AkashaNavigator.update.exe" -Algorithm SHA256).Hash.ToLower()
+
+          Write-Host "Expected updater SHA256: $expected"
+          Write-Host "Actual updater SHA256:   $actual"
+
+          if ($expected -ne $actual) {
+            Write-Error "Updater hash mismatch: installer pipeline is not using the same updater binary as portable package."
+            exit 1
+          }
 
       - name: 📥 Download kachina-builder
         shell: pwsh
@@ -198,6 +228,35 @@ jobs:
             -o AkashaNavigator.Install.${{ needs.validate.outputs.version }}.exe
           
           Write-Host "打包完成"
+
+      - name: ✅ Verify updater embedded in installer
+        shell: pwsh
+        run: |
+          cd dist
+          $expected = (Get-Content ".\updater.sha256" -Raw).Trim().ToLower()
+          $installer = ".\AkashaNavigator.Install.${{ needs.validate.outputs.version }}.exe"
+          $extractDir = ".\installer_verify"
+
+          if (Test-Path $extractDir) {
+            Remove-Item -Recurse -Force $extractDir
+          }
+
+          ..\kachina-builder.exe extract -i $installer --all $extractDir
+
+          $updaterFile = Get-ChildItem $extractDir -Recurse -File -Filter "AkashaNavigator.update.exe" | Select-Object -First 1
+          if ($null -eq $updaterFile) {
+            Write-Error "Failed to find AkashaNavigator.update.exe inside installer payload"
+            exit 1
+          }
+
+          $actual = (Get-FileHash $updaterFile.FullName -Algorithm SHA256).Hash.ToLower()
+          Write-Host "Expected updater SHA256: $expected"
+          Write-Host "Embedded updater SHA256: $actual"
+
+          if ($expected -ne $actual) {
+            Write-Error "Embedded updater mismatch: installer does not contain the same updater binary as portable package."
+            exit 1
+          }
 
       - uses: actions/upload-artifact@v6
         with:
