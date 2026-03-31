@@ -163,7 +163,7 @@ jobs:
             --repo YuehaiTeam/kachina-installer `
             --pattern "kachina-builder.exe" `
             --dir .
-          
+
           Write-Host "下载后文件列表："
           Get-ChildItem -Recurse | Where-Object { $_.Name -like "*kachina-builder*" } | ForEach-Object { Write-Host $_.FullName }
 
@@ -251,7 +251,7 @@ jobs:
           }
 
           & ..\kachina-builder.exe @args
-          
+
           Write-Host "hashed 目录内容："
           Get-ChildItem hashed -Recurse | ForEach-Object { Write-Host $_.FullName }
 
@@ -260,14 +260,15 @@ jobs:
         run: |
           cd dist
           Write-Host "开始打包 installer..."
-          
+
           ..\kachina-builder.exe pack `
             -c ..\Build\kachina.config.json `
             -m metadata.json `
+            --icon ..\assets\icons\akasha-navigator.ico `
             -t ..\assets\installer_left.webp `
             -d hashed `
             -o AkashaNavigator.Install.${{ needs.validate.outputs.version }}.exe
-          
+
           Write-Host "打包完成"
 
       - uses: actions/upload-artifact@v6
