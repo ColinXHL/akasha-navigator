@@ -100,7 +100,9 @@ public class AppUpdateService : IAppUpdateService
 
         try
         {
-            var arguments = $"-I --source {sourceId}";
+            var arguments = string.Equals(sourceId, "cnb", StringComparison.OrdinalIgnoreCase)
+                ? "-I"
+                : $"-I --source {sourceId}";
             Process.Start(updaterPath, arguments);
             Application.Current?.Shutdown();
             return Result.Success();

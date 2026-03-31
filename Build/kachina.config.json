@@ -27,6 +27,9 @@
   "description": "悬浮网页播放器",
   "windowTitle": "AkashaNavigator 安装程序",
   "windowBorderless": false,
+  "ignoreFolderPath": [
+    "${INSTALL_PATH}/User"
+  ],
   "userDataPath": [
     "${INSTALL_PATH}/User"
   ],
