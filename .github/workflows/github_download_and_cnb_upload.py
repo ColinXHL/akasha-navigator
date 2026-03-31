@@ -256,7 +256,8 @@ def create_cnb_config(files: List[str], version: str, token: str) -> Dict:
         CNB配置字典
     """
     is_alpha = "-alpha" in version
-    is_prerelease = '-' in version
+    # alpha 版本会发布到独立 alpha 仓库，不标记为 prerelease
+    is_prerelease = ('-' in version) and (not is_alpha)
     make_latest = "false" if is_prerelease else "true"
     project_path = "AkashaNavigator/akasha-navigator-alpha" if is_alpha else "AkashaNavigator/akasha-navigator"
     
