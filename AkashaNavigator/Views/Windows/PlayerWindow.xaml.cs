@@ -754,7 +754,19 @@ public partial class PlayerWindow : Window
                 (function() {{
                     var video = document.querySelector('video');
                     if (video) {{
+                        var wasPaused = !!video.paused;
                         video.currentTime += {seconds};
+
+                        if (wasPaused) {{
+                            try {{
+                                var playPromise = video.play();
+                                if (playPromise && typeof playPromise.catch === 'function') {{
+                                    playPromise.catch(function() {{ }});
+                                }}
+                            }} catch (_) {{
+                            }}
+                        }}
+
                         return video.currentTime;
                     }}
                     return -1;
