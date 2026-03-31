@@ -3,7 +3,7 @@
     {
       "id": "cnb",
       "name": "CNB",
-      "uri": "https://cnb.cool/AkashaNavigator/akasha-navigator/-/releases/download/v${version}/AkashaNavigator.Install.${version}.exe"
+      "uri": "plugin-github+https://cnb.cool/AkashaNavigator/akasha-navigator/-/releases/download/v${version}/AkashaNavigator.Install.${version}.exe#versionRegex=v([0-9]%2B\\.[0-9]%2B\\.[0-9]%2B(?:-[a-zA-Z0-9.%2B]+)?)&cacheTime=5"
     },
     {
       "id": "github",
