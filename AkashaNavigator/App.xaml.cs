@@ -19,6 +19,8 @@ namespace AkashaNavigator
 /// </summary>
 public partial class App : System.Windows.Application
 {
+    private const int CurrentFolderAclPolicyRevision = 1;
+
     #region Fields
 
     private Bootstrapper? _bootstrapper;
@@ -67,16 +69,34 @@ public partial class App : System.Windows.Application
         try
         {
             var currentVersion = GetCurrentAppVersion();
-            if (string.Equals(_config.RunForVersion, currentVersion, StringComparison.OrdinalIgnoreCase))
+            var appDirectory = AppContext.BaseDirectory;
+
+            var isSameVersion = string.Equals(_config.RunForVersion, currentVersion, StringComparison.OrdinalIgnoreCase);
+            var requiresPolicyMigration = _config.FolderAclPolicyRevision < CurrentFolderAclPolicyRevision;
+
+            if (isSameVersion && !requiresPolicyMigration)
             {
                 Log.Information("[{Source}] Skip folder ACL update: already applied for version {Version}", nameof(App),
                                 currentVersion);
                 return;
             }
 
-            var appDirectory = AppContext.BaseDirectory;
             if (appDirectory.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase))
             {
+                if (requiresPolicyMigration)
+                {
+                    var hasExpectedAcl = SecurityControlHelper.HasExpectedFolderSecurity(appDirectory);
+                    if (hasExpectedAcl)
+                    {
+                        _config.RunForVersion = currentVersion;
+                        _config.FolderAclPolicyRevision = CurrentFolderAclPolicyRevision;
+                        _configService?.Save();
+                        Log.Information("[{Source}] Folder ACL check passed during policy migration for version {Version}",
+                                        nameof(App), currentVersion);
+                        return;
+                    }
+                }
+
                 var success = SecurityControlHelper.AllowFullFolderSecurity(appDirectory);
                 if (!success)
                 {
@@ -86,12 +106,16 @@ public partial class App : System.Windows.Application
                 }
 
                 _config.RunForVersion = currentVersion;
+                _config.FolderAclPolicyRevision = CurrentFolderAclPolicyRevision;
                 _configService?.Save();
                 Log.Information("[{Source}] Folder ACL update applied for version {Version}", nameof(App),
                                 currentVersion);
             }
             else
             {
+                _config.RunForVersion = currentVersion;
+                _config.FolderAclPolicyRevision = CurrentFolderAclPolicyRevision;
+                _configService?.Save();
                 Log.Information("[{Source}] Skip folder ACL update: app directory is not on C drive ({AppDirectory})",
                                 nameof(App), appDirectory);
             }

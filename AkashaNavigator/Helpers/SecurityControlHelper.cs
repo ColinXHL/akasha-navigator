@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using Serilog;
@@ -63,5 +64,41 @@ public static class SecurityControlHelper
         using var identity = WindowsIdentity.GetCurrent();
         var principal = new WindowsPrincipal(identity);
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    public static bool HasExpectedFolderSecurity(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var info = new DirectoryInfo(folderPath);
+            var access = info.GetAccessControl(AccessControlSections.Access);
+            var everyoneSid = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+            var usersSid = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+
+            return HasAllowFullControlRule(access, everyoneSid) && HasAllowFullControlRule(access, usersSid);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[{Source}] Failed to inspect ACL for folder {FolderPath}", nameof(SecurityControlHelper),
+                        folderPath);
+            return false;
+        }
+    }
+
+    private static bool HasAllowFullControlRule(DirectorySecurity access, SecurityIdentifier expectedSid)
+    {
+        var rules = access.GetAccessRules(true, true, typeof(SecurityIdentifier))
+                          .OfType<FileSystemAccessRule>();
+
+        return rules.Any(rule =>
+            rule.AccessControlType == AccessControlType.Allow &&
+            rule.IdentityReference is SecurityIdentifier sid &&
+            sid.Equals(expectedSid) &&
+            (rule.FileSystemRights & FileSystemRights.FullControl) == FileSystemRights.FullControl);
     }
 }

@@ -95,6 +95,12 @@ public class AppConfig
     /// </summary>
     public string RunForVersion { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 目录权限策略修正版本号
+    /// 用于一次性触发 ACL 检查/修复迁移
+    /// </summary>
+    public int FolderAclPolicyRevision { get; set; }
+
 #endregion
 
 #region Logging
