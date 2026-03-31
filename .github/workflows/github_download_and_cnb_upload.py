@@ -255,13 +255,14 @@ def create_cnb_config(files: List[str], version: str, token: str) -> Dict:
     Returns:
         CNB配置字典
     """
-    # 判断是否为预发布版本
+    is_alpha = "-alpha" in version
     is_prerelease = '-' in version
     make_latest = "false" if is_prerelease else "true"
+    project_path = "AkashaNavigator/akasha-navigator-alpha" if is_alpha else "AkashaNavigator/akasha-navigator"
     
     config = {
         "token": token,
-        "project_path": "AkashaNavigator/akasha-navigator",
+        "project_path": project_path,
         "base_url": "https://api.cnb.cool",
         "overwrite": True,
         "release_data": {

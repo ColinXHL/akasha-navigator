@@ -19,12 +19,12 @@ on:
       create_release:
         description: "是否创建 GitHub Release 草稿"
         required: true
-        default: true
+        default: false
         type: boolean
       push_to_cnb:
         description: "是否触发 CNB 推送"
         required: true
-        default: false
+        default: true
         type: boolean
 
 jobs:
