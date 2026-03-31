@@ -61,7 +61,7 @@ public class AppUpdateService : IAppUpdateService
                 return Result<AppUpdateCheckResult>.Success(AppUpdateCheckResult.NoUpdate(currentVersion));
             }
 
-            var sourceId = string.IsNullOrWhiteSpace(candidate.Source) ? "cnb" : candidate.Source;
+            var sourceId = ResolveSourceId(candidate);
             var notes = candidate.Notes ?? string.Empty;
             var updateResult = AppUpdateCheckResult.WithUpdate(currentVersion, candidate.Version, notes,
                                                                 candidate.IsPrerelease, sourceId);
@@ -278,6 +278,18 @@ public class AppUpdateService : IAppUpdateService
 
         semanticVersion = new SemanticVersion(major, minor, patch, preRelease);
         return true;
+    }
+
+    private static string ResolveSourceId(UpdateCandidate candidate)
+    {
+        if (!string.IsNullOrWhiteSpace(candidate.Source))
+        {
+            return candidate.Source!;
+        }
+
+        return candidate.Version.Contains("-alpha", StringComparison.OrdinalIgnoreCase)
+            ? "cnb-alpha"
+            : "cnb";
     }
 
     private sealed class UpdateNotice
