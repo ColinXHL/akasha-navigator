@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
@@ -50,9 +51,9 @@ public partial class App : System.Windows.Application
     {
         ConfigureSerilog();
 
-        ModifyFolderSecurity();
-
         InitializeServices();
+
+        ModifyFolderSecurityIfVersionChanged();
 
         CheckAndHandleCrash();
 
@@ -61,19 +62,58 @@ public partial class App : System.Windows.Application
         InitializeApplication();
     }
 
-    private void ModifyFolderSecurity()
+    private void ModifyFolderSecurityIfVersionChanged()
     {
         try
         {
-            if (AppContext.BaseDirectory.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase))
+            var currentVersion = GetCurrentAppVersion();
+            if (string.Equals(_config.RunForVersion, currentVersion, StringComparison.OrdinalIgnoreCase))
             {
-                SecurityControlHelper.AllowFullFolderSecurity(AppContext.BaseDirectory);
+                Log.Information("[{Source}] Skip folder ACL update: already applied for version {Version}", nameof(App),
+                                currentVersion);
+                return;
+            }
+
+            var appDirectory = AppContext.BaseDirectory;
+            if (appDirectory.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase))
+            {
+                var success = SecurityControlHelper.AllowFullFolderSecurity(appDirectory);
+                if (!success)
+                {
+                    Log.Warning("[{Source}] Folder ACL update did not apply for {AppDirectory}", nameof(App),
+                                appDirectory);
+                    return;
+                }
+
+                _config.RunForVersion = currentVersion;
+                _configService?.Save();
+                Log.Information("[{Source}] Folder ACL update applied for version {Version}", nameof(App),
+                                currentVersion);
+            }
+            else
+            {
+                Log.Information("[{Source}] Skip folder ACL update: app directory is not on C drive ({AppDirectory})",
+                                nameof(App), appDirectory);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略权限设置失败，避免影响启动流程
+            Log.Error(ex, "[{Source}] Unexpected exception while modifying folder ACL", nameof(App));
         }
+    }
+
+    private static string GetCurrentAppVersion()
+    {
+        var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+        var infoVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(infoVersion))
+        {
+            var plusIndex = infoVersion.IndexOf('+');
+            return plusIndex > 0 ? infoVersion[..plusIndex] : infoVersion;
+        }
+
+        var version = assembly.GetName().Version;
+        return version == null ? "0.0.0" : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
     /// <summary>

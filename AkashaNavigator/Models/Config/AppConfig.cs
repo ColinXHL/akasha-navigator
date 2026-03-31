@@ -89,6 +89,12 @@ public class AppConfig
     /// </summary>
     public bool IsFirstLaunch { get; set; } = true;
 
+    /// <summary>
+    /// 最近一次已执行目录权限修正的应用版本
+    /// 用于避免每次启动都重复写 ACL
+    /// </summary>
+    public string RunForVersion { get; set; } = string.Empty;
+
 #endregion
 
 #region Logging

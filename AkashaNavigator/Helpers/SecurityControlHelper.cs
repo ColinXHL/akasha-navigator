@@ -2,44 +2,60 @@ using System;
 using System.IO;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using Serilog;
 
 namespace AkashaNavigator.Helpers;
 
 public static class SecurityControlHelper
 {
-    public static void AllowFullFolderSecurity(string folderPath)
+    public static bool AllowFullFolderSecurity(string folderPath)
     {
         if (!IsElevated())
         {
-            return;
+            Log.Warning("[{Source}] Skip ACL update: process is not elevated", nameof(SecurityControlHelper));
+            return false;
         }
 
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
         {
-            return;
+            Log.Warning("[{Source}] Skip ACL update: invalid or missing folder {FolderPath}", nameof(SecurityControlHelper),
+                        folderPath);
+            return false;
         }
 
-        var info = new DirectoryInfo(folderPath);
-        var access = info.GetAccessControl(AccessControlSections.All);
-        var inherits = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        try
+        {
+            var info = new DirectoryInfo(folderPath);
+            var access = info.GetAccessControl(AccessControlSections.All);
+            var inherits = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
 
-        var everyoneRule = new FileSystemAccessRule(
-            "Everyone",
-            FileSystemRights.FullControl,
-            inherits,
-            PropagationFlags.None,
-            AccessControlType.Allow);
+            var everyoneRule = new FileSystemAccessRule(
+                "Everyone",
+                FileSystemRights.FullControl,
+                inherits,
+                PropagationFlags.None,
+                AccessControlType.Allow);
 
-        var usersRule = new FileSystemAccessRule(
-            "Users",
-            FileSystemRights.FullControl,
-            inherits,
-            PropagationFlags.None,
-            AccessControlType.Allow);
+            var usersRule = new FileSystemAccessRule(
+                "Users",
+                FileSystemRights.FullControl,
+                inherits,
+                PropagationFlags.None,
+                AccessControlType.Allow);
 
-        access.ModifyAccessRule(AccessControlModification.Add, everyoneRule, out _);
-        access.ModifyAccessRule(AccessControlModification.Add, usersRule, out _);
-        info.SetAccessControl(access);
+            access.ModifyAccessRule(AccessControlModification.Add, everyoneRule, out _);
+            access.ModifyAccessRule(AccessControlModification.Add, usersRule, out _);
+            info.SetAccessControl(access);
+
+            Log.Information("[{Source}] ACL updated for folder {FolderPath}", nameof(SecurityControlHelper), folderPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[{Source}] ACL update failed for folder {FolderPath}", nameof(SecurityControlHelper),
+                      folderPath);
+            return false;
+        }
     }
 
     private static bool IsElevated()
