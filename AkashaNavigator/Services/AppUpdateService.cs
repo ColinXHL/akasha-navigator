@@ -100,12 +100,8 @@ public class AppUpdateService : IAppUpdateService
 
         try
         {
-            Process.Start(new ProcessStartInfo {
-                FileName = updaterPath,
-                Arguments = $"-I --source {sourceId}",
-                UseShellExecute = true,
-                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
-            });
+            var arguments = $"-I --source {sourceId}";
+            Process.Start(updaterPath, arguments);
             Application.Current?.Shutdown();
             return Result.Success();
         }
