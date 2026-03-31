@@ -6,6 +6,7 @@ using AkashaNavigator.Models.Config;
 using AkashaNavigator.Services;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Core;
+using AkashaNavigator.Helpers;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -49,6 +50,8 @@ public partial class App : System.Windows.Application
     {
         ConfigureSerilog();
 
+        ModifyFolderSecurity();
+
         InitializeServices();
 
         CheckAndHandleCrash();
@@ -56,6 +59,21 @@ public partial class App : System.Windows.Application
         ExecuteDataMigration();
 
         InitializeApplication();
+    }
+
+    private void ModifyFolderSecurity()
+    {
+        try
+        {
+            if (AppContext.BaseDirectory.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase))
+            {
+                SecurityControlHelper.AllowFullFolderSecurity(AppContext.BaseDirectory);
+            }
+        }
+        catch
+        {
+            // 忽略权限设置失败，避免影响启动流程
+        }
     }
 
     /// <summary>

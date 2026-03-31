@@ -1,12 +1,9 @@
 using System;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
@@ -101,23 +98,16 @@ public class AppUpdateService : IAppUpdateService
                 Error.FileSystem("UPDATER_NOT_FOUND", "更新程序不存在", filePath: updaterPath));
         }
 
-        EnsureUpdaterDirectoryPermissions(updaterPath);
-
         try
         {
             Process.Start(new ProcessStartInfo {
                 FileName = updaterPath,
                 Arguments = $"-I --source {sourceId}",
                 UseShellExecute = true,
-                Verb = "runas",
                 WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
             });
             Application.Current?.Shutdown();
             return Result.Success();
-        }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
-        {
-            return Result.Failure(Error.Permission("UPDATER_ELEVATION_CANCELLED", "已取消管理员权限授权，更新已中止", ex: ex));
         }
         catch (Exception ex)
         {
@@ -300,35 +290,6 @@ public class AppUpdateService : IAppUpdateService
         return candidate.Version.Contains("-alpha", StringComparison.OrdinalIgnoreCase)
             ? "cnb-alpha"
             : "cnb";
-    }
-
-    private void EnsureUpdaterDirectoryPermissions(string updaterPath)
-    {
-        try
-        {
-            var appDirectory = Path.GetDirectoryName(updaterPath);
-            if (string.IsNullOrWhiteSpace(appDirectory) || !Directory.Exists(appDirectory))
-            {
-                return;
-            }
-
-            var info = new DirectoryInfo(appDirectory);
-            var access = info.GetAccessControl();
-            var usersSid = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
-            var rule = new FileSystemAccessRule(
-                usersSid,
-                FileSystemRights.Modify | FileSystemRights.Synchronize,
-                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
-                PropagationFlags.None,
-                AccessControlType.Allow);
-
-            access.AddAccessRule(rule);
-            info.SetAccessControl(access);
-        }
-        catch (Exception ex)
-        {
-            _logService.Warn(nameof(AppUpdateService), "更新前设置安装目录权限失败: {Message}", ex.Message);
-        }
     }
 
     private sealed class UpdateNotice
