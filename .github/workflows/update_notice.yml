@@ -119,6 +119,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Download existing notice.json from Qiniu
+        shell: bash
+        env:
+          QINIU_NOTICE_URL: ${{ secrets.QINIU_NOTICE_URL }}
+        run: |
+          mkdir -p out
+          # 尝试下载现有的 notice.json
+          if curl -f -o out/notice_existing.json "$QINIU_NOTICE_URL" 2>/dev/null; then
+            echo "✅ 下载现有 notice.json 成功"
+            cat out/notice_existing.json
+          else
+            echo "⚠️ 未找到现有 notice.json，将创建新文件"
+            echo '{"stable":{"version":"0.0.0","installer":"","source":"qiniu","notes":""},"alpha":{"version":"0.0.0","installer":"","source":"qiniu","notes":""},"min_required_version":"1.0.0"}' > out/notice_existing.json
+          fi
+
       - name: Generate notice.json
         id: generate
         shell: bash
@@ -130,8 +145,6 @@ jobs:
           NOTES: ${{ needs.validate.outputs.notes }}
           SOURCE: ${{ needs.validate.outputs.source }}
         run: |
-          mkdir -p out
-
           python - <<'PY'
           import json
           import os
@@ -143,33 +156,30 @@ jobs:
           notes = os.environ["NOTES"]
           source = os.environ["SOURCE"]
 
-          data = {
-              "stable": {
-                  "version": "0.0.0",
-                  "installer": "",
-                  "source": source,
-                  "notes": ""
-              },
-              "alpha": {
-                  "version": "0.0.0",
-                  "installer": "",
-                  "source": source,
-                  "notes": ""
-              },
-              "min_required_version": min_required_version
-          }
+          # 读取现有的 notice.json
+          try:
+              with open("out/notice_existing.json", "r", encoding="utf-8") as f:
+                  data = json.load(f)
+                  print(f"✅ 读取现有配置成功")
+          except Exception as e:
+              print(f"⚠️ 读取现有配置失败，使用默认配置: {e}")
+              data = {
+                  "stable": {
+                      "version": "0.0.0",
+                      "installer": "",
+                      "source": source,
+                      "notes": ""
+                  },
+                  "alpha": {
+                      "version": "0.0.0",
+                      "installer": "",
+                      "source": source,
+                      "notes": ""
+                  },
+                  "min_required_version": min_required_version
+              }
 
-          # 如果仓库里已有 notice.json，可在这里先读取旧值再覆盖某一个通道
-          old_path = "Build/notice.json"
-          if os.path.exists(old_path):
-              with open(old_path, "r", encoding="utf-8") as f:
-                  try:
-                      old = json.load(f)
-                      if isinstance(old, dict):
-                          data.update(old)
-                  except Exception:
-                      pass
-
+          # 只更新指定通道
           data[channel] = {
               "version": version,
               "installer": installer_name,
@@ -178,8 +188,11 @@ jobs:
           }
           data["min_required_version"] = min_required_version
 
+          print(f"✅ 更新 {channel} 通道: {version}")
+
+          # 写入压缩格式的 JSON（无缩进、无空格）
           with open("out/notice.json", "w", encoding="utf-8") as f:
-              json.dump(data, f, ensure_ascii=False, indent=2)
+              json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
           PY
 
           echo "notice_file=out/notice.json" >> "$GITHUB_OUTPUT"
@@ -230,5 +243,16 @@ jobs:
           # 单文件上传，使用 fput 并添加 --overwrite 参数
           & $qshell fput $env:QINIU_BUCKET $env:QINIU_NOTICE_KEY .\out\notice.json --overwrite
 
+      - name: Refresh CDN cache
+        shell: pwsh
+        env:
+          QINIU_NOTICE_URL: ${{ secrets.QINIU_NOTICE_URL }}
+        run: |
+          $qshell = (Get-ChildItem .\qshell_bin -Recurse -Filter qshell*.exe | Select-Object -First 1).FullName
+
+          # 刷新 CDN 缓存
+          Write-Host "刷新 CDN 缓存: $env:QINIU_NOTICE_URL"
+          echo $env:QINIU_NOTICE_URL | & $qshell cdnrefresh
+
       - name: Done
-        run: echo "✅ notice.json 已上传"
+        run: echo "✅ notice.json 已上传并刷新 CDN 缓存"
