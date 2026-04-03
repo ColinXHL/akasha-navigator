@@ -25,10 +25,6 @@ on:
         required: false
         default: ""
         type: string
-      installer_name:
-        description: "安装包文件名（如 AkashaNavigator.Install.1.0.0.exe）"
-        required: true
-        type: string
       source:
         description: "下载源标识"
         required: true
@@ -55,9 +51,11 @@ jobs:
           VERSION="${{ github.event.inputs.version }}"
           CHANNEL="${{ github.event.inputs.channel }}"
           MIN_REQUIRED_VERSION="${{ github.event.inputs.min_required_version }}"
-          INSTALLER_NAME="${{ github.event.inputs.installer_name }}"
           NOTES="${{ github.event.inputs.notes }}"
           SOURCE="${{ github.event.inputs.source }}"
+
+          # 自动生成安装包文件名
+          INSTALLER_NAME="AkashaNavigator.Install.${VERSION}.exe"
 
           SEMVER_REGEX='^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'
 
@@ -75,6 +73,7 @@ jobs:
 
           echo "输入版本: $VERSION"
           echo "csproj版本: $CSPROJ_VERSION"
+          echo "安装包名称: $INSTALLER_NAME"
 
           if [[ "$VERSION" != "$CSPROJ_VERSION" ]]; then
             echo "❌ 输入版本号与 csproj 中 <Version> 不一致"
@@ -206,7 +205,7 @@ jobs:
         shell: pwsh
         run: |
           Invoke-WebRequest `
-            -Uri "https://devtools.qiniu.com/qshell-v2.16.0-windows-amd64.zip" `
+            -Uri "https://github.com/qiniu/qshell/releases/download/v2.18.0/qshell-v2.18.0-windows-amd64.zip" `
             -OutFile "qshell.zip"
           Expand-Archive -Path "qshell.zip" -DestinationPath ".\qshell_bin" -Force
           Get-ChildItem .\qshell_bin -Recurse
