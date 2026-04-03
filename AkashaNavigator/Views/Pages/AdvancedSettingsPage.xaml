@@ -30,7 +30,7 @@
                   Margin="0,0,0,4"
                   IsChecked="{Binding EnablePrereleaseUpdate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                   IsEnabled="{Binding IsPrereleaseToggleEnabled}"/>
-        <TextBlock Text="当前默认启用测试版更新，后续会开放手动切换"
+        <TextBlock Text="勾选后，检查更新时会包含测试版（alpha/beta）"
                    Foreground="#666" FontSize="11" Margin="0,0,0,16"/>
 
         <!-- 插件更新 -->

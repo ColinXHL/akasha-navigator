@@ -48,8 +48,7 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
 
-        EnablePrereleaseUpdate = true;
-        IsPrereleaseToggleEnabled = false;
+        IsPrereleaseToggleEnabled = true;
     }
 
     /// <summary>
@@ -58,9 +57,8 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     public void LoadSettings(AppConfig config)
     {
         EnablePluginUpdateNotification = config.EnablePluginUpdateNotification;
-        EnablePrereleaseUpdate = true;
+        EnablePrereleaseUpdate = config.EnablePrereleaseUpdate;
         EnableDebugLog = config.EnableDebugLog;
-        IsPrereleaseToggleEnabled = false;
     }
 
     /// <summary>
@@ -69,7 +67,7 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     public void SaveSettings(AppConfig config)
     {
         config.EnablePluginUpdateNotification = EnablePluginUpdateNotification;
-        config.EnablePrereleaseUpdate = true;
+        config.EnablePrereleaseUpdate = EnablePrereleaseUpdate;
         config.EnableDebugLog = EnableDebugLog;
     }
 
@@ -79,7 +77,7 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     public void ResetSettings(AppConfig config)
     {
         EnablePluginUpdateNotification = config.EnablePluginUpdateNotification;
-        EnablePrereleaseUpdate = true;
+        EnablePrereleaseUpdate = config.EnablePrereleaseUpdate;
         EnableDebugLog = config.EnableDebugLog;
     }
 

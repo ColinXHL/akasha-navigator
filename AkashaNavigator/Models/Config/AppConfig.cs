@@ -120,9 +120,9 @@ public class AppConfig
     public bool EnablePluginUpdateNotification { get; set; } = true;
 
     /// <summary>
-    /// 是否包含测试版更新（默认开启，当前版本固定为 true）
+    /// 是否包含测试版更新（默认关闭）
     /// </summary>
-    public bool EnablePrereleaseUpdate { get; set; } = true;
+    public bool EnablePrereleaseUpdate { get; set; } = false;
 
 #endregion
 
