@@ -1,0 +1,235 @@
+name: Update Qiniu Notice
+run-name: "Update notice ${{ github.event.inputs.version }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（如 1.0.0 / 1.1.0-alpha.3）"
+        required: true
+        type: string
+      channel:
+        description: "更新通道"
+        required: true
+        type: choice
+        default: stable
+        options:
+          - stable
+          - alpha
+      min_required_version:
+        description: "最低强制升级版本"
+        required: true
+        type: string
+      notes:
+        description: "更新说明"
+        required: false
+        default: ""
+        type: string
+      installer_name:
+        description: "安装包文件名（如 AkashaNavigator.Install.1.0.0.exe）"
+        required: true
+        type: string
+      source:
+        description: "下载源标识"
+        required: true
+        default: qiniu
+        type: string
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+      channel: ${{ steps.validate.outputs.channel }}
+      min_required_version: ${{ steps.validate.outputs.min_required_version }}
+      installer_name: ${{ steps.validate.outputs.installer_name }}
+      notes: ${{ steps.validate.outputs.notes }}
+      source: ${{ steps.validate.outputs.source }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate inputs
+        id: validate
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          CHANNEL="${{ github.event.inputs.channel }}"
+          MIN_REQUIRED_VERSION="${{ github.event.inputs.min_required_version }}"
+          INSTALLER_NAME="${{ github.event.inputs.installer_name }}"
+          NOTES="${{ github.event.inputs.notes }}"
+          SOURCE="${{ github.event.inputs.source }}"
+
+          SEMVER_REGEX='^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'
+
+          if ! [[ "$VERSION" =~ $SEMVER_REGEX ]]; then
+            echo "❌ version 不符合语义化版本"
+            exit 1
+          fi
+
+          if ! [[ "$MIN_REQUIRED_VERSION" =~ $SEMVER_REGEX ]]; then
+            echo "❌ min_required_version 不符合语义化版本"
+            exit 1
+          fi
+
+          CSPROJ_VERSION=$(grep -oP '(?<=<Version>)[^<]+' AkashaNavigator/AkashaNavigator.csproj)
+
+          echo "输入版本: $VERSION"
+          echo "csproj版本: $CSPROJ_VERSION"
+
+          if [[ "$VERSION" != "$CSPROJ_VERSION" ]]; then
+            echo "❌ 输入版本号与 csproj 中 <Version> 不一致"
+            exit 1
+          fi
+
+          case "$CHANNEL" in
+            stable|alpha) ;;
+            *)
+              echo "❌ channel 只能是 stable 或 alpha"
+              exit 1
+              ;;
+          esac
+
+          if [[ "$CHANNEL" == "stable" ]]; then
+            if [[ "$VERSION" == *"-"* ]]; then
+              echo "❌ stable 通道不应使用预发布版本号"
+              exit 1
+            fi
+          fi
+
+          if [[ "$CHANNEL" == "alpha" ]]; then
+            if [[ "$VERSION" != *"-"* ]]; then
+              echo "⚠️ alpha 通道通常建议使用预发布版本号，例如 1.1.0-alpha.3"
+            fi
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "min_required_version=$MIN_REQUIRED_VERSION" >> "$GITHUB_OUTPUT"
+          echo "installer_name=$INSTALLER_NAME" >> "$GITHUB_OUTPUT"
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          echo "✅ 参数校验通过"
+
+  build_notice:
+    runs-on: ubuntu-latest
+    needs: [validate]
+    outputs:
+      notice_file: ${{ steps.generate.outputs.notice_file }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate notice.json
+        id: generate
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          CHANNEL: ${{ needs.validate.outputs.channel }}
+          MIN_REQUIRED_VERSION: ${{ needs.validate.outputs.min_required_version }}
+          INSTALLER_NAME: ${{ needs.validate.outputs.installer_name }}
+          NOTES: ${{ needs.validate.outputs.notes }}
+          SOURCE: ${{ needs.validate.outputs.source }}
+        run: |
+          mkdir -p out
+
+          python - <<'PY'
+          import json
+          import os
+
+          version = os.environ["VERSION"]
+          channel = os.environ["CHANNEL"]
+          min_required_version = os.environ["MIN_REQUIRED_VERSION"]
+          installer_name = os.environ["INSTALLER_NAME"]
+          notes = os.environ["NOTES"]
+          source = os.environ["SOURCE"]
+
+          data = {
+              "stable": {
+                  "version": "0.0.0",
+                  "installer": "",
+                  "source": source,
+                  "notes": ""
+              },
+              "alpha": {
+                  "version": "0.0.0",
+                  "installer": "",
+                  "source": source,
+                  "notes": ""
+              },
+              "min_required_version": min_required_version
+          }
+
+          # 如果仓库里已有 notice.json，可在这里先读取旧值再覆盖某一个通道
+          old_path = "Build/notice.json"
+          if os.path.exists(old_path):
+              with open(old_path, "r", encoding="utf-8") as f:
+                  try:
+                      old = json.load(f)
+                      if isinstance(old, dict):
+                          data.update(old)
+                  except Exception:
+                      pass
+
+          data[channel] = {
+              "version": version,
+              "installer": installer_name,
+              "source": source,
+              "notes": notes
+          }
+          data["min_required_version"] = min_required_version
+
+          with open("out/notice.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+          PY
+
+          echo "notice_file=out/notice.json" >> "$GITHUB_OUTPUT"
+
+      - name: Show generated notice.json
+        run: cat out/notice.json
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qiniu_notice
+          path: out/notice.json
+
+  upload_notice:
+    runs-on: windows-latest
+    needs: [build_notice]
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: qiniu_notice
+          path: out
+
+      - name: Download qshell
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://devtools.qiniu.com/qshell-v2.16.0-windows-amd64.zip" `
+            -OutFile "qshell.zip"
+          Expand-Archive -Path "qshell.zip" -DestinationPath ".\qshell_bin" -Force
+          Get-ChildItem .\qshell_bin -Recurse
+
+      - name: Configure qshell account
+        shell: pwsh
+        env:
+          QINIU_ACCESS_KEY: ${{ secrets.QINIU_ACCESS_KEY }}
+          QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
+        run: |
+          $qshell = (Get-ChildItem .\qshell_bin -Recurse -Filter qshell*.exe | Select-Object -First 1).FullName
+          & $qshell account $env:QINIU_ACCESS_KEY $env:QINIU_SECRET_KEY github-actions
+
+      - name: Upload notice.json to Qiniu
+        shell: pwsh
+        env:
+          QINIU_BUCKET: ${{ secrets.QINIU_BUCKET }}
+          QINIU_NOTICE_KEY: ${{ secrets.QINIU_NOTICE_KEY }}
+        run: |
+          $qshell = (Get-ChildItem .\qshell_bin -Recurse -Filter qshell*.exe | Select-Object -First 1).FullName
+
+          # 单文件上传，key 相同即覆盖
+          & $qshell rput $env:QINIU_BUCKET $env:QINIU_NOTICE_KEY .\out\notice.json
+
+      - name: Done
+        run: echo "✅ notice.json 已上传"
