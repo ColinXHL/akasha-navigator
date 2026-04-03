@@ -227,8 +227,8 @@ jobs:
         run: |
           $qshell = (Get-ChildItem .\qshell_bin -Recurse -Filter qshell*.exe | Select-Object -First 1).FullName
 
-          # 单文件上传，key 相同即覆盖
-          & $qshell rput $env:QINIU_BUCKET $env:QINIU_NOTICE_KEY .\out\notice.json
+          # 单文件上传，使用 fput 并添加 --overwrite 参数
+          & $qshell fput $env:QINIU_BUCKET $env:QINIU_NOTICE_KEY .\out\notice.json --overwrite
 
       - name: Done
         run: echo "✅ notice.json 已上传"
