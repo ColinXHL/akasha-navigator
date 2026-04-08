@@ -225,6 +225,17 @@ public class CursorDetectionService : ICursorDetectionService, IDisposable
     }
 
     /// <summary>
+    /// 立即检测当前状态并触发相应事件
+    /// </summary>
+    public void RefreshState()
+    {
+        if (!_isRunning || _isSuspended)
+            return;
+
+        CheckInitialState();
+    }
+
+    /// <summary>
     /// 更新目标进程名
     /// </summary>
     /// <param name="processName">新的目标进程名</param>
@@ -296,13 +307,6 @@ public class CursorDetectionService : ICursorDetectionService, IDisposable
         // 光标自由 = UI 模式（鼠标可见）
         bool isClipped = Win32Helper.IsCursorClippedToCenter();
         bool cursorVisible = !isClipped;
-
-        // 如果按住 Alt 键，视为鼠标隐藏状态（Alt 呼出的鼠标是临时的，不需要降低透明度）
-        if (cursorVisible && Win32Helper.IsKeyPressed(Win32Helper.VK_MENU))
-        {
-            cursorVisible = false;
-            LogDebug(nameof(CursorDetectionService), "Alt key pressed, treating as cursor hidden");
-        }
 
         LogDebug(nameof(CursorDetectionService),
                  "Cursor detection: IsClipped={IsClipped}, CursorVisible={CursorVisible}", isClipped, cursorVisible);
@@ -379,12 +383,6 @@ public class CursorDetectionService : ICursorDetectionService, IDisposable
         // 检测当前鼠标状态
         bool isClipped = Win32Helper.IsCursorClippedToCenter();
         bool cursorVisible = !isClipped;
-
-        // Alt 键检测
-        if (cursorVisible && Win32Helper.IsKeyPressed(Win32Helper.VK_MENU))
-        {
-            cursorVisible = false;
-        }
 
         Services.LogService.Instance.Info(nameof(CursorDetectionService),
                                           "Initial check: IsClipped={IsClipped}, CursorVisible={CursorVisible}",

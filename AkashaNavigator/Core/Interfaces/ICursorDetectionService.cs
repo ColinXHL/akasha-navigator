@@ -73,6 +73,11 @@ public interface ICursorDetectionService : IDisposable
     void Resume();
 
     /// <summary>
+    /// 立即检测当前状态并触发相应事件
+    /// </summary>
+    void RefreshState();
+
+    /// <summary>
     /// 是否处于暂停状态
     /// </summary>
     bool IsSuspended { get; }

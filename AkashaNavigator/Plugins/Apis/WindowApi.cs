@@ -278,6 +278,15 @@ public class WindowApi
     }
 
     /// <summary>
+    /// 立即刷新当前鼠标检测状态
+    /// </summary>
+    [ScriptMember("refreshCursorDetectionState")]
+    public void RefreshCursorDetectionState()
+    {
+        _cursorDetectionService?.RefreshState();
+    }
+
+    /// <summary>
     /// 鼠标显示事件处理
     /// </summary>
     private void OnCursorShown(object? sender, EventArgs e)

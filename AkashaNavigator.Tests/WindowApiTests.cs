@@ -421,7 +421,22 @@ public class WindowApiTests : IDisposable
         Assert.False(result);
     }
 
-#endregion
+    /// <summary>
+    /// 验证 refreshCursorDetectionState 会转发到检测服务
+    /// </summary>
+    [Fact]
+    public void RefreshCursorDetectionState_WithService_InvokesService()
+    {
+        var windowApi = new WindowApi(_context, null);
+        var mockService = new MockCursorDetectionService();
+        windowApi.SetCursorDetectionService(mockService);
+
+        windowApi.RefreshCursorDetectionState();
+
+        Assert.True(mockService.RefreshStateCalled);
+    }
+
+    #endregion
 }
 
 /// <summary>
@@ -442,6 +457,7 @@ internal class MockCursorDetectionService : ICursorDetectionService
     public bool StopCalled { get; private set; }
     public bool SuspendCalled { get; private set; }
     public bool ResumeCalled { get; private set; }
+    public bool RefreshStateCalled { get; private set; }
     public HashSet<string>? LastWhitelist { get; private set; }
 
     public void Start(string? targetProcessName = null, int intervalMs = 200, bool enableDebugLog = false)
@@ -474,6 +490,11 @@ internal class MockCursorDetectionService : ICursorDetectionService
     {
         ResumeCalled = true;
         IsSuspended = false;
+    }
+
+    public void RefreshState()
+    {
+        RefreshStateCalled = true;
     }
 
     public void Dispose()

@@ -317,7 +317,11 @@ public class PluginHost : IPluginHost, IDisposable
             // 触发事件
             try
             {
-                pluginApi.Event?.emit(eventName, data);
+                dynamic eventApi = plugin.Engine == null ? null! : ((dynamic)plugin.Engine.Script).@event;
+                if (eventApi != null)
+                {
+                    eventApi.emit(eventName, data);
+                }
             }
             catch (Exception ex)
             {

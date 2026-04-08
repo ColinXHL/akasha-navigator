@@ -32,10 +32,34 @@ api.window.setClickThrough(true);
 
 ### api.window.isClickThrough()
 
-获取穿透模式状态。
+获取手动穿透模式状态。
 
 ```javascript
 var clickThrough = api.window.isClickThrough();
+```
+
+### api.window.setAutoClickThrough(enabled)
+
+设置插件控制的自动穿透状态。
+
+```javascript
+api.window.setAutoClickThrough(true);
+```
+
+### api.window.isAutoClickThrough()
+
+获取插件控制的自动穿透状态。
+
+```javascript
+var autoClickThrough = api.window.isAutoClickThrough();
+```
+
+### api.window.refreshCursorDetectionState()
+
+立即重新检测当前鼠标状态，并触发对应的 `cursorShown` 或 `cursorHidden` 事件。
+
+```javascript
+api.window.refreshCursorDetectionState();
 ```
 
 ## 窗口置顶

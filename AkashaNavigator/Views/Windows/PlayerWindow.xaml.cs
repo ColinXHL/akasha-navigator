@@ -857,6 +857,8 @@ public partial class PlayerWindow : Window
         // WebView2 的穿透需要通过其他方式处理
         // WebView.Visibility = result ? Visibility.Hidden : Visibility.Visible;
 
+        BroadcastClickThroughChanged("manual");
+
         return result;
     }
 
@@ -867,6 +869,7 @@ public partial class PlayerWindow : Window
     public void SetAutoClickThrough(bool enabled)
     {
         _windowBehavior.SetAutoClickThrough(enabled);
+        BroadcastClickThroughChanged("auto");
     }
 
     /// <summary>
@@ -875,6 +878,7 @@ public partial class PlayerWindow : Window
     public void ResetAutoClickThrough()
     {
         _windowBehavior.ResetAutoClickThrough();
+        BroadcastClickThroughChanged("reset");
     }
 
     /// <summary>
@@ -887,6 +891,24 @@ public partial class PlayerWindow : Window
     /// 是否处于鼠标穿透模式
     /// </summary>
     public bool IsClickThrough => _windowBehavior.IsClickThrough;
+
+    /// <summary>
+    /// 是否处于有效鼠标穿透模式（手动或自动）
+    /// </summary>
+    public bool IsEffectiveClickThrough => _windowBehavior.IsEffectiveClickThrough;
+
+    private void BroadcastClickThroughChanged(string source)
+    {
+        var payload = new {
+            enabled = IsEffectiveClickThrough,
+            manualEnabled = IsClickThrough,
+            autoEnabled = IsAutoClickThrough,
+            source
+        };
+
+        _pluginHost.BroadcastEvent(AkashaNavigator.Plugins.Utils.EventManager.ClickThroughChanged, payload);
+        _pluginHost.BroadcastEvent($"window.{AkashaNavigator.Plugins.Utils.EventManager.ClickThroughChanged}", payload);
+    }
 
     /// <summary>
     /// 更新配置

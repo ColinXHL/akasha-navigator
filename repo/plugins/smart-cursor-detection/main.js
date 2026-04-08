@@ -3,6 +3,8 @@
 
 // 保存原始透明度，用于恢复
 var originalOpacity = 1.0;
+var manualClickThroughEnabled = false;
+var pluginEffectActive = false;
 
 /**
  * 解析进程白名单字符串
@@ -23,17 +25,27 @@ function parseProcessList(str) {
  * 降低透明度 + 启用穿透，让用户能点击游戏 UI
  */
 function onCursorShown() {
+    if (!manualClickThroughEnabled) {
+        log.debug('手动穿透未开启，忽略智能鼠标效果');
+        return;
+    }
+
     var minOpacity = config.get('minOpacity', 0.3);
-    
+
+    if (pluginEffectActive) {
+        return;
+    }
+
     // 保存当前透明度
     originalOpacity = window.getOpacity();
-    
+
     // 降低透明度
     window.setOpacity(minOpacity);
-    
+
     // 启用自动点击穿透（不会触发定时器逻辑）
     window.setAutoClickThrough(true);
-    
+    pluginEffectActive = true;
+
     log.debug('游戏鼠标显示 - 降低透明度: ' + minOpacity + ', 启用穿透');
 }
 
@@ -42,13 +54,39 @@ function onCursorShown() {
  * 恢复透明度 + 禁用穿透
  */
 function onCursorHidden() {
+    if (!pluginEffectActive) {
+        return;
+    }
+
     // 禁用自动点击穿透
     window.setAutoClickThrough(false);
-    
+
     // 恢复透明度
     window.setOpacity(originalOpacity);
-    
+    pluginEffectActive = false;
+
     log.debug('游戏鼠标隐藏 - 恢复透明度: ' + originalOpacity + ', 禁用穿透');
+}
+
+/**
+ * 手动穿透变化事件处理
+ * 只有手动穿透开启时，才允许插件接管自动穿透效果
+ */
+function onClickThroughChanged(data) {
+    if (!data || data.source !== 'manual') {
+        return;
+    }
+
+    manualClickThroughEnabled = !!data.manualEnabled;
+
+    if (!manualClickThroughEnabled) {
+        onCursorHidden();
+        log.debug('手动穿透关闭 - 立即禁用智能鼠标效果');
+        return;
+    }
+
+    log.debug('手动穿透开启 - 立即刷新鼠标检测状态');
+    window.refreshCursorDetectionState();
 }
 
 /**
@@ -71,13 +109,14 @@ function onLoad() {
     
     log.info('监控进程: ' + processes.join(', '));
     log.info('检测间隔: ' + intervalMs + 'ms');
-    
-    // 保存当前透明度
-    originalOpacity = window.getOpacity();
-    
+
+    manualClickThroughEnabled = window.isClickThrough();
+    pluginEffectActive = false;
+
     // 注册鼠标状态事件
     window.on('cursorShown', onCursorShown);
     window.on('cursorHidden', onCursorHidden);
+    window.on('clickThroughChanged', onClickThroughChanged);
     
     // 启动鼠标检测
     var started = window.startCursorDetection({
@@ -87,6 +126,10 @@ function onLoad() {
     
     if (started) {
         log.info('鼠标检测已启动');
+
+        if (manualClickThroughEnabled) {
+            window.refreshCursorDetectionState();
+        }
     } else {
         log.warn('鼠标检测启动失败');
     }
@@ -100,10 +143,14 @@ function onUnload() {
     
     // 停止鼠标检测
     window.stopCursorDetection();
+
+    // 确保卸载时清理插件效果
+    onCursorHidden();
     
     // 取消事件订阅
     window.off('cursorShown');
     window.off('cursorHidden');
+    window.off('clickThroughChanged');
     
     log.info(plugin.name + ' 已卸载');
 }

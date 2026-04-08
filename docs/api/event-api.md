@@ -35,7 +35,7 @@ api.event.off("playStateChanged");
 | `playStateChanged` | `{ playing: boolean }` | 播放状态变化 |
 | `timeUpdate` | `{ currentTime: number }` | 播放时间更新 |
 | `opacityChanged` | `{ opacity: number }` | 透明度变化 |
-| `clickThroughChanged` | `{ enabled: boolean }` | 穿透模式变化 |
+| `clickThroughChanged` | `{ enabled: boolean, manualEnabled: boolean, autoEnabled: boolean, source: string }` | 穿透模式变化 |
 | `urlChanged` | `{ url: string }` | URL 变化 |
 | `profileChanged` | `{ profileId: string }` | Profile 切换 |
 
