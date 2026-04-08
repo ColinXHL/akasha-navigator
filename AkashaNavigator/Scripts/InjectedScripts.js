@@ -185,6 +185,21 @@
             '[aria-label*="全屏"]:not([aria-label*="网页"])'
         ];
 
+        const PART_NAVIGATION_SELECTORS = [
+            '.bpx-player-ctrl-prev',
+            '.bpx-player-ctrl-next',
+            '.bilibili-player-video-btn-prev',
+            '.bilibili-player-video-btn-next',
+            '.bpx-player-ending-related-item-prev',
+            '.bpx-player-ending-related-item-next',
+            '[data-action="prev"]',
+            '[data-action="next"]',
+            '[title*="上一"]',
+            '[title*="下一"]',
+            '[aria-label*="上一"]',
+            '[aria-label*="下一"]'
+        ];
+
         let restoreTimer = null;
         let restoreAttempts = 0;
         let waitingUserGesture = false;
@@ -194,6 +209,8 @@
         let lastObservedMode = null;
         let lastObservedRate = null;
         let activeRestoreTarget = null;
+        let lastUserInteractionAt = 0;
+        let lastExplicitRateRequest = null;
 
         function getRestoreReasonThrottleMs(reason) {
             if (!reason) {
@@ -280,10 +297,47 @@
             return snapshot ? snapshot.playbackRate : 1.0;
         }
 
+        function markUserInteraction() {
+            lastUserInteractionAt = Date.now();
+        }
+
+        function hasRecentUserInteraction() {
+            return (Date.now() - lastUserInteractionAt) <= 2000;
+        }
+
+        function markExplicitRateRequest(rate, source) {
+            const normalizedRate = Number(rate) || 1.0;
+            if (normalizedRate <= 0) {
+                return;
+            }
+
+            lastExplicitRateRequest = {
+                playbackRate: normalizedRate,
+                source: String(source || 'unknown'),
+                updatedAt: Date.now()
+            };
+        }
+
+        function matchesRecentExplicitRateRequest(rate) {
+            if (!lastExplicitRateRequest) {
+                return false;
+            }
+
+            if ((Date.now() - Number(lastExplicitRateRequest.updatedAt || 0)) > 2500) {
+                return false;
+            }
+
+            return approxEqual(lastExplicitRateRequest.playbackRate, rate);
+        }
+
         function shouldSkipGlobalRateOverwrite(targetRate, reason) {
             const previousRate = readGlobalRate();
             const isDowngradeToDefault = approxEqual(targetRate, 1.0) && previousRate > 1.0;
             if (!isDowngradeToDefault) {
+                return false;
+            }
+
+            if (hasRecentUserInteraction() || matchesRecentExplicitRateRequest(targetRate)) {
                 return false;
             }
 
@@ -292,6 +346,8 @@
                 'replaceState': true,
                 'beforeunload': true,
                 'pagehide': true,
+                'video-ratechange': true,
+                'video-ended': true,
                 'video-loadedmetadata': true,
                 'video-playing': true,
                 'mode-poll': true,
@@ -367,6 +423,31 @@
 
         function getPlayerContainer() {
             return document.querySelector('.bpx-player-container, .bpx-player-container-wrap, .bilibili-player, #bilibili-player, .bpx-player-video-wrap');
+        }
+
+        function isPartNavigationElement(element) {
+            if (!(element instanceof Element)) {
+                return false;
+            }
+
+            const matched = element.closest(PART_NAVIGATION_SELECTORS.join(', '));
+            if (!matched) {
+                return false;
+            }
+
+            const text = String(
+                matched.getAttribute('title') ||
+                matched.getAttribute('aria-label') ||
+                matched.textContent ||
+                ''
+            );
+
+            if (/[上下]一/.test(text) || /prev|next/i.test(text)) {
+                return true;
+            }
+
+            const className = String(matched.className || '');
+            return /prev|next/i.test(className);
         }
 
         function clickElementRobust(element) {
@@ -556,13 +637,28 @@
             return rate;
         }
 
-        function buildSnapshot(modeOverride, fallbackSnapshot) {
+        function shouldUseNavigationRateFallback(reason) {
+            const reasonText = String(reason || 'unknown');
+            const allowedReasons = {
+                'pushState': true,
+                'beforeunload': true,
+                'pagehide': true,
+                'external-save-hint': true,
+                'popstate': true
+            };
+
+            return !!allowedReasons[reasonText];
+        }
+
+        function buildSnapshot(reason, modeOverride, fallbackSnapshot) {
             const video = getVideoElement();
             const rawPlaybackRate = video && typeof video.playbackRate === 'number' ? video.playbackRate : 1.0;
             let playbackRate = pickStablePlaybackRate(rawPlaybackRate, fallbackSnapshot);
-            const globalRate = readGlobalRate();
-            if (approxEqual(playbackRate, 1.0) && globalRate > 0) {
-                playbackRate = globalRate;
+            if (shouldUseNavigationRateFallback(reason) && approxEqual(playbackRate, 1.0)) {
+                const globalRate = readGlobalRate();
+                if (globalRate > 0 && !approxEqual(globalRate, 1.0)) {
+                    playbackRate = globalRate;
+                }
             }
             const mode = modeOverride || getFullscreenMode();
 
@@ -580,7 +676,7 @@
             }
 
             try {
-                const snapshot = buildSnapshot(modeOverride, fallbackSnapshot);
+                const snapshot = buildSnapshot(reason, modeOverride, fallbackSnapshot);
                 sessionStorage.setItem(getStorageKey(), JSON.stringify(snapshot));
                 saveGlobalRate(snapshot.playbackRate, reason);
                 console.log('[SandronePlayer] Playback state saved:', reason, snapshot);
@@ -595,12 +691,13 @@
             }
 
             try {
-                const snapshot = buildSnapshot(modeOverride, fallbackSnapshot);
+                const snapshot = buildSnapshot(reason, modeOverride, fallbackSnapshot);
                 sessionStorage.setItem(getPendingStorageKey(), JSON.stringify(snapshot));
                 postPlaybackDebug('savePendingSnapshot', {
                     reason: reason,
                     mode: snapshot.fullscreenMode,
-                    rate: snapshot.playbackRate
+                    rate: snapshot.playbackRate,
+                    globalRate: readGlobalRate()
                 });
             } catch (err) {
                 console.warn('[SandronePlayer] Failed to save pending playback state:', err);
@@ -694,6 +791,10 @@
             video.__akashaPlaybackStateBound = true;
 
             video.addEventListener('ratechange', function () {
+                const rate = Number(video.playbackRate) || 1.0;
+                if (hasRecentUserInteraction()) {
+                    markExplicitRateRequest(rate, 'video-ratechange');
+                }
                 saveSnapshot('video-ratechange');
             });
 
@@ -709,6 +810,11 @@
             video.addEventListener('playing', function () {
                 saveSnapshot('video-playing');
                 scheduleRestore('video-playing');
+            });
+
+            video.addEventListener('ended', function () {
+                // Capture the handoff state before the site resets the next-part player back to 1.0x.
+                savePendingSnapshot('video-ended');
             });
         }
 
@@ -846,6 +952,32 @@
             }
         }
 
+        function shouldApplyGlobalRateFallback(snapshot, reason, fallbackToLatestRate) {
+            if (!snapshot) {
+                return false;
+            }
+
+            if (!fallbackToLatestRate) {
+                return false;
+            }
+
+            if (!approxEqual(snapshot.playbackRate, 1.0)) {
+                return false;
+            }
+
+            const reasonText = String(reason || 'unknown');
+            const allowedReasons = {
+                'init': true,
+                'delayed-init': true,
+                'host-navigation-completed': true,
+                'video-loadedmetadata': true,
+                'video-canplay': true,
+                'video-playing': true
+            };
+
+            return !!allowedReasons[reasonText];
+        }
+
         function registerUserGestureRetry() {
             if (waitingUserGesture || !pendingFullscreenSnapshot) {
                 return;
@@ -912,7 +1044,16 @@
             }
 
             const globalRate = readGlobalRate();
-            if (snapshot && globalRate > 0 && !approxEqual(snapshot.playbackRate, globalRate)) {
+            if (!snapshot && globalRate > 0) {
+                snapshot = {
+                    playbackRate: globalRate,
+                    fullscreenMode: 'none',
+                    href: window.location.href,
+                    updatedAt: Date.now()
+                };
+                applyGlobalRate = true;
+            }
+            else if (snapshot && globalRate > 0 && !approxEqual(snapshot.playbackRate, globalRate)) {
                 snapshot = {
                     playbackRate: globalRate,
                     fullscreenMode: snapshot.fullscreenMode,
@@ -959,6 +1100,7 @@
                 reason: reason,
                 fallbackToLatestRate: fallbackToLatestRate,
                 applyGlobalRate: applyGlobalRate,
+                globalRate: globalRate,
                 targetMode: snapshot.fullscreenMode,
                 targetRate: snapshot.playbackRate
             });
@@ -1033,7 +1175,7 @@
             try {
                 const originalPushState = history.pushState;
                 history.pushState = function () {
-                    const previousSnapshot = readSnapshot();
+                    const previousSnapshot = readPendingSnapshot() || readSnapshot();
                     const result = originalPushState.apply(this, arguments);
                     saveSnapshot('pushState', null, previousSnapshot);
                     savePendingSnapshot('pushState', null, previousSnapshot);
@@ -1067,6 +1209,7 @@
             }, true);
 
             document.addEventListener('click', function (event) {
+                markUserInteraction();
                 const target = event.target;
                 if (!(target instanceof Element)) {
                     return;
@@ -1083,7 +1226,24 @@
                     setTimeout(function () {
                         saveSnapshot('fullscreen-button-click-full', 'full');
                     }, 60);
+                    return;
                 }
+
+                if (isPartNavigationElement(target)) {
+                    saveSnapshot('part-navigation-click');
+                    savePendingSnapshot('part-navigation-click');
+                    postPlaybackDebug('partNavigationClick', {
+                        globalRate: readGlobalRate(),
+                        currentRate: (function () {
+                            const video = getVideoElement();
+                            return video ? Number(video.playbackRate) : null;
+                        })()
+                    });
+                }
+            }, true);
+
+            document.addEventListener('keydown', function () {
+                markUserInteraction();
             }, true);
 
             window.addEventListener('beforeunload', function () {
@@ -1109,6 +1269,17 @@
             window.addEventListener('akasha:save-playback-state', function () {
                 saveSnapshot('external-save-hint');
                 savePendingSnapshot('external-save-hint');
+            });
+
+            window.addEventListener('akasha:set-playback-rate', function (event) {
+                const detail = event && event.detail ? event.detail : null;
+                const rate = detail && typeof detail.rate !== 'undefined' ? Number(detail.rate) : 1.0;
+                markExplicitRateRequest(rate, 'host-set-playback-rate');
+                saveGlobalRate(rate, 'host-set-playback-rate');
+                postPlaybackDebug('explicitGlobalRateUpdate', {
+                    source: 'host-set-playback-rate',
+                    rate: rate
+                });
             });
         }
 

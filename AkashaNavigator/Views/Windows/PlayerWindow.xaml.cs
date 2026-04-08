@@ -928,6 +928,9 @@ public partial class PlayerWindow : Window
 
         string script = $@"
             (function() {{
+                window.dispatchEvent(new CustomEvent('akasha:set-playback-rate', {{
+                    detail: {{ rate: {rate.ToString(System.Globalization.CultureInfo.InvariantCulture)} }}
+                }}));
                 var video = document.querySelector('video');
                 if (video) {{
                     video.playbackRate = {rate.ToString(System.Globalization.CultureInfo.InvariantCulture)};
