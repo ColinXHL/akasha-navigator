@@ -33,6 +33,31 @@ public static class AppConstants
     public const int ResizeBorderThickness = 8;
 
     /// <summary>
+    /// 缩放提示悬停触发延迟（毫秒）
+    /// </summary>
+    public const int ResizeHintHoverDelayMs = 500;
+
+    /// <summary>
+    /// 按住 Shift 时的缩放宽高比（宽）
+    /// </summary>
+    public const double AspectRatio16By9Width = 16.0;
+
+    /// <summary>
+    /// 按住 Shift 时的缩放宽高比（高）
+    /// </summary>
+    public const double AspectRatio16By9Height = 9.0;
+
+    /// <summary>
+    /// 缩放提示消息
+    /// </summary>
+    public const string ResizeHintMessage = "按住 Shift 可按 16:9 缩放";
+
+    /// <summary>
+    /// 缩放提示图标
+    /// </summary>
+    public const string ResizeHintIcon = "📐";
+
+    /// <summary>
     /// 边缘吸附阈值（像素）
     /// </summary>
     public const int SnapThreshold = 15;

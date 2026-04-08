@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using AkashaNavigator.Core;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Events.Events;
@@ -47,6 +48,7 @@ public partial class PlayerWindow : Window
     private readonly ICursorDetectionService _cursorDetectionService;
     private readonly IEventBus _eventBus;
     private readonly IDialogFactory _dialogFactory;
+    private readonly OsdManager _osdManager;
     private readonly Func<PioneerNoteWindow> _pioneerNoteWindowFactory;
     private readonly ScriptExecutionQueue _scriptQueue;
 
@@ -105,6 +107,21 @@ public partial class PlayerWindow : Window
     /// </summary>
     private bool _isHidden;
 
+    /// <summary>
+    /// 缩放提示悬停计时器
+    /// </summary>
+    private readonly DispatcherTimer _resizeHintHoverTimer;
+
+    /// <summary>
+    /// 当前是否处于可缩放边缘区域
+    /// </summary>
+    private bool _isInResizableEdge;
+
+    /// <summary>
+    /// 本次进入可缩放边缘后是否已显示提示
+    /// </summary>
+    private bool _hasShownResizeHintInCurrentHover;
+
 #endregion
 
 #region Constructor
@@ -113,7 +130,8 @@ public partial class PlayerWindow : Window
                         IWindowStateService windowStateService, ISubtitleService subtitleService,
                         IDataService dataService, IPluginHost pluginHost, ILogService logService,
                         ICursorDetectionService cursorDetectionService, IEventBus eventBus,
-                        IDialogFactory dialogFactory, Func<PioneerNoteWindow> pioneerNoteWindowFactory,
+                        IDialogFactory dialogFactory, OsdManager osdManager,
+                        Func<PioneerNoteWindow> pioneerNoteWindowFactory,
                         ScriptExecutionQueue scriptQueue)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
@@ -128,9 +146,16 @@ public partial class PlayerWindow : Window
             cursorDetectionService ?? throw new ArgumentNullException(nameof(cursorDetectionService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _dialogFactory = dialogFactory ?? throw new ArgumentNullException(nameof(dialogFactory));
+        _osdManager = osdManager ?? throw new ArgumentNullException(nameof(osdManager));
         _pioneerNoteWindowFactory =
             pioneerNoteWindowFactory ?? throw new ArgumentNullException(nameof(pioneerNoteWindowFactory));
         _scriptQueue = scriptQueue ?? throw new ArgumentNullException(nameof(scriptQueue));
+
+        _resizeHintHoverTimer = new DispatcherTimer
+                                {
+                                    Interval = TimeSpan.FromMilliseconds(AppConstants.ResizeHintHoverDelayMs)
+                                };
+        _resizeHintHoverTimer.Tick += ResizeHintHoverTimer_Tick;
 
         InitializeComponent();
         _config = _configService.Config;
@@ -274,12 +299,23 @@ public partial class PlayerWindow : Window
     private void SaveWindowState()
     {
         var state = _windowStateService.Load();
-        state.Left = Left;
-        state.Top = Top;
-        state.Width = Width;
-        state.Height = Height;
+        if (_isMaximized && _restoreBounds.Width > 0 && _restoreBounds.Height > 0)
+        {
+            state.Left = _restoreBounds.Left;
+            state.Top = _restoreBounds.Top;
+            state.Width = _restoreBounds.Width;
+            state.Height = _restoreBounds.Height;
+        }
+        else
+        {
+            state.Left = Left;
+            state.Top = Top;
+            state.Width = Width;
+            state.Height = Height;
+        }
+
         state.Opacity = _windowBehavior.WindowOpacity;
-        state.IsMaximized = _isMaximized;
+        state.IsMaximized = false;
         state.LastUrl = WebView.CoreWebView2?.Source ?? AppConstants.DefaultHomeUrl;
         state.IsMuted = WebView.CoreWebView2?.IsMuted ?? false;
         _windowStateService.Save(state);
@@ -1036,8 +1072,32 @@ public partial class PlayerWindow : Window
     {
         base.OnMouseMove(e);
 
+        if (_isMaximized)
+        {
+            StopResizeHintHover();
+            _isInResizableEdge = false;
+            _hasShownResizeHintInCurrentHover = false;
+            Cursor = Cursors.Arrow;
+            return;
+        }
+
         var position = e.GetPosition(this);
         var direction = Win32Helper.GetResizeDirection(this, position, AppConstants.ResizeBorderThickness);
+
+        bool isInResizableEdge = direction != Win32Helper.ResizeDirection.None;
+
+        if (isInResizableEdge && !_isInResizableEdge)
+        {
+            _isInResizableEdge = true;
+            _hasShownResizeHintInCurrentHover = false;
+            StartResizeHintHover();
+        }
+        else if (!isInResizableEdge && _isInResizableEdge)
+        {
+            _isInResizableEdge = false;
+            _hasShownResizeHintInCurrentHover = false;
+            StopResizeHintHover();
+        }
 
         Cursor = direction switch { Win32Helper.ResizeDirection.Left => Cursors.SizeWE,
                                     Win32Helper.ResizeDirection.Right => Cursors.SizeWE,
@@ -1048,6 +1108,53 @@ public partial class PlayerWindow : Window
                                     Win32Helper.ResizeDirection.TopRight => Cursors.SizeNESW,
                                     Win32Helper.ResizeDirection.BottomLeft => Cursors.SizeNESW,
                                     _ => Cursors.Arrow };
+    }
+
+    /// <summary>
+    /// 鼠标离开窗口时重置缩放提示状态
+    /// </summary>
+    protected override void OnMouseLeave(System.Windows.Input.MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        _isInResizableEdge = false;
+        _hasShownResizeHintInCurrentHover = false;
+        StopResizeHintHover();
+    }
+
+    /// <summary>
+    /// 启动缩放提示悬停计时器
+    /// </summary>
+    private void StartResizeHintHover()
+    {
+        if (_resizeHintHoverTimer.IsEnabled)
+            return;
+
+        _resizeHintHoverTimer.Start();
+    }
+
+    /// <summary>
+    /// 停止缩放提示悬停计时器
+    /// </summary>
+    private void StopResizeHintHover()
+    {
+        if (_resizeHintHoverTimer.IsEnabled)
+        {
+            _resizeHintHoverTimer.Stop();
+        }
+    }
+
+    /// <summary>
+    /// 缩放提示悬停计时器回调
+    /// </summary>
+    private void ResizeHintHoverTimer_Tick(object? sender, EventArgs e)
+    {
+        StopResizeHintHover();
+
+        if (_isMaximized || !_isInResizableEdge || _hasShownResizeHintInCurrentHover)
+            return;
+
+        _osdManager.ShowMessage(AppConstants.ResizeHintMessage, AppConstants.ResizeHintIcon);
+        _hasShownResizeHintInCurrentHover = true;
     }
 
 #endregion
@@ -1290,6 +1397,10 @@ public partial class PlayerWindow : Window
 
         // 保存窗口状态
         SaveWindowState();
+
+        // 停止缩放提示计时器
+        StopResizeHintHover();
+        _resizeHintHoverTimer.Tick -= ResizeHintHoverTimer_Tick;
 
         // 停止穿透模式定时器
         _windowBehavior.StopClickThroughTimer();

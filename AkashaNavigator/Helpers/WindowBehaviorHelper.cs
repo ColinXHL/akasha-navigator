@@ -460,6 +460,12 @@ public class WindowBehaviorHelper
         int sizingEdge = wParam.ToInt32();
         var rect = Marshal.PtrToStructure<Win32Helper.RECT>(lParam);
         Win32Helper.SnapSizingEdge(ref rect, workArea, threshold, sizingEdge);
+
+        if (Win32Helper.IsKeyPressed(Win32Helper.VK_SHIFT))
+        {
+            ApplyAspectRatio16By9(ref rect, sizingEdge, dpiScale);
+        }
+
         Marshal.StructureToPtr(rect, lParam, false);
     }
 
@@ -517,6 +523,83 @@ public class WindowBehaviorHelper
                 // 鼠标离开窗口，恢复正常透明度
                 Win32Helper.SetWindowOpacity(_window, _opacityBeforeClickThrough);
             }
+        }
+    }
+
+    /// <summary>
+    /// 按住 Shift 调整大小时，将窗口约束为 16:9。
+    /// </summary>
+    private static void ApplyAspectRatio16By9(ref Win32Helper.RECT rect, int sizingEdge, double dpiScale)
+    {
+        int minWidth = (int)Math.Ceiling(AppConstants.MinWindowWidth * dpiScale);
+        int minHeight = (int)Math.Ceiling(AppConstants.MinWindowHeight * dpiScale);
+        double aspectRatio = AppConstants.AspectRatio16By9Width / AppConstants.AspectRatio16By9Height;
+
+        int width = rect.Right - rect.Left;
+        int height = rect.Bottom - rect.Top;
+
+        if (width <= 0 || height <= 0)
+            return;
+
+        bool isVerticalEdge = sizingEdge == 3 || sizingEdge == 6;
+
+        if (isVerticalEdge)
+        {
+            height = Math.Max(height, minHeight);
+            width = (int)Math.Round(height * aspectRatio);
+
+            if (width < minWidth)
+            {
+                width = minWidth;
+                height = (int)Math.Round(width / aspectRatio);
+            }
+        }
+        else
+        {
+            width = Math.Max(width, minWidth);
+            height = (int)Math.Round(width / aspectRatio);
+
+            if (height < minHeight)
+            {
+                height = minHeight;
+                width = (int)Math.Round(height * aspectRatio);
+            }
+        }
+
+        switch (sizingEdge)
+        {
+        case 1: // WMSZ_LEFT
+            rect.Left = rect.Right - width;
+            rect.Bottom = rect.Top + height;
+            break;
+        case 2: // WMSZ_RIGHT
+            rect.Right = rect.Left + width;
+            rect.Bottom = rect.Top + height;
+            break;
+        case 3: // WMSZ_TOP
+            rect.Top = rect.Bottom - height;
+            rect.Right = rect.Left + width;
+            break;
+        case 4: // WMSZ_TOPLEFT
+            rect.Left = rect.Right - width;
+            rect.Top = rect.Bottom - height;
+            break;
+        case 5: // WMSZ_TOPRIGHT
+            rect.Right = rect.Left + width;
+            rect.Top = rect.Bottom - height;
+            break;
+        case 6: // WMSZ_BOTTOM
+            rect.Bottom = rect.Top + height;
+            rect.Right = rect.Left + width;
+            break;
+        case 7: // WMSZ_BOTTOMLEFT
+            rect.Left = rect.Right - width;
+            rect.Bottom = rect.Top + height;
+            break;
+        case 8: // WMSZ_BOTTOMRIGHT
+            rect.Right = rect.Left + width;
+            rect.Bottom = rect.Top + height;
+            break;
         }
     }
 
