@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Services;
 using AkashaNavigator.Views.Windows;
 
@@ -12,6 +13,7 @@ namespace AkashaNavigator.Plugins.Apis
 public class OverlayContext
 {
     private readonly string _pluginId;
+    private readonly IOverlayManager _overlayManager;
 
     // 绘图状态（小写属性名，Canvas 风格）
     public string fillStyle { get; set; } = "#000000";
@@ -19,9 +21,10 @@ public class OverlayContext
     public double lineWidth { get; set; } = 1.0;
     public string font { get; set; } = "14px Arial";
 
-    public OverlayContext(string pluginId)
+    public OverlayContext(string pluginId, IOverlayManager overlayManager)
     {
         _pluginId = pluginId;
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
     }
 
     /// <summary>
@@ -29,7 +32,7 @@ public class OverlayContext
     /// </summary>
     public void fillRect(double x, double y, double width, double height)
     {
-        var overlay = OverlayManager.Instance.GetOverlay(_pluginId);
+        var overlay = _overlayManager.GetOverlay(_pluginId);
         if (overlay == null)
             return;
 
@@ -46,7 +49,7 @@ public class OverlayContext
     /// </summary>
     public void strokeRect(double x, double y, double width, double height)
     {
-        var overlay = OverlayManager.Instance.GetOverlay(_pluginId);
+        var overlay = _overlayManager.GetOverlay(_pluginId);
         if (overlay == null)
             return;
 
@@ -63,7 +66,7 @@ public class OverlayContext
     /// </summary>
     public void fillText(string text, double x, double y)
     {
-        var overlay = OverlayManager.Instance.GetOverlay(_pluginId);
+        var overlay = _overlayManager.GetOverlay(_pluginId);
         if (overlay == null)
             return;
 
@@ -96,7 +99,7 @@ public class OverlayContext
     /// </summary>
     public void drawImage(string src, double x, double y, double? width = null, double? height = null)
     {
-        var overlay = OverlayManager.Instance.GetOverlay(_pluginId);
+        var overlay = _overlayManager.GetOverlay(_pluginId);
         if (overlay == null)
             return;
 
@@ -113,7 +116,7 @@ public class OverlayContext
     /// </summary>
     public void clear()
     {
-        var overlay = OverlayManager.Instance.GetOverlay(_pluginId);
+        var overlay = _overlayManager.GetOverlay(_pluginId);
         System.Windows.Application.Current?.Dispatcher.Invoke(() => overlay?.ClearDrawingElements());
     }
 }

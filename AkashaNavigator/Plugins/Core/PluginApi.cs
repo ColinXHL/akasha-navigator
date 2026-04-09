@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.ClearScript;
 using AkashaNavigator.Models.Plugin;
-using AkashaNavigator.Views.Windows;
+using AkashaNavigator.Core;
+using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Helpers;
+using AkashaNavigator.Services;
 using AkashaNavigator.Plugins.Utils;
 using AkashaNavigator.Plugins.Apis.Core;
 using AkashaNavigator.Plugins.Apis;
@@ -23,23 +26,6 @@ public class PluginApi
     private readonly PluginConfig _config;
     private readonly HashSet<string> _permissions;
     private readonly EventManager _eventManager;
-
-    // 用于延迟设置的窗口引用
-    private static Func<PlayerWindow?>? _globalWindowGetter;
-
-#endregion
-
-#region Static Methods
-
-    /// <summary>
-    /// 设置全局 PlayerWindow 获取器
-    /// 应在应用启动时调用
-    /// </summary>
-    /// <param name="windowGetter">获取 PlayerWindow 的委托</param>
-    public static void SetGlobalWindowGetter(Func<PlayerWindow?> windowGetter)
-    {
-        _globalWindowGetter = windowGetter;
-    }
 
 #endregion
 
@@ -140,7 +126,16 @@ public class PluginApi
     /// <param name="context">插件上下文</param>
     /// <param name="config">插件配置</param>
     /// <param name="profileInfo">Profile 信息</param>
-    public PluginApi(PluginContext context, PluginConfig config, ProfileInfo profileInfo)
+    public PluginApi(PluginContext context, PluginConfig config, ProfileInfo profileInfo,
+                     IPlayerRuntimeBridge? runtimeBridge = null,
+                     ICursorDetectionService? cursorDetectionService = null,
+                     IOverlayManager? overlayManager = null,
+                     IPanelManager? panelManager = null,
+                     ISubtitleService? subtitleService = null,
+                     ScriptExecutionQueue? scriptExecutionQueue = null,
+                     HotkeyService? hotkeyService = null,
+                     OsdManager? osdManager = null,
+                     ILogService? logService = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _manifest = context.Manifest;
@@ -165,17 +160,20 @@ public class PluginApi
         Profile = profileInfo ?? throw new ArgumentNullException(nameof(profileInfo));
 
         // 初始化现有需要权限的 API
-        _overlayApi = new OverlayApi(context, Config);
+        overlayManager ??= new OverlayManager();
+        _overlayApi = new OverlayApi(context, Config, overlayManager);
         // SubtitleApi 需要 V8ScriptEngine，从 context 获取
-        if (context.Engine != null)
+        if (context.Engine != null && subtitleService != null)
         {
-            _subtitleApi = new SubtitleApi(context, context.Engine);
+            _subtitleApi = new SubtitleApi(context, context.Engine, subtitleService);
             _subtitleApi.SetEventManager(_eventManager);
         }
 
         // 初始化新增的需要权限的 API
-        _playerApi = _globalWindowGetter != null ? new PlayerApi(context, _globalWindowGetter) : null;
-        _windowApi = _globalWindowGetter != null ? new WindowApi(context, _globalWindowGetter) : null;
+        _playerApi = runtimeBridge != null ? new PlayerApi(context, runtimeBridge.GetPlayerWindow) : null;
+        _windowApi = runtimeBridge != null && cursorDetectionService != null
+            ? new WindowApi(context, runtimeBridge, cursorDetectionService)
+            : null;
         _storageApi = new StorageApi(context);
         _httpApi = new HttpApi(context);
         _eventApi = new EventApi(context, _eventManager);

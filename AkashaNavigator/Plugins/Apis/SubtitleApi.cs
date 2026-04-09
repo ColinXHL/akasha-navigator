@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Data;
 using AkashaNavigator.Services;
 using AkashaNavigator.Plugins.Core;
@@ -15,13 +16,15 @@ public class SubtitleApi
 {
     private readonly PluginContext _context;
     private readonly V8ScriptEngine _engine;
+    private readonly ISubtitleService _subtitleService;
     private EventManager? _eventManager;
     private bool _isSubscribed;
 
-    public SubtitleApi(PluginContext context, V8ScriptEngine engine)
+    public SubtitleApi(PluginContext context, V8ScriptEngine engine, ISubtitleService subtitleService)
     {
         _context = context;
         _engine = engine;
+        _subtitleService = subtitleService ?? throw new ArgumentNullException(nameof(subtitleService));
     }
 
     public void SetEventManager(EventManager eventManager)
@@ -38,9 +41,9 @@ public class SubtitleApi
         if (_isSubscribed || _eventManager == null)
             return;
 
-        SubtitleService.Instance.SubtitleChanged += OnSubtitleChanged;
-        SubtitleService.Instance.SubtitleLoaded += OnSubtitleLoaded;
-        SubtitleService.Instance.SubtitleCleared += OnSubtitleCleared;
+        _subtitleService.SubtitleChanged += OnSubtitleChanged;
+        _subtitleService.SubtitleLoaded += OnSubtitleLoaded;
+        _subtitleService.SubtitleCleared += OnSubtitleCleared;
         _isSubscribed = true;
 
         LogService.Instance.Debug($"Plugin:{_context.PluginId}", "SubtitleApi: EventManager set");
@@ -54,9 +57,9 @@ public class SubtitleApi
         if (!_isSubscribed)
             return;
 
-        SubtitleService.Instance.SubtitleChanged -= OnSubtitleChanged;
-        SubtitleService.Instance.SubtitleLoaded -= OnSubtitleLoaded;
-        SubtitleService.Instance.SubtitleCleared -= OnSubtitleCleared;
+        _subtitleService.SubtitleChanged -= OnSubtitleChanged;
+        _subtitleService.SubtitleLoaded -= OnSubtitleLoaded;
+        _subtitleService.SubtitleCleared -= OnSubtitleCleared;
         _isSubscribed = false;
     }
 
@@ -104,11 +107,11 @@ public class SubtitleApi
     }
 
     // 属性和方法
-    public bool hasSubtitles => SubtitleService.Instance.GetSubtitleData() != null;
+    public bool hasSubtitles => _subtitleService.GetSubtitleData() != null;
 
     public object? getCurrent(double? time = null)
     {
-        var entry = time.HasValue ? SubtitleService.Instance.GetSubtitleAt(time.Value) : null;
+        var entry = time.HasValue ? _subtitleService.GetSubtitleAt(time.Value) : null;
         if (entry == null)
             return null;
         return new { from = entry.From, to = entry.To, content = entry.Content };
@@ -116,15 +119,15 @@ public class SubtitleApi
 
     public object getAll()
     {
-        var entries = SubtitleService.Instance.GetAllSubtitles();
+        var entries = _subtitleService.GetAllSubtitles();
         return CreateJsArray(entries);
     }
 
-    public string language => SubtitleService.Instance.GetSubtitleData()?.Language ?? string.Empty;
+    public string language => _subtitleService.GetSubtitleData()?.Language ?? string.Empty;
 
     public void request()
     {
-        _ = SubtitleService.Instance.RequestSubtitleAsync();
+        _ = _subtitleService.RequestSubtitleAsync();
     }
 
     public int on(string eventName, object callback)

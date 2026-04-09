@@ -6,6 +6,7 @@ using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Plugins.Core;
 using AkashaNavigator.Plugins.Utils;
 using AkashaNavigator.Plugins.Apis.Core;
+using AkashaNavigator.Core.Interfaces;
 using Microsoft.ClearScript;
 
 namespace AkashaNavigator.Plugins.Apis
@@ -17,12 +18,14 @@ public class OverlayApi
 {
     private readonly PluginContext _context;
     private readonly ConfigApi _configApi;
+    private readonly IOverlayManager _overlayManager;
     private readonly EventManager _eventManager;
 
-    public OverlayApi(PluginContext context, ConfigApi configApi)
+    public OverlayApi(PluginContext context, ConfigApi configApi, IOverlayManager overlayManager)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _configApi = configApi ?? throw new ArgumentNullException(nameof(configApi));
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _eventManager = new EventManager();
     }
 
@@ -62,7 +65,7 @@ public class OverlayApi
     {
         try
         {
-            var overlay = OverlayManager.Instance.GetOverlay(_context.PluginId);
+            var overlay = _overlayManager.GetOverlay(_context.PluginId);
             System.Windows.Application.Current?.Dispatcher.Invoke(() => overlay?.Hide());
         }
         catch
@@ -98,11 +101,11 @@ public class OverlayApi
     {
         if (Enum.TryParse<Views.Windows.Direction>(direction, true, out var dir))
         {
-            OverlayManager.Instance.ShowDirectionMarker(_context.PluginId, dir, duration);
+            _overlayManager.ShowDirectionMarker(_context.PluginId, dir, duration);
         }
     }
 
-    public void clearMarkers() => OverlayManager.Instance.ClearMarkers(_context.PluginId);
+    public void clearMarkers() => _overlayManager.ClearMarkers(_context.PluginId);
 
     /// <summary>
     /// 设置标记样式
@@ -168,7 +171,7 @@ public class OverlayApi
     /// </summary>
     private OverlayWindow? EnsureOverlay()
     {
-        var overlay = OverlayManager.Instance.GetOverlay(_context.PluginId);
+        var overlay = _overlayManager.GetOverlay(_context.PluginId);
         if (overlay == null)
         {
             // 从配置读取初始位置和大小
@@ -179,7 +182,7 @@ public class OverlayApi
             var options = new OverlayOptions { X = Convert.ToDouble(x), Y = Convert.ToDouble(y),
                                                Width = Convert.ToDouble(size), Height = Convert.ToDouble(size) };
 
-            overlay = OverlayManager.Instance.CreateOverlay(_context.PluginId, options);
+            overlay = _overlayManager.CreateOverlay(_context.PluginId, options);
         }
         return overlay;
     }
@@ -190,7 +193,7 @@ public class OverlayApi
     /// <returns>绘图上下文对象</returns>
     public OverlayContext getContext()
     {
-        return new OverlayContext(_context.PluginId);
+        return new OverlayContext(_context.PluginId, _overlayManager);
     }
 
     /// <summary>
@@ -199,7 +202,7 @@ public class OverlayApi
     /// <returns>包含 x 和 y 属性的对象</returns>
     public object? getPosition()
     {
-        var overlay = OverlayManager.Instance.GetOverlay(_context.PluginId);
+        var overlay = _overlayManager.GetOverlay(_context.PluginId);
         if (overlay == null)
             return null;
 

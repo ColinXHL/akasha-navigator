@@ -200,7 +200,10 @@ public static class PluginEngine
         // overlay API
         if (permissions.Contains(PluginPermissions.Overlay, StringComparer.OrdinalIgnoreCase))
         {
-            var overlayApi = new OverlayApi(context, configApi);
+            if (options.OverlayManager == null)
+                throw new InvalidOperationException("OverlayManager is required when overlay permission is granted.");
+
+            var overlayApi = new OverlayApi(context, configApi, options.OverlayManager);
             engine.AddHostObject("overlay", overlayApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: overlay");
         }
@@ -208,7 +211,10 @@ public static class PluginEngine
         // player API
         if (permissions.Contains(PluginPermissions.Player, StringComparer.OrdinalIgnoreCase))
         {
-            var playerApi = new PlayerApi(context, options.GetPlayerWindow);
+            if (options.RuntimeBridge == null)
+                throw new InvalidOperationException("RuntimeBridge is required when player permission is granted.");
+
+            var playerApi = new PlayerApi(context, options.RuntimeBridge.GetPlayerWindow);
             playerApi.SetEventManager(eventManager);
             engine.AddHostObject("player", playerApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: player");
@@ -217,7 +223,10 @@ public static class PluginEngine
         // window API
         if (permissions.Contains(PluginPermissions.Window, StringComparer.OrdinalIgnoreCase))
         {
-            var windowApi = new WindowApi(context, options.GetPlayerWindow);
+            if (options.RuntimeBridge == null || options.CursorDetectionService == null)
+                throw new InvalidOperationException("RuntimeBridge and CursorDetectionService are required for WindowApi.");
+
+            var windowApi = new WindowApi(context, options.RuntimeBridge, options.CursorDetectionService);
             windowApi.SetEventManager(eventManager);
             engine.AddHostObject("window", windowApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: window");
@@ -226,7 +235,10 @@ public static class PluginEngine
         // panel API
         if (permissions.Contains(PluginPermissions.Panel, StringComparer.OrdinalIgnoreCase))
         {
-            var panelApi = new PanelApi(context, configApi);
+            if (options.PanelManager == null)
+                throw new InvalidOperationException("PanelManager is required when panel permission is granted.");
+
+            var panelApi = new PanelApi(context, configApi, options.PanelManager);
             engine.AddHostObject("panel", panelApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: panel");
         }
@@ -250,7 +262,10 @@ public static class PluginEngine
         // subtitle API
         if (permissions.Contains(PluginPermissions.Subtitle, StringComparer.OrdinalIgnoreCase))
         {
-            var subtitleApi = new SubtitleApi(context, engine);
+            if (options.SubtitleService == null)
+                throw new InvalidOperationException("SubtitleService is required when subtitle permission is granted.");
+
+            var subtitleApi = new SubtitleApi(context, engine, options.SubtitleService);
             subtitleApi.SetEventManager(eventManager);
             engine.AddHostObject("subtitle", subtitleApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: subtitle");
@@ -264,8 +279,10 @@ public static class PluginEngine
         // hotkey API
         if (permissions.Contains(PluginPermissions.Hotkey, StringComparer.OrdinalIgnoreCase))
         {
-            var hotkeyApi = new HotkeyApi(pluginId);
-            // 注意：ActionDispatcher 需要在 PluginHost 中设置
+            if (options.HotkeyService == null || options.ActionDispatcher == null)
+                throw new InvalidOperationException("HotkeyService and ActionDispatcher are required for HotkeyApi.");
+
+            var hotkeyApi = new HotkeyApi(pluginId, options.HotkeyService, options.ActionDispatcher);
             engine.AddHostObject("hotkey", hotkeyApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: hotkey");
         }
@@ -273,7 +290,11 @@ public static class PluginEngine
         // webview API（需要 player 权限）
         if (permissions.Contains(PluginPermissions.Player, StringComparer.OrdinalIgnoreCase))
         {
-            var webviewApi = new WebViewApi(pluginId, options.GetPlayerWindow);
+            if (options.RuntimeBridge == null || options.ScriptExecutionQueue == null || options.LogService == null)
+                throw new InvalidOperationException("RuntimeBridge, ScriptExecutionQueue and LogService are required for WebViewApi.");
+
+            var webviewApi = new WebViewApi(pluginId, options.RuntimeBridge, options.ScriptExecutionQueue,
+                                            options.LogService);
             engine.AddHostObject("webview", webviewApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: webview");
         }

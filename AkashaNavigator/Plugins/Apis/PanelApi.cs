@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using AkashaNavigator.Plugins.Apis.Core;
 using AkashaNavigator.Plugins.Core;
 using AkashaNavigator.Plugins.Utils;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Services;
 using AkashaNavigator.Views.Windows;
 
@@ -16,14 +17,16 @@ public class PanelApi
 {
     private readonly PluginContext _context;
     private readonly ConfigApi _configApi;
+    private readonly IPanelManager _panelManager;
     private readonly EventManager _eventManager;
 
     private PluginPanelWindow? _boundPanel;
 
-    public PanelApi(PluginContext context, ConfigApi configApi)
+    public PanelApi(PluginContext context, ConfigApi configApi, IPanelManager panelManager)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _configApi = configApi ?? throw new ArgumentNullException(nameof(configApi));
+        _panelManager = panelManager ?? throw new ArgumentNullException(nameof(panelManager));
         _eventManager = new EventManager();
     }
 
@@ -54,7 +57,7 @@ public class PanelApi
     {
         try
         {
-            var panel = PanelManager.Instance.GetPanel(_context.PluginId);
+            var panel = _panelManager.GetPanel(_context.PluginId);
             System.Windows.Application.Current?.Dispatcher.Invoke(() => panel?.Hide());
         }
         catch
@@ -67,7 +70,7 @@ public class PanelApi
     {
         try
         {
-            PanelManager.Instance.DestroyPanel(_context.PluginId);
+            _panelManager.DestroyPanel(_context.PluginId);
         }
         catch
         {
@@ -109,7 +112,7 @@ public class PanelApi
 
     public object? getPosition()
     {
-        var panel = PanelManager.Instance.GetPanel(_context.PluginId);
+        var panel = _panelManager.GetPanel(_context.PluginId);
         if (panel == null)
             return null;
 
@@ -121,7 +124,7 @@ public class PanelApi
 
     public object? getBounds()
     {
-        var panel = PanelManager.Instance.GetPanel(_context.PluginId);
+        var panel = _panelManager.GetPanel(_context.PluginId);
         if (panel == null)
             return null;
 
@@ -136,7 +139,7 @@ public class PanelApi
     public PanelContext getContext()
     {
         EnsurePanel();
-        return new PanelContext(_context.PluginId);
+        return new PanelContext(_context.PluginId, _panelManager);
     }
 
     public void setHeader(string title, string? hint = null)
@@ -208,7 +211,7 @@ public class PanelApi
 
     private Views.Windows.PluginPanelWindow? EnsurePanel()
     {
-        var panel = PanelManager.Instance.GetPanel(_context.PluginId);
+        var panel = _panelManager.GetPanel(_context.PluginId);
         if (panel == null)
         {
             var x = Convert.ToDouble(_configApi.Get("panel.x", _configApi.Get("overlay.x", (object)120.0)));
@@ -226,7 +229,7 @@ public class PanelApi
                 Title = _context.Manifest.Name ?? _context.PluginId
             };
 
-            panel = PanelManager.Instance.CreatePanel(_context.PluginId, options);
+            panel = _panelManager.CreatePanel(_context.PluginId, options);
         }
 
         if (panel != null && !ReferenceEquals(_boundPanel, panel))

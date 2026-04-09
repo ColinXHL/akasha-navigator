@@ -8,7 +8,6 @@ using AkashaNavigator.Models.Common;
 using AkashaNavigator.Plugins.Core;
 using AkashaNavigator.Plugins.Utils;
 using AkashaNavigator.Core.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Services
 {
@@ -18,47 +17,19 @@ namespace AkashaNavigator.Services
 /// </summary>
 public class PluginHost : IPluginHost, IDisposable
 {
-#region Singleton
-
-    private static PluginHost? _instance;
-    private static readonly object _lock = new();
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static PluginHost Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    if (_instance == null)
-                    {
-                        // 使用 DI 容器中的实例，确保与注入的实例一致
-                        var logService = App.Services?.GetRequiredService<ILogService>() ?? LogService.Instance;
-                        var pluginAssociationManager = App.Services?.GetRequiredService<IPluginAssociationManager>() ??
-                                                       PluginAssociationManager.Instance;
-                        var pluginLibrary =
-                            App.Services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance;
-
-                        _instance = new PluginHost(logService, pluginAssociationManager, pluginLibrary);
-                    }
-                }
-            }
-            return _instance;
-        }
-    internal
-        set => _instance = value;
-    }
-
-#endregion
-
 #region Fields
 
     private readonly ILogService _logService;
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly IPluginLibrary _pluginLibrary;
+    private readonly IPlayerRuntimeBridge _runtimeBridge;
+    private readonly IOverlayManager _overlayManager;
+    private readonly IPanelManager _panelManager;
+    private readonly ICursorDetectionService _cursorDetectionService;
+    private readonly ISubtitleService _subtitleService;
+    private readonly ScriptExecutionQueue _scriptExecutionQueue;
+    private readonly HotkeyService _hotkeyService;
+    private readonly Core.OsdManager _osdManager;
 
 #endregion
 
@@ -87,23 +58,6 @@ public class PluginHost : IPluginHost, IDisposable
     private string? _currentProfileId;
     private bool _disposed;
 
-    // 全局 PlayerWindow 获取器
-    private static Func<Views.Windows.PlayerWindow?>? _globalWindowGetter;
-
-#endregion
-
-#region Static Methods
-
-    /// <summary>
-    /// 设置全局 PlayerWindow 获取器
-    /// 应在应用启动时调用
-    /// </summary>
-    /// <param name="windowGetter">获取 PlayerWindow 的委托</param>
-    public static void SetGlobalWindowGetter(Func<Views.Windows.PlayerWindow?> windowGetter)
-    {
-        _globalWindowGetter = windowGetter;
-    }
-
 #endregion
 
 #region Properties
@@ -126,11 +80,23 @@ public class PluginHost : IPluginHost, IDisposable
     /// 私有构造函数（单例模式 + DI）
     /// </summary>
     public PluginHost(ILogService logService, IPluginAssociationManager pluginAssociationManager,
-                      IPluginLibrary pluginLibrary)
+                      IPluginLibrary pluginLibrary, IPlayerRuntimeBridge runtimeBridge,
+                      IOverlayManager overlayManager, IPanelManager panelManager,
+                      ICursorDetectionService cursorDetectionService, ISubtitleService subtitleService,
+                      ScriptExecutionQueue scriptExecutionQueue, HotkeyService hotkeyService,
+                      Core.OsdManager osdManager)
     {
         _logService = logService;
         _pluginAssociationManager = pluginAssociationManager;
         _pluginLibrary = pluginLibrary;
+        _runtimeBridge = runtimeBridge;
+        _overlayManager = overlayManager;
+        _panelManager = panelManager;
+        _cursorDetectionService = cursorDetectionService;
+        _subtitleService = subtitleService;
+        _scriptExecutionQueue = scriptExecutionQueue;
+        _hotkeyService = hotkeyService;
+        _osdManager = osdManager;
 
         // 订阅插件启用状态变化事件
         _pluginAssociationManager.PluginEnabledChanged += OnPluginEnabledChanged;
@@ -146,12 +112,24 @@ public class PluginHost : IPluginHost, IDisposable
     /// 用于测试的内部构造函数
     /// </summary>
     internal PluginHost(bool forTesting, ILogService logService, IPluginAssociationManager pluginAssociationManager,
-                        IPluginLibrary? pluginLibrary = null)
+                        IPluginLibrary pluginLibrary, IPlayerRuntimeBridge runtimeBridge,
+                        IOverlayManager overlayManager, IPanelManager panelManager,
+                        ICursorDetectionService cursorDetectionService, ISubtitleService subtitleService,
+                        ScriptExecutionQueue scriptExecutionQueue, HotkeyService hotkeyService,
+                        Core.OsdManager osdManager)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _pluginAssociationManager =
             pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
-        _pluginLibrary = pluginLibrary ?? PluginLibrary.Instance;
+        _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
+        _runtimeBridge = runtimeBridge ?? throw new ArgumentNullException(nameof(runtimeBridge));
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
+        _panelManager = panelManager ?? throw new ArgumentNullException(nameof(panelManager));
+        _cursorDetectionService = cursorDetectionService ?? throw new ArgumentNullException(nameof(cursorDetectionService));
+        _subtitleService = subtitleService ?? throw new ArgumentNullException(nameof(subtitleService));
+        _scriptExecutionQueue = scriptExecutionQueue ?? throw new ArgumentNullException(nameof(scriptExecutionQueue));
+        _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
+        _osdManager = osdManager ?? throw new ArgumentNullException(nameof(osdManager));
         // 测试用构造函数，不订阅事件
     }
 
@@ -641,8 +619,16 @@ public class PluginHost : IPluginHost, IDisposable
         var engineOptions = new PluginEngineOptions {
             ProfileId = _currentProfileId ?? string.Empty, ProfileName = _currentProfileId ?? string.Empty,
             ProfileDirectory = GetPluginConfigDirectory(_currentProfileId ?? string.Empty, pluginId),
-            GetPlayerWindow = _globalWindowGetter,
-            OsdManager = App.Services?.GetService<Core.OsdManager>()
+            RuntimeBridge = _runtimeBridge,
+            OverlayManager = _overlayManager,
+            PanelManager = _panelManager,
+            CursorDetectionService = _cursorDetectionService,
+            SubtitleService = _subtitleService,
+            ScriptExecutionQueue = _scriptExecutionQueue,
+            HotkeyService = _hotkeyService,
+            ActionDispatcher = _hotkeyService.GetDispatcher(),
+            LogService = _logService,
+            OsdManager = _osdManager
         };
 
         // 创建插件上下文
@@ -658,10 +644,9 @@ public class PluginHost : IPluginHost, IDisposable
         }
 
         // 创建 PluginApi（用于事件广播等）
-        var pluginApi = new PluginApi(context, config, profileInfo);
-
-        // 设置 HotkeyApi 的 ActionDispatcher（如果插件有 hotkey 权限）
-        SetupHotkeyApi(context, manifest);
+        var pluginApi = new PluginApi(context, config, profileInfo, _runtimeBridge, _cursorDetectionService,
+                                      _overlayManager, _panelManager, _subtitleService, _scriptExecutionQueue,
+                                      _hotkeyService, _osdManager, _logService);
 
         // 调用 onLoad
         if (!context.CallOnLoad())
@@ -718,61 +703,6 @@ public class PluginHost : IPluginHost, IDisposable
         _pluginApis.Remove(pluginId);
         PluginUnloaded?.Invoke(this, pluginId);
         Log("插件 {PluginId} 已卸载", pluginId);
-    }
-
-    /// <summary>
-    /// 设置插件的 HotkeyApi（如果插件有 hotkey 权限）
-    /// </summary>
-    /// <param name="context">插件上下文</param>
-    /// <param name="manifest">插件清单</param>
-    private void SetupHotkeyApi(PluginContext context, PluginManifest manifest)
-    {
-        // 检查插件是否有 hotkey 权限
-        var permissions = manifest.Permissions ?? new List<string>();
-        if (!permissions.Contains(PluginPermissions.Hotkey, StringComparer.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        // 从 V8 引擎获取 HotkeyApi 实例
-        if (context.Engine == null)
-        {
-            Log("插件 {PluginId} 的引擎为空，无法设置 HotkeyApi", context.PluginId);
-            return;
-        }
-
-        try
-        {
-            // 从引擎中获取 hotkey 全局对象
-            var hotkeyObj = context.Engine.Script.hotkey;
-            if (hotkeyObj == null)
-            {
-                Log("插件 {PluginId} 没有 hotkey API，跳过设置", context.PluginId);
-                return;
-            }
-
-            // 将 ScriptObject 转换为 HotkeyApi
-            if (hotkeyObj is Plugins.Apis.HotkeyApi hotkeyApi)
-            {
-                // 从 DI 容器获取 HotkeyService
-                var hotkeyService = App.Services?.GetService<HotkeyService>();
-                if (hotkeyService != null)
-                {
-                    var dispatcher = hotkeyService.GetDispatcher();
-                    hotkeyApi.SetDispatcher(dispatcher);
-                    hotkeyApi.SetHotkeyService(hotkeyService);
-                    Log("插件 {PluginId} 的 HotkeyApi 已设置 ActionDispatcher 和 HotkeyService", context.PluginId);
-                }
-                else
-                {
-                    Log("无法获取 HotkeyService，插件 {PluginId} 的快捷键功能将不可用", context.PluginId);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log("设置插件 {PluginId} 的 HotkeyApi 失败: {ErrorMessage}", context.PluginId, ex.Message);
-        }
     }
 
     /// <summary>

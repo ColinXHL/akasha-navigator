@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Plugins.Apis;
 using AkashaNavigator.Plugins.Apis.Core;
@@ -21,6 +22,7 @@ public class OverlayApiTests : IDisposable
     private readonly string _tempDir;
     private readonly PluginContext _context;
     private readonly ConfigApi _configApi;
+    private readonly IOverlayManager _overlayManager = new NoopOverlayManager();
 
     public OverlayApiTests()
     {
@@ -51,6 +53,11 @@ public class OverlayApiTests : IDisposable
                 // 忽略清理错误
             }
         }
+    }
+
+    private OverlayApi CreateOverlayApi()
+    {
+        return new OverlayApi(_context, _configApi, _overlayManager);
     }
 
 #region Property 2 : 绘图元素 ID 唯一性
@@ -114,7 +121,7 @@ public class OverlayApiTests : IDisposable
     [Fact]
     public void Show_NoUI_ShouldNotThrow()
     {
-        var overlayApi = new OverlayApi(_context, _configApi);
+        var overlayApi = CreateOverlayApi();
         overlayApi.show();
     }
 
@@ -124,7 +131,7 @@ public class OverlayApiTests : IDisposable
     [Fact]
     public void Hide_NoUI_ShouldNotThrow()
     {
-        var overlayApi = new OverlayApi(_context, _configApi);
+        var overlayApi = CreateOverlayApi();
         overlayApi.hide();
     }
 
@@ -134,7 +141,7 @@ public class OverlayApiTests : IDisposable
     [Fact]
     public void SetPosition_NoUI_ShouldNotThrow()
     {
-        var overlayApi = new OverlayApi(_context, _configApi);
+        var overlayApi = CreateOverlayApi();
         overlayApi.setPosition(100, 100);
     }
 
@@ -147,7 +154,7 @@ public class OverlayApiTests : IDisposable
     [InlineData(-10, 100)]
     public void SetSize_InvalidSize_ShouldBeIgnored(int width, int height)
     {
-        var overlayApi = new OverlayApi(_context, _configApi);
+        var overlayApi = CreateOverlayApi();
 
         // 不应该抛出异常
         overlayApi.setSize(width, height);
@@ -163,7 +170,7 @@ public class OverlayApiTests : IDisposable
     [InlineData("123")]
     public void ShowMarker_InvalidDirection_ShouldBeIgnored(string? direction)
     {
-        var overlayApi = new OverlayApi(_context, _configApi);
+        var overlayApi = CreateOverlayApi();
 
         // 不应该抛出异常
         overlayApi.showMarker(direction!, 0);
@@ -183,7 +190,7 @@ public class OverlayApiTests : IDisposable
     [InlineData("ne")]
     public void ShowMarker_ValidDirection_ShouldNotThrow(string direction)
     {
-        var overlayApi = new OverlayApi(_context, _configApi);
+        var overlayApi = CreateOverlayApi();
 
         // 不应该抛出异常
         overlayApi.showMarker(direction, 1000);
@@ -195,7 +202,7 @@ public class OverlayApiTests : IDisposable
     [Fact]
     public void ClearMarkers_NoUI_ShouldNotThrow()
     {
-        var overlayApi = new OverlayApi(_context, _configApi);
+        var overlayApi = CreateOverlayApi();
         overlayApi.clearMarkers();
     }
 
@@ -205,7 +212,7 @@ public class OverlayApiTests : IDisposable
     [Fact]
     public void Constructor_NullContext_ShouldThrow()
     {
-        Assert.Throws<ArgumentNullException>(() => new OverlayApi(null!, _configApi));
+        Assert.Throws<ArgumentNullException>(() => new OverlayApi(null!, _configApi, _overlayManager));
     }
 
     /// <summary>
@@ -214,9 +221,45 @@ public class OverlayApiTests : IDisposable
     [Fact]
     public void Constructor_NullConfigApi_ShouldThrow()
     {
-        Assert.Throws<ArgumentNullException>(() => new OverlayApi(_context, null!));
+        Assert.Throws<ArgumentNullException>(() => new OverlayApi(_context, null!, _overlayManager));
+
+    }
+
+    [Fact]
+    public void Constructor_NullOverlayManager_ShouldThrow()
+    {
+        Assert.Throws<ArgumentNullException>(() => new OverlayApi(_context, _configApi, null!));
     }
 
 #endregion
+}
+
+internal sealed class NoopOverlayManager : IOverlayManager
+{
+    public AkashaNavigator.Views.Windows.OverlayWindow CreateOverlay(string pluginId, AkashaNavigator.Services.OverlayOptions? options = null)
+    {
+        throw new NotSupportedException();
+    }
+
+    public AkashaNavigator.Views.Windows.OverlayWindow? GetOverlay(string pluginId)
+    {
+        return null;
+    }
+
+    public void DestroyOverlay(string pluginId)
+    {
+    }
+
+    public void DestroyAllOverlays()
+    {
+    }
+
+    public void ShowDirectionMarker(string pluginId, AkashaNavigator.Views.Windows.Direction direction, int durationMs = 0)
+    {
+    }
+
+    public void ClearMarkers(string pluginId)
+    {
+    }
 }
 }

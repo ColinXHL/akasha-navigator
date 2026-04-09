@@ -11,14 +11,10 @@ namespace AkashaNavigator.Services
 /// </summary>
 public class PanelManager : IPanelManager
 {
-    private static readonly Lazy<PanelManager> _instance = new(() => new PanelManager());
-
-    public static PanelManager Instance => _instance.Value;
-
     private readonly Dictionary<string, PluginPanelWindow> _panels = new();
     private readonly object _lock = new();
 
-    private PanelManager()
+    public PanelManager()
     {
     }
 

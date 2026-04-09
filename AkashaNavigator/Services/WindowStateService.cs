@@ -25,7 +25,11 @@ public class WindowStateService : IWindowStateService
         get {
             if (_instance == null)
             {
-                _instance = new WindowStateService(LogService.Instance, ProfileManager.Instance);
+                var profileManager = App.Services?.GetService(typeof(IProfileManager)) as IProfileManager;
+                if (profileManager == null)
+                    throw new InvalidOperationException("IProfileManager is not available.");
+
+                _instance = new WindowStateService(LogService.Instance, profileManager);
             }
             return _instance;
         }

@@ -2,10 +2,9 @@ using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Services;
 using AkashaNavigator.Views.Windows;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Plugins.Apis
 {
@@ -24,8 +23,9 @@ public class WebViewApi
 #region Fields
 
     private readonly string _pluginId;
-    private readonly Func<PlayerWindow?>? _getPlayerWindow;
-    private ScriptExecutionQueue? _scriptQueue;
+    private readonly IPlayerRuntimeBridge _runtimeBridge;
+    private readonly ScriptExecutionQueue _scriptQueue;
+    private readonly ILogService _logService;
     private const int ExecuteScriptSyncTimeoutMs = 350;
 
 #endregion
@@ -36,11 +36,16 @@ public class WebViewApi
     /// 创建 WebView API 实例
     /// </summary>
     /// <param name="pluginId">插件 ID</param>
-    /// <param name="getPlayerWindow">获取 PlayerWindow 的委托</param>
-    public WebViewApi(string pluginId, Func<PlayerWindow?>? getPlayerWindow = null)
+    /// <param name="runtimeBridge">运行时 PlayerWindow 桥接</param>
+    /// <param name="scriptExecutionQueue">脚本执行队列</param>
+    /// <param name="logService">日志服务</param>
+    public WebViewApi(string pluginId, IPlayerRuntimeBridge runtimeBridge, ScriptExecutionQueue scriptExecutionQueue,
+                      ILogService logService)
     {
         _pluginId = pluginId;
-        _getPlayerWindow = getPlayerWindow;
+        _runtimeBridge = runtimeBridge ?? throw new ArgumentNullException(nameof(runtimeBridge));
+        _scriptQueue = scriptExecutionQueue ?? throw new ArgumentNullException(nameof(scriptExecutionQueue));
+        _logService = logService ?? throw new ArgumentNullException(nameof(logService));
     }
 
 #endregion
@@ -57,7 +62,7 @@ public class WebViewApi
     {
         if (string.IsNullOrWhiteSpace(css))
         {
-            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectCSS: css is empty", _pluginId);
+            _logService.Warn(nameof(WebViewApi), "WebViewApi.InjectCSS: css is empty ({PluginId})", _pluginId);
             return false;
         }
 
@@ -68,7 +73,7 @@ public class WebViewApi
             var playerWindow = GetPlayerWindow();
             if (playerWindow?.WebView?.CoreWebView2 == null)
             {
-                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectCSS: WebView not available", _pluginId);
+                _logService.Warn(nameof(WebViewApi), "WebViewApi.InjectCSS: WebView not available ({PluginId})", _pluginId);
                 return false;
             }
 
@@ -90,13 +95,13 @@ public class WebViewApi
             // 根据时机执行注入
             ExecuteWithTiming(playerWindow, script, timing);
 
-            LogService.Instance.Debug("Plugin:{PluginId}", "CSS injected (timing: {Timing})", _pluginId, timing);
+            _logService.Debug(nameof(WebViewApi), "CSS injected ({PluginId}, timing: {Timing})", _pluginId, timing);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.InjectCSS error: {ErrorMessage}", _pluginId,
-                                      ex.Message);
+            _logService.Error(nameof(WebViewApi), "WebViewApi.InjectCSS error ({PluginId}): {ErrorMessage}", _pluginId,
+                              ex.Message);
             return false;
         }
     }
@@ -111,7 +116,7 @@ public class WebViewApi
     {
         if (string.IsNullOrWhiteSpace(script))
         {
-            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectScript: script is empty", _pluginId);
+            _logService.Warn(nameof(WebViewApi), "WebViewApi.InjectScript: script is empty ({PluginId})", _pluginId);
             return false;
         }
 
@@ -122,8 +127,8 @@ public class WebViewApi
             var playerWindow = GetPlayerWindow();
             if (playerWindow?.WebView?.CoreWebView2 == null)
             {
-                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.InjectScript: WebView not available",
-                                         _pluginId);
+                _logService.Warn(nameof(WebViewApi), "WebViewApi.InjectScript: WebView not available ({PluginId})",
+                                 _pluginId);
                 return false;
             }
 
@@ -144,13 +149,13 @@ public class WebViewApi
             // 根据时机执行注入
             ExecuteWithTiming(playerWindow, wrappedScript, timing);
 
-            LogService.Instance.Debug("Plugin:{PluginId}", "Script injected (timing: {Timing})", _pluginId, timing);
+            _logService.Debug(nameof(WebViewApi), "Script injected ({PluginId}, timing: {Timing})", _pluginId, timing);
             return true;
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.InjectScript error: {ErrorMessage}", _pluginId,
-                                      ex.Message);
+            _logService.Error(nameof(WebViewApi), "WebViewApi.InjectScript error ({PluginId}): {ErrorMessage}", _pluginId,
+                              ex.Message);
             return false;
         }
     }
@@ -164,7 +169,7 @@ public class WebViewApi
     {
         if (string.IsNullOrWhiteSpace(script))
         {
-            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScript: script is empty", _pluginId);
+            _logService.Warn(nameof(WebViewApi), "WebViewApi.ExecuteScript: script is empty ({PluginId})", _pluginId);
             return null;
         }
 
@@ -173,8 +178,8 @@ public class WebViewApi
             var playerWindow = GetPlayerWindow();
             if (playerWindow?.WebView?.CoreWebView2 == null)
             {
-                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScript: WebView not available",
-                                         _pluginId);
+                _logService.Warn(nameof(WebViewApi), "WebViewApi.ExecuteScript: WebView not available ({PluginId})",
+                                 _pluginId);
                 return null;
             }
 
@@ -201,8 +206,8 @@ public class WebViewApi
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.ExecuteScript error: {ErrorMessage}", _pluginId,
-                                      ex.Message);
+            _logService.Error(nameof(WebViewApi), "WebViewApi.ExecuteScript error ({PluginId}): {ErrorMessage}", _pluginId,
+                              ex.Message);
             throw;
         }
     }
@@ -216,7 +221,7 @@ public class WebViewApi
     {
         if (string.IsNullOrWhiteSpace(script))
         {
-            LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScriptSync: script is empty", _pluginId);
+            _logService.Warn(nameof(WebViewApi), "WebViewApi.ExecuteScriptSync: script is empty ({PluginId})", _pluginId);
             return null;
         }
 
@@ -225,8 +230,8 @@ public class WebViewApi
             var playerWindow = GetPlayerWindow();
             if (playerWindow?.WebView?.CoreWebView2 == null)
             {
-                LogService.Instance.Warn("Plugin:{PluginId}", "WebViewApi.ExecuteScriptSync: WebView not available",
-                                         _pluginId);
+                _logService.Warn(nameof(WebViewApi), "WebViewApi.ExecuteScriptSync: WebView not available ({PluginId})",
+                                 _pluginId);
                 return null;
             }
 
@@ -240,25 +245,25 @@ public class WebViewApi
             {
                 if (!WaitTaskOnUiThread(executeTask, dispatcher, ExecuteScriptSyncTimeoutMs))
                 {
-                    LogService.Instance.Warn("Plugin:{PluginId}",
-                                             "WebViewApi.ExecuteScriptSync timeout on UI thread ({TimeoutMs}ms)",
-                                             _pluginId, ExecuteScriptSyncTimeoutMs);
+                    _logService.Warn(nameof(WebViewApi),
+                                     "WebViewApi.ExecuteScriptSync timeout on UI thread ({PluginId}, {TimeoutMs}ms)",
+                                     _pluginId, ExecuteScriptSyncTimeoutMs);
                     return null;
                 }
             }
             else if (!executeTask.Wait(ExecuteScriptSyncTimeoutMs))
             {
-                LogService.Instance.Warn("Plugin:{PluginId}",
-                                         "WebViewApi.ExecuteScriptSync timeout ({TimeoutMs}ms)",
-                                         _pluginId, ExecuteScriptSyncTimeoutMs);
+                _logService.Warn(nameof(WebViewApi),
+                                 "WebViewApi.ExecuteScriptSync timeout ({PluginId}, {TimeoutMs}ms)",
+                                 _pluginId, ExecuteScriptSyncTimeoutMs);
                 return null;
             }
 
             if (!executeTask.IsCompletedSuccessfully)
             {
-                LogService.Instance.Warn("Plugin:{PluginId}",
-                                         "WebViewApi.ExecuteScriptSync failed",
-                                         _pluginId);
+                _logService.Warn(nameof(WebViewApi),
+                                 "WebViewApi.ExecuteScriptSync failed ({PluginId})",
+                                 _pluginId);
                 return null;
             }
 
@@ -266,8 +271,8 @@ public class WebViewApi
         }
         catch (Exception ex)
         {
-            LogService.Instance.Error("Plugin:{PluginId}", "WebViewApi.ExecuteScriptSync error: {ErrorMessage}",
-                                      _pluginId, ex.Message);
+            _logService.Error(nameof(WebViewApi), "WebViewApi.ExecuteScriptSync error ({PluginId}): {ErrorMessage}",
+                              _pluginId, ex.Message);
             return null;
         }
     }
@@ -281,25 +286,7 @@ public class WebViewApi
     /// </summary>
     private PlayerWindow? GetPlayerWindow()
     {
-        if (_getPlayerWindow != null)
-        {
-            return _getPlayerWindow();
-        }
-
-        // 从 Application 中查找 PlayerWindow
-        PlayerWindow? playerWindow = null;
-        Application.Current?.Dispatcher.Invoke(() =>
-                                               {
-                                                   foreach (Window window in Application.Current.Windows)
-                                                   {
-                                                       if (window is PlayerWindow pw)
-                                                       {
-                                                           playerWindow = pw;
-                                                           break;
-                                                       }
-                                                   }
-                                               });
-        return playerWindow;
+        return _runtimeBridge.GetPlayerWindow();
     }
 
     /// <summary>
@@ -385,20 +372,8 @@ public class WebViewApi
         if (webView == null)
             return null;
 
-        var scriptQueue = GetScriptQueue();
-        if (scriptQueue == null)
-        {
-            return await webView.ExecuteScriptAsync(script);
-        }
-
-        return await scriptQueue.ExecuteAsync(webView, script, scriptName,
+        return await _scriptQueue.ExecuteAsync(webView, script, scriptName,
                                               priority: ScriptExecutionQueue.ScriptExecutionPriority.Normal);
-    }
-
-    private ScriptExecutionQueue? GetScriptQueue()
-    {
-        _scriptQueue ??= App.Services?.GetService<ScriptExecutionQueue>();
-        return _scriptQueue;
     }
 
     /// <summary>

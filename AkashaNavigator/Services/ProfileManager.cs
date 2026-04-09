@@ -10,7 +10,6 @@ using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Plugins.Utils;
 using AkashaNavigator.Core.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Services
 {
@@ -21,56 +20,6 @@ namespace AkashaNavigator.Services
 /// </summary>
 public class ProfileManager : IProfileManager
 {
-#region Singleton
-
-    private static ProfileManager? _instance;
-    private static readonly object _lock = new();
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static ProfileManager Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    if (_instance == null)
-                    {
-                        // 使用 DI 容器中的实例，确保与注入的实例一致
-                        var services = App.Services;
-                        _instance = new ProfileManager(
-                            services?.GetRequiredService<IConfigService>() ?? ConfigService.Instance,
-                            services?.GetRequiredService<ILogService>() ?? LogService.Instance,
-                            services?.GetRequiredService<IPluginHost>() ?? PluginHost.Instance,
-                            services?.GetRequiredService<IPluginAssociationManager>() ??
-                                PluginAssociationManager.Instance,
-                            services?.GetRequiredService<ISubscriptionManager>() ?? SubscriptionManager.Instance,
-                            services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance,
-                            services?.GetRequiredService<IProfileRegistry>() ?? ProfileRegistry.Instance);
-                    }
-                }
-            }
-            return _instance;
-        }
-    internal
-        set => _instance = value;
-    }
-
-    /// <summary>
-    /// 重置单例实例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance()
-    {
-        lock (_lock)
-        {
-            _instance = null;
-        }
-    }
-
-#endregion
-
 #region Fields
 
     private readonly IConfigService _configService;

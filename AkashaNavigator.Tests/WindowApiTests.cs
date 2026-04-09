@@ -22,6 +22,8 @@ public class WindowApiTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly PluginContext _context;
+    private readonly TestPlayerRuntimeBridge _runtimeBridge = new();
+    private readonly MockCursorDetectionService _cursorDetectionService = new();
 
     public WindowApiTests()
     {
@@ -51,6 +53,11 @@ public class WindowApiTests : IDisposable
         }
     }
 
+    private WindowApi CreateWindowApi()
+    {
+        return new WindowApi(_context, _runtimeBridge, _cursorDetectionService);
+    }
+
 #region Property 4 : 透明度 Round - Trip(无窗口时的默认行为)
 
     /// <summary>
@@ -61,7 +68,7 @@ public class WindowApiTests : IDisposable
     [Property(MaxTest = 100)]
     public Property OpacityRoundTrip_NoWindow_ReturnsDefault(PositiveInt seed)
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
 
         // 生成 0.2 到 1.0 之间的透明度值
         var opacity = 0.2 + (seed.Get % 81) / 100.0; // 0.2 到 1.0
@@ -106,7 +113,7 @@ public class WindowApiTests : IDisposable
     [Property(MaxTest = 100)]
     public Property ClickThroughConsistency_NoWindow_ReturnsDefault(bool enabled)
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
 
         // 设置穿透模式（无窗口时应该静默失败）
         windowApi.SetClickThrough(enabled);
@@ -130,7 +137,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void WindowApi_SetEventManager_ShouldIntegrate()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var eventManager = new EventManager();
 
         // 设置 EventManager
@@ -162,7 +169,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void WindowApi_NullEventManager_ShouldNotThrow()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
 
         // 不设置 EventManager，调用方法不应该抛出异常
         windowApi.SetOpacity(0.5);
@@ -182,7 +189,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void GetOpacity_NoWindow_ReturnsDefault()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var result = windowApi.GetOpacity();
         Assert.Equal(1.0, result);
     }
@@ -193,7 +200,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void IsClickThrough_NoWindow_ReturnsFalse()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var result = windowApi.IsClickThrough();
         Assert.False(result);
     }
@@ -204,7 +211,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void IsTopmost_NoWindow_ReturnsTrue()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var result = windowApi.IsTopmost();
         Assert.True(result);
     }
@@ -215,7 +222,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void GetBounds_NoWindow_ReturnsDefault()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var result = windowApi.GetBounds();
 
         Assert.NotNull(result);
@@ -239,7 +246,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void SetOpacity_NoWindow_ShouldNotThrow()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
 
         // 不应该抛出异常
         windowApi.SetOpacity(0.5);
@@ -254,7 +261,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void SetClickThrough_NoWindow_ShouldNotThrow()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
 
         windowApi.SetClickThrough(true);
         windowApi.SetClickThrough(false);
@@ -266,7 +273,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void SetTopmost_NoWindow_ShouldNotThrow()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
 
         windowApi.SetTopmost(true);
         windowApi.SetTopmost(false);
@@ -278,7 +285,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void Constructor_WithNullContext_ShouldThrow()
     {
-        Assert.Throws<ArgumentNullException>(() => new WindowApi(null!, () => null));
+        Assert.Throws<ArgumentNullException>(() => new WindowApi(null!, _runtimeBridge, _cursorDetectionService));
     }
 
 #endregion
@@ -295,7 +302,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void StartCursorDetection_EmptyWhitelist_ReturnsFalse()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
@@ -316,7 +323,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void StartCursorDetection_NullWhitelist_ReturnsFalse()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
@@ -338,7 +345,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void StartCursorDetection_NonEmptyWhitelist_ReturnsTrue_Simple()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
@@ -365,7 +372,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void StartCursorDetection_WhitelistWithOnlyEmptyStrings_ReturnsFalse()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
@@ -388,7 +395,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void StopCursorDetection_AfterStart_StopsDetection()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
@@ -416,7 +423,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void IsAutoClickThrough_NoWindow_ReturnsFalse()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var result = windowApi.IsAutoClickThrough();
         Assert.False(result);
     }
@@ -427,7 +434,7 @@ public class WindowApiTests : IDisposable
     [Fact]
     public void RefreshCursorDetectionState_WithService_InvokesService()
     {
-        var windowApi = new WindowApi(_context, null);
+        var windowApi = CreateWindowApi();
         var mockService = new MockCursorDetectionService();
         windowApi.SetCursorDetectionService(mockService);
 
@@ -505,5 +512,17 @@ internal class MockCursorDetectionService : ICursorDetectionService
     // 用于测试触发事件
     public void TriggerCursorShown() => CursorShown?.Invoke(this, EventArgs.Empty);
     public void TriggerCursorHidden() => CursorHidden?.Invoke(this, EventArgs.Empty);
+}
+
+internal sealed class TestPlayerRuntimeBridge : IPlayerRuntimeBridge
+{
+    public AkashaNavigator.Views.Windows.PlayerWindow? GetPlayerWindow()
+    {
+        return null;
+    }
+
+    public void SetPlayerWindow(AkashaNavigator.Views.Windows.PlayerWindow playerWindow)
+    {
+    }
 }
 }

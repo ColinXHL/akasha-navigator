@@ -24,7 +24,8 @@ public class HotkeyApi
     private readonly Dictionary<int, HotkeyRegistration> _registrations = new();
     private readonly Dictionary<string, int> _keyComboToId = new(StringComparer.OrdinalIgnoreCase);
     private int _nextId = 1;
-    private ActionDispatcher? _dispatcher;
+    private readonly ActionDispatcher _dispatcher;
+    private readonly HotkeyService _hotkeyService;
 
 #endregion
 
@@ -34,32 +35,16 @@ public class HotkeyApi
     /// 创建热键 API 实例
     /// </summary>
     /// <param name="pluginId">插件 ID</param>
-    public HotkeyApi(string pluginId)
+    public HotkeyApi(string pluginId, HotkeyService hotkeyService, ActionDispatcher dispatcher)
     {
         _pluginId = pluginId;
+        _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
+        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
     }
 
 #endregion
 
 #region Internal Methods
-
-    /// <summary>
-    /// 设置 ActionDispatcher（由 PluginEngine 调用）
-    /// </summary>
-    internal void SetDispatcher(ActionDispatcher dispatcher)
-    {
-        _dispatcher = dispatcher;
-    }
-
-    /// <summary>
-    /// 设置 HotkeyService（由 PluginHost 调用）
-    /// </summary>
-    internal void SetHotkeyService(HotkeyService hotkeyService)
-    {
-        _hotkeyService = hotkeyService;
-    }
-
-    private HotkeyService? _hotkeyService;
 
     /// <summary>
     /// 清理所有注册的热键（插件卸载时调用）
@@ -68,7 +53,7 @@ public class HotkeyApi
     {
         foreach (var registration in _registrations.Values)
         {
-            _dispatcher?.UnregisterAction(registration.ActionName);
+            _dispatcher.UnregisterAction(registration.ActionName);
         }
         _registrations.Clear();
         _keyComboToId.Clear();
@@ -144,10 +129,10 @@ public class HotkeyApi
         };
 
         // 注册到 ActionDispatcher
-        _dispatcher?.RegisterAction(actionName, actionHandler);
+        _dispatcher.RegisterAction(actionName, actionHandler);
 
         // 注册到 HotkeyService（添加到配置绑定列表）
-        _hotkeyService?.RegisterPluginHotkey(parseResult.VkCode, parseResult.Modifiers, actionName);
+        _hotkeyService.RegisterPluginHotkey(parseResult.VkCode, parseResult.Modifiers, actionName);
 
         // 保存注册信息
         var registration = new HotkeyRegistration { Id = id, KeyCombo = normalizedCombo, ActionName = actionName,
@@ -192,10 +177,10 @@ public class HotkeyApi
             return false;
 
         // 从 ActionDispatcher 注销
-        _dispatcher?.UnregisterAction(registration.ActionName);
+        _dispatcher.UnregisterAction(registration.ActionName);
 
         // 从 HotkeyService 注销
-        _hotkeyService?.UnregisterPluginHotkey(registration.ActionName);
+        _hotkeyService.UnregisterPluginHotkey(registration.ActionName);
 
         // 移除注册信息
         _registrations.Remove(id);
@@ -231,8 +216,8 @@ public class HotkeyApi
     {
         foreach (var registration in _registrations.Values.ToList())
         {
-            _dispatcher?.UnregisterAction(registration.ActionName);
-            _hotkeyService?.UnregisterPluginHotkey(registration.ActionName);
+            _dispatcher.UnregisterAction(registration.ActionName);
+            _hotkeyService.UnregisterPluginHotkey(registration.ActionName);
         }
         _registrations.Clear();
         _keyComboToId.Clear();

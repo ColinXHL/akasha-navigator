@@ -5,7 +5,6 @@ using AkashaNavigator.Views.Dialogs;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Events.Events;
-using AkashaNavigator.Plugins.Core;
 using AkashaNavigator.ViewModels.Windows;
 using AkashaNavigator.Services;
 
@@ -41,9 +40,9 @@ public class Bootstrapper
         // 从 DI 容器获取主窗口
         _playerWindow = sp.GetRequiredService<PlayerWindow>();
 
-        // 设置 PluginApi 和 PluginHost 的全局窗口获取器（在创建 PlayerWindow 后立即设置）
-        PluginApi.SetGlobalWindowGetter(() => _playerWindow);
-        PluginHost.SetGlobalWindowGetter(() => _playerWindow);
+        // 发布运行时 PlayerWindow
+        var runtimeBridge = sp.GetRequiredService<IPlayerRuntimeBridge>();
+        runtimeBridge.SetPlayerWindow(_playerWindow);
 
         // 加载当前 Profile 的插件
         var profileManager = sp.GetRequiredService<IProfileManager>();

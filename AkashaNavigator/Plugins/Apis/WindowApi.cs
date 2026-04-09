@@ -14,16 +14,16 @@ namespace AkashaNavigator.Plugins.Apis
 public class WindowApi
 {
     private readonly PluginContext _context;
-    private readonly Func<Views.Windows.PlayerWindow?>? _getPlayerWindow;
+    private readonly IPlayerRuntimeBridge _runtimeBridge;
     private EventManager? _eventManager;
-    private ICursorDetectionService? _cursorDetectionService;
+    private ICursorDetectionService _cursorDetectionService;
     private bool _isCursorDetectionStartedByThisApi;
 
-    public WindowApi(PluginContext context, Func<Views.Windows.PlayerWindow?>? getPlayerWindow)
+    public WindowApi(PluginContext context, IPlayerRuntimeBridge runtimeBridge, ICursorDetectionService cursorDetectionService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
-        _getPlayerWindow = getPlayerWindow;
-        _cursorDetectionService = CursorDetectionService.Instance;
+        _runtimeBridge = runtimeBridge ?? throw new ArgumentNullException(nameof(runtimeBridge));
+        _cursorDetectionService = cursorDetectionService ?? throw new ArgumentNullException(nameof(cursorDetectionService));
     }
 
     public void SetEventManager(EventManager eventManager)
@@ -36,22 +36,27 @@ public class WindowApi
     /// </summary>
     internal void SetCursorDetectionService(ICursorDetectionService service)
     {
-        _cursorDetectionService = service;
+        _cursorDetectionService = service ?? throw new ArgumentNullException(nameof(service));
+    }
+
+    private Views.Windows.PlayerWindow? GetPlayerWindow()
+    {
+        return _runtimeBridge.GetPlayerWindow();
     }
 
     [ScriptMember("getOpacity")]
-    public double GetOpacity() => _getPlayerWindow?.Invoke()?.Opacity ?? 1.0;
+    public double GetOpacity() => GetPlayerWindow()?.Opacity ?? 1.0;
 
     [ScriptMember("isClickThrough")]
-    public bool IsClickThrough() => _getPlayerWindow?.Invoke()?.IsClickThrough ?? false;
+    public bool IsClickThrough() => GetPlayerWindow()?.IsClickThrough ?? false;
 
     [ScriptMember("isTopmost")]
-    public bool IsTopmost() => _getPlayerWindow?.Invoke()?.Topmost ?? true;
+    public bool IsTopmost() => GetPlayerWindow()?.Topmost ?? true;
 
     [ScriptMember("getBounds")]
     public object GetBounds()
     {
-        var window = _getPlayerWindow?.Invoke();
+        var window = GetPlayerWindow();
         if (window == null)
             return new { x = 0.0, y = 0.0, width = 0.0, height = 0.0 };
         return new { x = (double)window.Left, y = (double)window.Top, width = (double)window.Width,
@@ -61,7 +66,7 @@ public class WindowApi
     [ScriptMember("setOpacity")]
     public void SetOpacity(double opacity)
     {
-        var window = _getPlayerWindow?.Invoke();
+        var window = GetPlayerWindow();
         if (window != null)
         {
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
@@ -80,7 +85,7 @@ public class WindowApi
     [ScriptMember("setClickThrough")]
     public void SetClickThrough(bool enabled)
     {
-        var window = _getPlayerWindow?.Invoke();
+        var window = GetPlayerWindow();
         if (window != null && window.IsClickThrough != enabled)
             System.Windows.Application.Current?.Dispatcher.Invoke(() => window.ToggleClickThrough());
     }
@@ -88,7 +93,7 @@ public class WindowApi
     [ScriptMember("setTopmost")]
     public void SetTopmost(bool enabled)
     {
-        var window = _getPlayerWindow?.Invoke();
+        var window = GetPlayerWindow();
         if (window != null)
             System.Windows.Application.Current?.Dispatcher.Invoke(() => window.Topmost = enabled);
     }
@@ -118,9 +123,6 @@ public class WindowApi
     [ScriptMember("startCursorDetection")]
     public bool StartCursorDetection(object options)
     {
-        if (_cursorDetectionService == null)
-            return false;
-
         // 解析 options 参数
         var whitelist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int intervalMs = 200;
@@ -231,9 +233,6 @@ public class WindowApi
     [ScriptMember("stopCursorDetection")]
     public void StopCursorDetection()
     {
-        if (_cursorDetectionService == null)
-            return;
-
         // 取消订阅事件
         _cursorDetectionService.CursorShown -= OnCursorShown;
         _cursorDetectionService.CursorHidden -= OnCursorHidden;
@@ -252,7 +251,7 @@ public class WindowApi
     [ScriptMember("setAutoClickThrough")]
     public void SetAutoClickThrough(bool enabled)
     {
-        var window = _getPlayerWindow?.Invoke();
+        var window = GetPlayerWindow();
         if (window != null)
         {
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
@@ -273,7 +272,7 @@ public class WindowApi
     [ScriptMember("isAutoClickThrough")]
     public bool IsAutoClickThrough()
     {
-        var window = _getPlayerWindow?.Invoke();
+        var window = GetPlayerWindow();
         return window?.IsAutoClickThrough ?? false;
     }
 

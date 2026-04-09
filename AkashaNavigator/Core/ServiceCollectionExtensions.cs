@@ -56,6 +56,9 @@ public static class ServiceCollectionExtensions
         // ScriptExecutionQueue（依赖LogService，用于WebView2脚本执行队列化）
         services.AddSingleton<ScriptExecutionQueue>();
 
+        // PlayerRuntimeBridge（运行时 PlayerWindow 桥接）
+        services.AddSingleton<IPlayerRuntimeBridge, PlayerRuntimeBridge>();
+
         // ============================================================
         // Level 1: 依赖 LogService
         // ============================================================
@@ -134,11 +137,11 @@ public static class ServiceCollectionExtensions
         // 其他服务
         // ============================================================
 
-        // OverlayManager（使用现有单例实例，私有构造函数）
-        services.AddSingleton<IOverlayManager>(sp => OverlayManager.Instance);
+        // OverlayManager
+        services.AddSingleton<IOverlayManager, OverlayManager>();
 
-        // PanelManager（使用现有单例实例，私有构造函数）
-        services.AddSingleton<IPanelManager>(sp => PanelManager.Instance);
+        // PanelManager
+        services.AddSingleton<IPanelManager, PanelManager>();
 
         // ============================================================
         // ViewModels（Pages）- 必须在 PluginCenterViewModel 之前注册

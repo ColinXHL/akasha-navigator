@@ -11,24 +11,16 @@ namespace AkashaNavigator.Services
 /// </summary>
 public class OverlayManager : IOverlayManager
 {
-#region Singleton
-
-    private static readonly Lazy<OverlayManager> _instance = new(() => new OverlayManager());
-
-    public static OverlayManager Instance => _instance.Value;
-
-    private OverlayManager()
-    {
-    }
-
-#endregion
-
 #region Fields
 
     private readonly Dictionary<string, OverlayWindow> _overlays = new();
     private readonly object _lock = new();
 
 #endregion
+
+    public OverlayManager()
+    {
+    }
 
 #region Public Methods
 

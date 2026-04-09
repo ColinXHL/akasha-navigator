@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Windows;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Services;
 
 namespace AkashaNavigator.Plugins.Apis
@@ -12,6 +13,7 @@ namespace AkashaNavigator.Plugins.Apis
 public class PanelContext
 {
     private readonly string _pluginId;
+    private readonly IPanelManager _panelManager;
 
     public string fillStyle { get; set; } = "#000000";
     public string strokeStyle { get; set; } = "#000000";
@@ -21,20 +23,21 @@ public class PanelContext
 
     private readonly List<Point> _pathPoints = new();
 
-    public PanelContext(string pluginId)
+    public PanelContext(string pluginId, IPanelManager panelManager)
     {
         _pluginId = pluginId;
+        _panelManager = panelManager ?? throw new ArgumentNullException(nameof(panelManager));
     }
 
     public void clear()
     {
-        var panel = PanelManager.Instance.GetPanel(_pluginId);
+        var panel = _panelManager.GetPanel(_pluginId);
         System.Windows.Application.Current?.Dispatcher.Invoke(() => panel?.ClearDrawingElements());
     }
 
     public void fillRect(double x, double y, double width, double height)
     {
-        var panel = PanelManager.Instance.GetPanel(_pluginId);
+        var panel = _panelManager.GetPanel(_pluginId);
         if (panel == null)
             return;
 
@@ -50,7 +53,7 @@ public class PanelContext
 
     public void strokeRect(double x, double y, double width, double height)
     {
-        var panel = PanelManager.Instance.GetPanel(_pluginId);
+        var panel = _panelManager.GetPanel(_pluginId);
         if (panel == null)
             return;
 
@@ -67,7 +70,7 @@ public class PanelContext
 
     public void fillText(string text, double x, double y)
     {
-        var panel = PanelManager.Instance.GetPanel(_pluginId);
+        var panel = _panelManager.GetPanel(_pluginId);
         if (panel == null)
             return;
 
@@ -126,7 +129,7 @@ public class PanelContext
 
     public void stroke()
     {
-        var panel = PanelManager.Instance.GetPanel(_pluginId);
+        var panel = _panelManager.GetPanel(_pluginId);
         if (panel == null)
             return;
 
@@ -139,7 +142,7 @@ public class PanelContext
 
     public void drawImage(string src, double x, double y, double? width = null, double? height = null)
     {
-        var panel = PanelManager.Instance.GetPanel(_pluginId);
+        var panel = _panelManager.GetPanel(_pluginId);
         if (panel == null)
             return;
 

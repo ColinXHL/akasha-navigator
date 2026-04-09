@@ -28,7 +28,11 @@ public class DataService : IDataService
         {
             if (_instance == null)
             {
-                _instance = new DataService(LogService.Instance, ProfileManager.Instance);
+                var profileManager = App.Services?.GetService(typeof(IProfileManager)) as IProfileManager;
+                if (profileManager == null)
+                    throw new InvalidOperationException("IProfileManager is not available.");
+
+                _instance = new DataService(LogService.Instance, profileManager);
             }
             return _instance;
         }

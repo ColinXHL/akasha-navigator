@@ -194,7 +194,8 @@ public class ProfileMarketplaceService
                 var services = App.Services;
                 _instance = new ProfileMarketplaceService(
                     services?.GetRequiredService<ILogService>() ?? LogService.Instance,
-                    services?.GetRequiredService<IProfileManager>() ?? ProfileManager.Instance,
+                    services?.GetRequiredService<IProfileManager>() ??
+                        throw new InvalidOperationException("IProfileManager is not available."),
                     services?.GetRequiredService<IPluginAssociationManager>() ?? PluginAssociationManager.Instance,
                     services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance);
             }
