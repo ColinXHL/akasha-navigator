@@ -156,7 +156,7 @@ public class PluginApi
 
         // 初始化无需权限的 API
         Core = new CoreApi(context);
-        Config = new ConfigApi(config, _eventManager);
+        Config = new ConfigApi(config, _eventManager, logService);
         Profile = profileInfo ?? throw new ArgumentNullException(nameof(profileInfo));
 
         // 初始化现有需要权限的 API

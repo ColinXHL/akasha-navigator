@@ -166,7 +166,7 @@ public static class PluginEngine
         engine.AddHostObject("log", logApi);
 
         // 2. 暴露 config 全局对象
-        var configApi = new ConfigApi(config, eventManager);
+        var configApi = new ConfigApi(config, eventManager, options.LogService);
         engine.AddHostObject("config", configApi);
 
         // 3. 暴露 settings 全局对象（动态代理）

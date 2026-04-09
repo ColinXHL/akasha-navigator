@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AkashaNavigator.Models.Common;
 
 namespace AkashaNavigator.Models.Plugin
 {
@@ -261,11 +262,11 @@ public class PluginConfig
     /// <summary>
     /// 保存配置到文件
     /// </summary>
-    public void SaveToFile(string? filePath = null)
+    public Result SaveToFile(string? filePath = null)
     {
         var path = filePath ?? _filePath;
         if (string.IsNullOrEmpty(path))
-            throw new InvalidOperationException("未指定配置文件路径");
+            return Result.Failure(Error.Validation("INVALID_PATH", "未指定配置文件路径"));
 
         _filePath = path;
 
@@ -280,10 +281,24 @@ public class PluginConfig
 
             var json = configObj.ToJsonString(_jsonOptions);
             File.WriteAllText(path, json);
+            return Result.Success();
         }
-        catch
+        catch (IOException ex)
         {
-            // 忽略保存错误
+            return Result.Failure(Error.FileSystem("IO_WRITE_ERROR", $"写入插件配置失败: {ex.Message}", ex, path));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Result.Failure(Error.Permission("WRITE_ACCESS_DENIED", $"无权限写入插件配置: {path}",
+                                                   $"无法写入文件 {Path.GetFileName(path)}", ex));
+        }
+        catch (ArgumentException ex)
+        {
+            return Result.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {path}", ex.Message));
+        }
+        catch (NotSupportedException ex)
+        {
+            return Result.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {path}", ex.Message));
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AkashaNavigator.Core.Interfaces;
 using Microsoft.ClearScript;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Plugins.Utils;
@@ -18,6 +19,7 @@ public class ConfigApi
 
     private readonly PluginConfig _config;
     private readonly EventManager? _eventManager;
+    private readonly ILogService _logService;
 
 #endregion
 
@@ -27,7 +29,7 @@ public class ConfigApi
     /// 创建配置 API 实例
     /// </summary>
     /// <param name="config">插件配置</param>
-    public ConfigApi(PluginConfig config) : this(config, null)
+    public ConfigApi(PluginConfig config) : this(config, null, null)
     {
     }
 
@@ -36,10 +38,12 @@ public class ConfigApi
     /// </summary>
     /// <param name="config">插件配置</param>
     /// <param name="eventManager">事件管理器（可选，用于发射配置变更事件）</param>
-    public ConfigApi(PluginConfig config, EventManager? eventManager)
+    /// <param name="logService">日志服务（可选）</param>
+    public ConfigApi(PluginConfig config, EventManager? eventManager, ILogService? logService = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _eventManager = eventManager;
+        _logService = logService ?? Services.LogService.Instance;
     }
 
 #endregion
@@ -67,7 +71,7 @@ public class ConfigApi
         }
         catch (Exception ex)
         {
-            Services.LogService.Instance.Error(nameof(ConfigApi), "Get({Key}) failed: {ErrorMessage}", key, ex.Message);
+            _logService.Error(nameof(ConfigApi), "Get({Key}) failed: {ErrorMessage}", key, ex.Message);
             return defaultValue;
         }
     }
@@ -102,14 +106,12 @@ public class ConfigApi
         // 设置新值
         _config.Set(key, value);
 
-        // 自动保存
-        try
+        var saveResult = _config.SaveToFile();
+        if (!saveResult.IsSuccess)
         {
-            _config.SaveToFile();
-        }
-        catch
-        {
-            // 忽略保存错误
+            _logService.Error(nameof(ConfigApi), "Failed to save config for key '{Key}': {ErrorCode}", key,
+                              saveResult.Error?.Code ?? "UNKNOWN");
+            return;
         }
 
         // 发射配置变更事件（仅当值实际发生变化时）
@@ -128,8 +130,7 @@ public class ConfigApi
                 }
                 catch (Exception ex)
                 {
-                    Services.LogService.Instance.Error(
-                        "ConfigApi", "Failed to emit configChanged event: {ErrorMessage}", ex.Message);
+                    _logService.Error(nameof(ConfigApi), "Failed to emit configChanged event: {ErrorMessage}", ex.Message);
                 }
             }
         }
@@ -157,13 +158,12 @@ public class ConfigApi
         var result = _config.Remove(key);
         if (result)
         {
-            try
+            var saveResult = _config.SaveToFile();
+            if (!saveResult.IsSuccess)
             {
-                _config.SaveToFile();
-            }
-            catch
-            {
-                // 忽略保存错误
+                _logService.Error(nameof(ConfigApi), "Failed to save config after remove '{Key}': {ErrorCode}", key,
+                                  saveResult.Error?.Code ?? "UNKNOWN");
+                return false;
             }
         }
         return result;
@@ -180,7 +180,7 @@ public class ConfigApi
     {
         if (_eventManager == null)
         {
-            Services.LogService.Instance.Warn(nameof(ConfigApi), "EventManager not available, cannot register listener");
+            _logService.Warn(nameof(ConfigApi), "EventManager not available, cannot register listener");
             return -1;
         }
 

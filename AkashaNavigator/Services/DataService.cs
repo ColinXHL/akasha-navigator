@@ -322,28 +322,22 @@ public class DataService : IDataService
     private void SaveHistory()
     {
         var filePath = GetHistoryFilePath();
-        try
+        var result = JsonHelper.SaveToFile(filePath, _historyCache);
+        if (!result.IsSuccess)
         {
-            JsonHelper.SaveToFile(filePath, _historyCache);
-        }
-        catch (Exception ex)
-        {
-            _logService.Debug(nameof(DataService), "保存历史记录失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                      ex.Message);
+            _logService.Warn(nameof(DataService), "保存历史记录失败 [{FilePath}]: {ErrorCode}", filePath,
+                             result.Error?.Code ?? "UNKNOWN");
         }
     }
 
     private void SaveBookmarks()
     {
         var filePath = GetBookmarksFilePath();
-        try
+        var result = JsonHelper.SaveToFile(filePath, _bookmarkCache);
+        if (!result.IsSuccess)
         {
-            JsonHelper.SaveToFile(filePath, _bookmarkCache);
-        }
-        catch (Exception ex)
-        {
-            _logService.Debug(nameof(DataService), "保存收藏夹失败 [{FilePath}]: {ErrorMessage}", filePath,
-                                      ex.Message);
+            _logService.Warn(nameof(DataService), "保存收藏夹失败 [{FilePath}]: {ErrorCode}", filePath,
+                             result.Error?.Code ?? "UNKNOWN");
         }
     }
 

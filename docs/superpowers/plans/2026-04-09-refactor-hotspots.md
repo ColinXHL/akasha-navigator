@@ -575,7 +575,7 @@ git commit -m "refactor(core): remove static singleton and service-locator plugi
 - Modify: `AkashaNavigator/App.xaml.cs`
 - Test: `AkashaNavigator.Tests/Helpers/JsonHelperTests.cs`
 
-- [ ] **Step 1: Remove raw JSON debug output from `JsonHelper`**
+- [x] **Step 1: Remove raw JSON debug output from `JsonHelper`**
 
 Delete:
 
@@ -584,7 +584,7 @@ System.Diagnostics.Debug.WriteLine($"[JsonHelper] Saving to: {filePath}");
 System.Diagnostics.Debug.WriteLine($"[JsonHelper] JSON preview (first 500 chars): {json.Substring(0, Math.Min(500, json.Length))}");
 ```
 
-- [ ] **Step 2: Change `DataService` to check `Result` instead of fake exception handling**
+- [x] **Step 2: Change `DataService` to check `Result` instead of fake exception handling**
 
 Use this shape:
 
@@ -602,7 +602,7 @@ private void SaveHistory()
 
 Apply the same pattern to `SaveBookmarks()`.
 
-- [ ] **Step 3: Change `ProfileManager` persistence helpers to return `Result` and use the real constant name**
+- [x] **Step 3: Change `ProfileManager` persistence helpers to return `Result` and use the real constant name**
 
 Use:
 
@@ -614,7 +614,7 @@ private Result SaveProfileToDisk(GameProfile profile)
 }
 ```
 
-- [ ] **Step 4: Make `ConfigApi` save before emitting events**
+- [x] **Step 4: Make `ConfigApi` save before emitting events**
 
 Use:
 
@@ -627,7 +627,7 @@ if (!saveResult.IsSuccess)
 }
 ```
 
-- [ ] **Step 5: Replace magic-string log contexts in `App.xaml.cs`**
+- [x] **Step 5: Replace magic-string log contexts in `App.xaml.cs`**
 
 Use:
 
@@ -635,7 +635,7 @@ Use:
 logService.Info(nameof(App), "检测到需要数据迁移，开始执行...");
 ```
 
-- [ ] **Step 6: Run persistence tests and build**
+- [x] **Step 6: Run persistence tests and build**
 
 Run: `dotnet test AkashaNavigator.Tests --filter "FullyQualifiedName~JsonHelperTests"`
 Expected: PASS

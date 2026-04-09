@@ -69,6 +69,9 @@ namespace AkashaNavigator.Helpers
             if (string.IsNullOrWhiteSpace(filePath))
                 return Result<T>.Failure(Error.Validation("INVALID_PATH", "文件路径为空"));
 
+            if (!IsPathValid(filePath))
+                return Result<T>.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {filePath}"));
+
             // 检查文件是否存在
             if (!File.Exists(filePath))
                 return Result<T>.Failure(Error.FileSystem("FILE_NOT_FOUND", $"文件不存在: {filePath}", filePath: filePath));
@@ -95,6 +98,14 @@ namespace AkashaNavigator.Helpers
             {
                 return Result<T>.Failure(Error.Permission("READ_ACCESS_DENIED", $"无权限读取文件: {filePath}", $"无法读取文件 {Path.GetFileName(filePath)}", ex));
             }
+            catch (ArgumentException ex)
+            {
+                return Result<T>.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {filePath}", ex.Message));
+            }
+            catch (NotSupportedException ex)
+            {
+                return Result<T>.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {filePath}", ex.Message));
+            }
         }
 
         /// <summary>
@@ -110,6 +121,9 @@ namespace AkashaNavigator.Helpers
             if (string.IsNullOrWhiteSpace(filePath))
                 return Result.Failure(Error.Validation("INVALID_PATH", "文件路径为空"));
 
+            if (!IsPathValid(filePath))
+                return Result.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {filePath}"));
+
             try
             {
                 // 确保目录存在
@@ -122,10 +136,6 @@ namespace AkashaNavigator.Helpers
                 // 序列化并写入文件
                 var json = Serialize(obj);
 
-                // 调试日志
-                System.Diagnostics.Debug.WriteLine($"[JsonHelper] Saving to: {filePath}");
-                System.Diagnostics.Debug.WriteLine($"[JsonHelper] JSON preview (first 500 chars): {json.Substring(0, Math.Min(500, json.Length))}");
-
                 File.WriteAllText(filePath, json);
                 return Result.Success();
             }
@@ -137,6 +147,26 @@ namespace AkashaNavigator.Helpers
             {
                 return Result.Failure(Error.Permission("WRITE_ACCESS_DENIED", $"无权限写入文件: {filePath}", $"无法写入文件 {Path.GetFileName(filePath)}", ex));
             }
+            catch (ArgumentException ex)
+            {
+                return Result.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {filePath}", ex.Message));
+            }
+            catch (NotSupportedException ex)
+            {
+                return Result.Failure(Error.Validation("INVALID_PATH", $"文件路径无效: {filePath}", ex.Message));
+            }
+        }
+
+        private static bool IsPathValid(string filePath)
+        {
+            if (filePath.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+                return false;
+
+            var fileName = Path.GetFileName(filePath);
+            if (!string.IsNullOrEmpty(fileName) && fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                return false;
+
+            return true;
         }
     }
 }

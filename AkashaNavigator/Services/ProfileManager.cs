@@ -170,18 +170,11 @@ public class ProfileManager : IProfileManager
     /// </summary>
     public void SaveProfile(GameProfile profile)
     {
-        var profileDir = GetProfileDirectory(profile.Id);
-        var profilePath = Path.Combine(profileDir, AppConstants.ProfileFileName);
-
-        try
+        var saveResult = SaveProfileToDisk(profile);
+        if (!saveResult.IsSuccess)
         {
-            Directory.CreateDirectory(profileDir);
-            JsonHelper.SaveToFile(profilePath, profile);
-        }
-        catch (Exception ex)
-        {
-            _logService.Debug(nameof(ProfileManager), "保存 Profile 失败 [{ProfilePath}]: {ErrorMessage}", profilePath,
-                              ex.Message);
+            _logService.Warn(nameof(ProfileManager), "保存 Profile 失败 [{ProfileId}]: {ErrorCode}", profile.Id,
+                             saveResult.Error?.Code ?? "UNKNOWN");
         }
     }
 
@@ -1120,6 +1113,15 @@ public class ProfileManager : IProfileManager
 #endregion
 
 #region Private Methods
+
+    private Result SaveProfileToDisk(GameProfile profile)
+    {
+        var profileDirectory = GetProfileDirectory(profile.Id);
+        Directory.CreateDirectory(profileDirectory);
+
+        var filePath = Path.Combine(profileDirectory, AppConstants.ProfileFileName);
+        return JsonHelper.SaveToFile(filePath, profile);
+    }
 
     /// <summary>
     /// 加载所有已订阅的 Profile

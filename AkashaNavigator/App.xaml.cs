@@ -196,7 +196,7 @@ public partial class App : System.Windows.Application
             if (!_dataMigration.NeedsMigration())
                 return;
 
-            logService.Info("App", "检测到需要数据迁移，开始执行...");
+            logService.Info(nameof(App), "检测到需要数据迁移，开始执行...");
 
             var result = _dataMigration.Migrate();
 
@@ -204,22 +204,22 @@ public partial class App : System.Windows.Application
             {
                 case MigrationResultStatus.Success:
                     logService.Info(
-                        "App", "数据迁移成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
+                        nameof(App), "数据迁移成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
                         result.MigratedPluginCount, result.MigratedProfileCount);
                     break;
 
                 case MigrationResultStatus.PartialSuccess:
                     logService.Warn(
-                        "App", "数据迁移部分成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
+                        nameof(App), "数据迁移部分成功: {MigratedPluginCount} 个插件, {MigratedProfileCount} 个 Profile",
                         result.MigratedPluginCount, result.MigratedProfileCount);
                     foreach (var warning in result.Warnings)
                     {
-                        logService.Warn("App", "迁移警告: {Warning}", warning);
+                        logService.Warn(nameof(App), "迁移警告: {Warning}", warning);
                     }
                     break;
 
                 case MigrationResultStatus.Failed:
-                    logService.Error("App", "数据迁移失败: {ErrorMessage}", result.ErrorMessage);
+                    logService.Error(nameof(App), "数据迁移失败: {ErrorMessage}", result.ErrorMessage);
                     MessageBox.Show($"数据迁移失败：{result.ErrorMessage}\n\n应用将继续运行，但部分插件可能无法正常工作。",
                                     "迁移警告", MessageBoxButton.OK, MessageBoxImage.Warning);
                     break;
@@ -231,7 +231,7 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             var logService = Services.GetRequiredService<ILogService>();
-            logService?.Error("App", ex, "数据迁移过程中发生异常");
+            logService?.Error(nameof(App), ex, "数据迁移过程中发生异常");
         }
     }
 
