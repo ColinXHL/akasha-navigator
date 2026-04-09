@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Services;
 using AkashaNavigator.ViewModels.Windows;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
@@ -33,6 +34,7 @@ public partial class ControlBarWindow : Window
 
     private readonly ControlBarViewModel _viewModel;
     private readonly PlayerWindow _playerWindow;
+    private readonly ControlBarDisplayController _displayController;
 
     /// <summary>
     /// 是否正在拖动
@@ -50,11 +52,6 @@ public partial class ControlBarWindow : Window
     private double _windowStartLeft;
 
     /// <summary>
-    /// 当前显示状态
-    /// </summary>
-    private ControlBarDisplayState _displayState = ControlBarDisplayState.Hidden;
-
-    /// <summary>
     /// 鼠标位置检测定时器
     /// </summary>
     private DispatcherTimer? _mouseCheckTimer;
@@ -65,11 +62,6 @@ public partial class ControlBarWindow : Window
     private DispatcherTimer? _hideDelayTimer;
 
     /// <summary>
-    /// 状态切换后的稳定期（防抖）
-    /// </summary>
-    private DateTime _lastStateChangeTime = DateTime.MinValue;
-
-    /// <summary>
     /// 窗口内容边距（与 XAML 中 MainBorder 的 Margin 一致）
     /// </summary>
     private const double ContentMargin = 4;
@@ -78,10 +70,13 @@ public partial class ControlBarWindow : Window
 
 #region Constructor
 
-    public ControlBarWindow(ControlBarViewModel viewModel, PlayerWindow playerWindow)
+    public ControlBarWindow(ControlBarViewModel viewModel,
+                            PlayerWindow playerWindow,
+                            ControlBarDisplayController displayController)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _playerWindow = playerWindow ?? throw new ArgumentNullException(nameof(playerWindow));
+        _displayController = displayController ?? throw new ArgumentNullException(nameof(displayController));
 
         InitializeComponent();
         DataContext = _viewModel;
@@ -387,10 +382,6 @@ public partial class ControlBarWindow : Window
         if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPos))
             return;
 
-        // 防抖：状态切换后短暂稳定期内不做处理
-        if ((DateTime.Now - _lastStateChangeTime).TotalMilliseconds < AppConstants.ControlBarStateStabilityMs)
-            return;
-
         // 使用物理像素计算触发区域（避免 DPI 问题）
         int screenHeight = Win32Helper.GetScreenMetrics(Win32Helper.SM_CYSCREEN);
         int triggerAreaHeight = (int)(screenHeight * AppConstants.ControlBarTriggerAreaRatio);
@@ -412,71 +403,45 @@ public partial class ControlBarWindow : Window
         // 检查鼠标是否在屏幕顶部触发区域（整个屏幕宽度，使用物理像素）
         bool isInTriggerArea = cursorPos.Y >= 0 && cursorPos.Y <= triggerAreaHeight;
 
-        // 根据当前状态和鼠标位置决定目标状态
-        ControlBarDisplayState targetState = _displayState;
+        bool isContextMenuOpen = BtnMenu.ContextMenu?.IsOpen == true;
+        bool isUrlTextBoxFocused = UrlTextBox.IsFocused;
 
-        switch (_displayState)
+        if (isUrlTextBoxFocused && !isMouseOverWindow && !isContextMenuOpen)
         {
-        case ControlBarDisplayState.Hidden:
-            if (isInTriggerArea)
+            bool mouseButtonDown = Win32Helper.IsKeyPressed(Win32Helper.VK_LBUTTON);
+            if (mouseButtonDown)
             {
-                targetState = ControlBarDisplayState.TriggerLine;
+                Keyboard.ClearFocus();
+                FocusManager.SetFocusedElement(this, null);
+                isUrlTextBoxFocused = false;
             }
-            break;
-
-        case ControlBarDisplayState.TriggerLine:
-            if (isMouseOverWindow)
-            {
-                targetState = ControlBarDisplayState.Expanded;
-                StopHideDelayTimer();
-            }
-            else if (!isInTriggerArea)
-            {
-                StartHideDelayTimer();
-            }
-            else
-            {
-                StopHideDelayTimer();
-            }
-            break;
-
-        case ControlBarDisplayState.Expanded:
-            // 检查 ContextMenu 是否打开
-            bool isContextMenuOpen = BtnMenu.ContextMenu?.IsOpen == true;
-
-            if (isMouseOverWindow || isContextMenuOpen)
-            {
-                StopHideDelayTimer();
-            }
-            else if (UrlTextBox.IsFocused)
-            {
-                // 输入框聚焦但鼠标不在窗口上
-                // 检测鼠标左键是否被按下（点击了其他位置）
-                bool mouseButtonDown = Win32Helper.IsKeyPressed(Win32Helper.VK_LBUTTON);
-                if (mouseButtonDown)
-                {
-                    // 点击了其他位置，清除焦点并移除焦点视觉样式
-                    Keyboard.ClearFocus();
-                    FocusManager.SetFocusedElement(this, null);
-                }
-                else
-                {
-                    // 输入框聚焦时不隐藏
-                    StopHideDelayTimer();
-                }
-            }
-            else
-            {
-                // 不在窗口上且输入框未聚焦，启动延迟隐藏
-                StartHideDelayTimer();
-            }
-            break;
         }
 
-        // 应用状态变化
-        if (targetState != _displayState)
+        var decision = _displayController.EvaluateMouse(
+            isMouseOverWindow,
+            isInTriggerArea,
+            isContextMenuOpen,
+            isUrlTextBoxFocused,
+            DateTime.UtcNow);
+
+        ApplyDecision(decision);
+    }
+
+    private void ApplyDecision(ControlBarDecision decision)
+    {
+        if (decision.StopHideDelayTimer)
         {
-            SetDisplayState(targetState);
+            StopHideDelayTimer();
+        }
+
+        if (decision.StartHideDelayTimer)
+        {
+            StartHideDelayTimer();
+        }
+
+        if (decision.NextState != _displayController.State)
+        {
+            SetDisplayState(decision.NextState);
         }
     }
 
@@ -506,11 +471,17 @@ public partial class ControlBarWindow : Window
                                 cursorPos.Y <= windowRect.Bottom - ContentMargin;
         }
 
-        // 只要不在窗口上就隐藏（不考虑触发区域）
-        if (!isMouseOverWindow)
-        {
-            SetDisplayState(ControlBarDisplayState.Hidden);
-        }
+        bool isContextMenuOpen = BtnMenu.ContextMenu?.IsOpen == true;
+        bool isUrlTextBoxFocused = UrlTextBox.IsFocused;
+
+        var decision = _displayController.EvaluateHideDelay(
+            isMouseOverWindow,
+            isMouseInTopTriggerZone: false,
+            isContextMenuOpen,
+            isUrlTextBoxFocused,
+            DateTime.UtcNow);
+
+        ApplyDecision(decision);
     }
 
     /// <summary>
@@ -541,11 +512,10 @@ public partial class ControlBarWindow : Window
         if (!IsLoaded)
             return;
 
-        if (_displayState == state)
+        if (_displayController.State == state)
             return;
 
-        _displayState = state;
-        _lastStateChangeTime = DateTime.Now;
+        _displayController.SetState(state, DateTime.UtcNow);
 
         switch (state)
         {

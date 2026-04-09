@@ -899,7 +899,7 @@ git commit -m "refactor(profiles): extract delete planning and execution workflo
 - Modify: `AkashaNavigator/Core/ServiceCollectionExtensions.cs`
 - Create: `AkashaNavigator.Tests/Windows/ControlBarDisplayControllerTests.cs`
 
-- [ ] **Step 1: Write the failing controller test against a real decision API**
+- [x] **Step 1: Write the failing controller test against a real decision API**
 
 ```csharp
 namespace AkashaNavigator.Tests.Windows;
@@ -924,12 +924,12 @@ public class ControlBarDisplayControllerTests
 }
 ```
 
-- [ ] **Step 2: Run the controller test and confirm it fails because the controller does not exist yet**
+- [x] **Step 2: Run the controller test and confirm it fails because the controller does not exist yet**
 
 Run: `dotnet test AkashaNavigator.Tests --filter "FullyQualifiedName~ControlBarDisplayControllerTests"`
 Expected: FAIL with missing type/member errors for `ControlBarDisplayController`.
 
-- [ ] **Step 3: Create the controller around decisions, not just state storage**
+- [x] **Step 3: Create the controller around decisions, not just state storage**
 
 Use this shape:
 
@@ -952,7 +952,7 @@ public class ControlBarDisplayController
 }
 ```
 
-- [ ] **Step 4: Wire the controller into `ControlBarWindow` and register it in DI**
+- [x] **Step 4: Wire the controller into `ControlBarWindow` and register it in DI**
 
 Add:
 
@@ -962,7 +962,7 @@ services.AddSingleton<ControlBarDisplayController>();
 
 Update `ControlBarWindow` constructor to accept it and route `MouseCheckTimer_Tick` / `HideDelayTimer_Tick` through the controller.
 
-- [ ] **Step 5: Run controller tests and build**
+- [x] **Step 5: Run controller tests and build**
 
 Run: `dotnet test AkashaNavigator.Tests --filter "FullyQualifiedName~ControlBarDisplayControllerTests"`
 Expected: PASS
@@ -970,7 +970,7 @@ Expected: PASS
 Run: `dotnet build`
 Expected: PASS
 
-- [ ] **Step 6: Commit the control-bar extraction**
+- [x] **Step 6: Commit the control-bar extraction**
 
 ```bash
 git add AkashaNavigator/Services/ControlBarDisplayController.cs AkashaNavigator/Views/Windows/ControlBarWindow.xaml.cs AkashaNavigator/Core/ServiceCollectionExtensions.cs AkashaNavigator.Tests/Windows/ControlBarDisplayControllerTests.cs

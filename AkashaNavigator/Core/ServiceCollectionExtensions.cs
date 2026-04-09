@@ -53,6 +53,9 @@ public static class ServiceCollectionExtensions
         // OsdManager（无依赖，用于显示屏幕提示）
         services.AddSingleton<OsdManager>();
 
+        // ControlBarDisplayController（控制栏显示策略）
+        services.AddSingleton<ControlBarDisplayController>();
+
         // ScriptExecutionQueue（依赖LogService，用于WebView2脚本执行队列化）
         services.AddSingleton<ScriptExecutionQueue>();
 
