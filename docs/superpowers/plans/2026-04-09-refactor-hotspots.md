@@ -643,7 +643,7 @@ Expected: PASS
 Run: `dotnet build`
 Expected: PASS
 
-- [ ] **Step 7: Commit the persistence cleanup**
+- [x] **Step 7: Commit the persistence cleanup**
 
 ```bash
 git add AkashaNavigator/Helpers/JsonHelper.cs AkashaNavigator/Services/DataService.cs AkashaNavigator/Services/ProfileManager.cs AkashaNavigator/Plugins/Apis/Core/ConfigApi.cs AkashaNavigator/App.xaml.cs
