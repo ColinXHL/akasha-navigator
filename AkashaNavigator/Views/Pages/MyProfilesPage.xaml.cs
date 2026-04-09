@@ -7,7 +7,6 @@ using AkashaNavigator.ViewModels.Pages;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Views.Dialogs;
-using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
@@ -28,13 +27,14 @@ public partial class MyProfilesPage : UserControl, IDisposable
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly INotificationService _notificationService;
     private readonly IEventBus _eventBus;
+    private readonly IPluginSettingsWindowService _pluginSettingsWindowService;
     private bool _disposed;
 
     // DI构造函数
     public MyProfilesPage(MyProfilesPageViewModel viewModel, IDialogFactory dialogFactory,
                           IProfileManager profileManager, IPluginLibrary pluginLibrary, IPluginHost pluginHost,
                           IPluginAssociationManager pluginAssociationManager, INotificationService notificationService,
-                          IEventBus eventBus)
+                          IEventBus eventBus, IPluginSettingsWindowService pluginSettingsWindowService)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _dialogFactory = dialogFactory ?? throw new ArgumentNullException(nameof(dialogFactory));
@@ -45,6 +45,7 @@ public partial class MyProfilesPage : UserControl, IDisposable
             pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _pluginSettingsWindowService = pluginSettingsWindowService ?? throw new ArgumentNullException(nameof(pluginSettingsWindowService));
 
         InitializeComponent();
         DataContext = _viewModel;
@@ -420,7 +421,7 @@ public partial class MyProfilesPage : UserControl, IDisposable
         var pluginDirectory = _pluginLibrary.GetPluginDirectory(pluginId);
         var configDirectory = _pluginHost.GetPluginConfigDirectory(profileId, pluginId);
 
-        PluginSettingsWindow.ShowSettings(pluginId, pluginInfo.Name, pluginDirectory, configDirectory,
+        _pluginSettingsWindowService.Show(pluginId, pluginInfo.Name, pluginDirectory, configDirectory,
                                           Window.GetWindow(this), profileId);
     }
 

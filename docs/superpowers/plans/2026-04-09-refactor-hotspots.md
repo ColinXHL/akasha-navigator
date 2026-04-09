@@ -664,7 +664,7 @@ git commit -m "refactor(persistence): surface file write failures and normalize 
 - Create: `AkashaNavigator.Tests/TestDoubles/PluginRefactorTestDoubles.cs`
 - Create: `AkashaNavigator.Tests/ViewModels/PluginSettingsViewModelTests.cs`
 
-- [ ] **Step 1: Write the failing view-model test against a real public save API**
+- [x] **Step 1: Write the failing view-model test against a real public save API**
 
 ```csharp
 using AkashaNavigator.Tests.TestDoubles;
@@ -696,12 +696,12 @@ public class PluginSettingsViewModelTests
 }
 ```
 
-- [ ] **Step 2: Run the view-model test and confirm it fails because the view model does not exist yet**
+- [x] **Step 2: Run the view-model test and confirm it fails because the view model does not exist yet**
 
 Run: `dotnet test AkashaNavigator.Tests --filter "FullyQualifiedName~PluginSettingsViewModelTests"`
 Expected: FAIL with missing type/member errors for `PluginSettingsViewModel` and `SaveAsync()`.
 
-- [ ] **Step 3: Keep dynamic `SettingsUiRenderer` hosting in the window and move state/save logic to the view model**
+- [x] **Step 3: Keep dynamic `SettingsUiRenderer` hosting in the window and move state/save logic to the view model**
 
 The view model must own:
 
@@ -721,7 +721,7 @@ private void OnButtonAction(object? sender, SettingsButtonActionEventArgs e)
 
 `OnSettingValueChanged(...)` should call `viewModel.UpdateValue(...)` instead of saving directly.
 
-- [ ] **Step 4: Create a dedicated edit-session coordinator for overlay edit mode**
+- [x] **Step 4: Create a dedicated edit-session coordinator for overlay edit mode**
 
 Use this contract:
 
@@ -735,7 +735,7 @@ public interface IPluginSettingsEditSessionCoordinator
 
 Move parent-window hide/show, focus restore, and overlay exit handling out of the view model and into this coordinator.
 
-- [ ] **Step 5: Replace the static settings window entry point with a launcher service**
+- [x] **Step 5: Replace the static settings window entry point with a launcher service**
 
 Use:
 
@@ -766,7 +766,7 @@ public PluginSettingsWindow(
 
 Delete `PluginSettingsWindow.ShowSettings(...)`.
 
-- [ ] **Step 6: Update `MyProfilesPage` to use the launcher service**
+- [x] **Step 6: Update `MyProfilesPage` to use the launcher service**
 
 Use this call shape:
 
@@ -774,7 +774,7 @@ Use this call shape:
 _pluginSettingsWindowService.Show(pluginId, pluginName, pluginDirectory, configDirectory, Window.GetWindow(this), profileId);
 ```
 
-- [ ] **Step 7: Run plugin settings tests and build**
+- [x] **Step 7: Run plugin settings tests and build**
 
 Run: `dotnet test AkashaNavigator.Tests --filter "FullyQualifiedName~PluginSettingsViewModelTests"`
 Expected: PASS
@@ -782,7 +782,7 @@ Expected: PASS
 Run: `dotnet build`
 Expected: PASS
 
-- [ ] **Step 8: Commit the plugin settings refactor**
+- [x] **Step 8: Commit the plugin settings refactor**
 
 ```bash
 git add AkashaNavigator/ViewModels/Windows/PluginSettingsViewModel.cs AkashaNavigator/Core/Interfaces/IPluginSettingsWindowService.cs AkashaNavigator/Core/Interfaces/IPluginSettingsEditSessionCoordinator.cs AkashaNavigator/Services/PluginSettingsWindowService.cs AkashaNavigator/Services/PluginSettingsEditSessionCoordinator.cs AkashaNavigator/Views/Windows/PluginSettingsWindow.xaml.cs AkashaNavigator/Views/Pages/MyProfilesPage.xaml.cs AkashaNavigator/Core/ServiceCollectionExtensions.cs AkashaNavigator.Tests/TestDoubles/PluginRefactorTestDoubles.cs AkashaNavigator.Tests/ViewModels/PluginSettingsViewModelTests.cs

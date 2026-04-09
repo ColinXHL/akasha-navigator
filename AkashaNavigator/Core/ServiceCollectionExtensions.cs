@@ -204,6 +204,29 @@ public static class ServiceCollectionExtensions
         // PioneerNoteViewModel（依赖 IPioneerNoteService）
         services.AddTransient<PioneerNoteViewModel>();
 
+        services.AddTransient<Func<string, string, string, string, string?, PluginSettingsViewModel>>(
+            sp => (pluginId, pluginName, pluginDirectory, configDirectory, profileId) =>
+            {
+                var profileManager = sp.GetRequiredService<IProfileManager>();
+                var logService = sp.GetRequiredService<ILogService>();
+                var pluginHost = sp.GetRequiredService<IPluginHost>();
+                var notificationService = sp.GetRequiredService<INotificationService>();
+                return new PluginSettingsViewModel(profileManager, logService, pluginHost, notificationService,
+                                                   pluginId, pluginName, pluginDirectory, configDirectory,
+                                                   profileId);
+            });
+
+        services.AddTransient<Func<PluginSettingsViewModel, PluginSettingsWindow>>(
+            sp => viewModel =>
+            {
+                var coordinator = sp.GetRequiredService<IPluginSettingsEditSessionCoordinator>();
+                var logService = sp.GetRequiredService<ILogService>();
+                return new PluginSettingsWindow(viewModel, coordinator, logService);
+            });
+
+        services.AddSingleton<IPluginSettingsWindowService, PluginSettingsWindowService>();
+        services.AddSingleton<IPluginSettingsEditSessionCoordinator, PluginSettingsEditSessionCoordinator>();
+
         // ============================================================
         // Pages（Transient，每次请求创建新实例）
         // 必须在 PluginCenterWindow 之前注册
@@ -264,24 +287,6 @@ public static class ServiceCollectionExtensions
         // 依赖链：PluginCenterWindow → (PluginCenterViewModel, MyProfilesPage, InstalledPluginsPage,
         //         AvailablePluginsPage, ProfileMarketPage)
         services.AddTransient<PluginCenterWindow>();
-
-        // PluginSettingsWindow 工厂方法（用于创建带参数的窗口）
-        services.AddSingleton < Func < string, string, string, string, string ?,
-            PluginSettingsWindow >> (sp =>
-                                     {
-                                         return (pluginId, pluginName, pluginDirectory, configDirectory, profileId) =>
-                                         {
-                                             var profileManager = sp.GetRequiredService<IProfileManager>();
-                                             var logService = sp.GetRequiredService<ILogService>();
-                                             var pluginHost = sp.GetRequiredService<IPluginHost>();
-                                             var notificationService = sp.GetRequiredService<INotificationService>();
-                                             var overlayManager = sp.GetRequiredService<IOverlayManager>();
-                                             return new PluginSettingsWindow(profileManager, logService, pluginHost,
-                                                                             notificationService, overlayManager,
-                                                                             pluginId, pluginName, pluginDirectory,
-                                                                             configDirectory, profileId);
-                                         };
-                                     });
 
         // HistoryWindow（依赖 HistoryWindowViewModel + IDialogFactory）
         // 依赖链：HistoryWindow → (HistoryWindowViewModel, IDialogFactory)
