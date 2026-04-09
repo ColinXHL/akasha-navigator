@@ -1,14 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using AkashaNavigator.ViewModels.Pages;
 using AkashaNavigator.Models.Profile;
-using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Views.Dialogs;
-using AkashaNavigator.Core.Events;
-using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Core.Interfaces;
 using Microsoft.Win32;
 
@@ -26,7 +22,6 @@ public partial class MyProfilesPage : UserControl, IDisposable
     private readonly IPluginHost _pluginHost;
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly INotificationService _notificationService;
-    private readonly IEventBus _eventBus;
     private readonly IPluginSettingsWindowService _pluginSettingsWindowService;
     private bool _disposed;
 
@@ -34,7 +29,7 @@ public partial class MyProfilesPage : UserControl, IDisposable
     public MyProfilesPage(MyProfilesPageViewModel viewModel, IDialogFactory dialogFactory,
                           IProfileManager profileManager, IPluginLibrary pluginLibrary, IPluginHost pluginHost,
                           IPluginAssociationManager pluginAssociationManager, INotificationService notificationService,
-                          IEventBus eventBus, IPluginSettingsWindowService pluginSettingsWindowService)
+                          IPluginSettingsWindowService pluginSettingsWindowService)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _dialogFactory = dialogFactory ?? throw new ArgumentNullException(nameof(dialogFactory));
@@ -44,7 +39,6 @@ public partial class MyProfilesPage : UserControl, IDisposable
         _pluginAssociationManager =
             pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
-        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _pluginSettingsWindowService = pluginSettingsWindowService ?? throw new ArgumentNullException(nameof(pluginSettingsWindowService));
 
         InitializeComponent();
@@ -128,120 +122,18 @@ public partial class MyProfilesPage : UserControl, IDisposable
         if (string.IsNullOrEmpty(profileId))
             return;
 
-        var profile = _profileManager.GetProfileById(profileId);
-        var profileName = profile?.Name ?? profileId;
-
-        // 获取仅此 Profile 使用的插件列表（引用计数为 1）
-        var profilePlugins = _pluginAssociationManager.GetPluginsInProfile(profileId);
-        var uniquePluginIds =
-            profilePlugins.Where(p => _pluginAssociationManager.GetPluginReferenceCount(p.PluginId) == 1)
-                .Select(p => p.PluginId)
-                .ToList();
-
-        List<string>? pluginsToUninstall = null;
-
-        if (uniquePluginIds.Count > 0)
+        var plan = _viewModel.PrepareDeleteProfile(profileId);
+        if (string.IsNullOrWhiteSpace(plan.ProfileId))
         {
-            // 有唯一插件，显示 PluginUninstallDialog
-            var pluginItems = uniquePluginIds
-                                  .Select(pluginId =>
-                                          {
-                                              var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
-                                              return new PluginUninstallItem {
-                                                  PluginId = pluginId, Name = pluginInfo?.Name ?? pluginId,
-                                                  Description = pluginInfo?.Description ?? string.Empty,
-                                                  IsSelected = true // 默认选中
-                                              };
-                                          })
-                                  .ToList();
-
-            var dialog = _dialogFactory.CreatePluginUninstallDialog(profileName, pluginItems);
-            dialog.Owner = Window.GetWindow(this);
-
-            if (dialog.ShowDialog() != true || !dialog.Confirmed)
-            {
-                // 用户取消
-                return;
-            }
-
-            pluginsToUninstall = dialog.SelectedPluginIds;
-        }
-        else
-        {
-            // 没有唯一插件，使用 NotificationService 显示确认对话框
-            var confirmed = await _notificationService.ConfirmAsync(
-                $"确定要删除 Profile \"{profileName}\" 吗？\n\n此操作将删除该 Profile 的配置文件。", "确认删除");
-
-            if (!confirmed)
-            {
-                return;
-            }
+            return;
         }
 
-        // 执行删除
-        await DeleteProfileAsync(profileId, profileName, pluginsToUninstall);
-    }
-
-    /// <summary>
-    /// 执行 Profile 删除
-    /// </summary>
-    private System.Threading.Tasks.Task DeleteProfileAsync(string profileId, string profileName,
-                                                           List<string>? pluginsToUninstall)
-    {
-        // 执行删除
-        var deleteResult = _profileManager.DeleteProfile(profileId);
-
-        if (deleteResult.IsSuccess)
+        var dialog = _dialogFactory.CreatePluginUninstallDialog(plan.ProfileName, plan.PluginChoices.ToList());
+        dialog.Owner = Window.GetWindow(this);
+        if (dialog.ShowDialog() == true && dialog.Confirmed)
         {
-            // 如果用户选择了要卸载的插件，执行卸载
-            if (pluginsToUninstall != null && pluginsToUninstall.Count > 0)
-            {
-                int successCount = 0;
-                int failCount = 0;
-
-                foreach (var pluginId in pluginsToUninstall)
-                {
-                    var result = _pluginLibrary.UninstallPlugin(pluginId);
-                    if (result.IsSuccess)
-                    {
-                        successCount++;
-                    }
-                    else
-                    {
-                        failCount++;
-                    }
-                }
-
-                // 通知其他页面刷新插件列表
-                _eventBus.Publish(new PluginListChangedEvent());
-
-                if (failCount > 0)
-                {
-                    _notificationService.Warning(
-                        $"Profile \"{profileName}\" 已删除。插件卸载: 成功 {successCount} 个，失败 {failCount} 个");
-                }
-                else
-                {
-                    _notificationService.Success($"Profile \"{profileName}\" 已删除，同时卸载了 {successCount} 个插件");
-                }
-            }
-            else
-            {
-                _notificationService.Success($"Profile \"{profileName}\" 已删除");
-            }
-
-            // 通知 Profile 市场页面刷新（更新安装状态）
-            _eventBus.Publish(new ProfileListChangedEvent());
-
-            // 刷新 Profile 列表（会自动切换到默认 Profile）
-            _viewModel.RefreshProfileList();
+            await _viewModel.ConfirmDeleteProfileAsync(plan, dialog.SelectedPluginIds);
         }
-        else
-        {
-            _notificationService.Error($"删除失败: {deleteResult.Error?.Message}");
-        }
-
-        return System.Threading.Tasks.Task.CompletedTask;
     }
 
     /// <summary>

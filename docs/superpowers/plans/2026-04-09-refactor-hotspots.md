@@ -801,7 +801,7 @@ git commit -m "refactor(plugin-settings): separate window session behavior from 
 - Create: `AkashaNavigator.Tests/TestDoubles/PluginRefactorTestDoubles.cs`
 - Create: `AkashaNavigator.Tests/Services/ProfileDeletionWorkflowTests.cs`
 
-- [ ] **Step 1: Write the failing workflow test around a delete-plan DTO instead of the page**
+- [x] **Step 1: Write the failing workflow test around a delete-plan DTO instead of the page**
 
 ```csharp
 using AkashaNavigator.Tests.TestDoubles;
@@ -828,12 +828,12 @@ public class ProfileDeletionWorkflowTests
 }
 ```
 
-- [ ] **Step 2: Run the workflow test and confirm it fails because the workflow does not exist yet**
+- [x] **Step 2: Run the workflow test and confirm it fails because the workflow does not exist yet**
 
 Run: `dotnet test AkashaNavigator.Tests --filter "FullyQualifiedName~ProfileDeletionWorkflowTests"`
 Expected: FAIL with missing type/member errors for `ProfileDeletionWorkflow` and `DeleteProfilePlan`.
 
-- [ ] **Step 3: Introduce the delete-plan DTO and workflow service**
+- [x] **Step 3: Introduce the delete-plan DTO and workflow service**
 
 Use this DTO shape:
 
@@ -863,7 +863,7 @@ Register the workflow in DI:
 services.AddSingleton<IProfileDeletionWorkflow, ProfileDeletionWorkflow>();
 ```
 
-- [ ] **Step 4: Move `MyProfilesPage` to dialog glue only**
+- [x] **Step 4: Move `MyProfilesPage` to dialog glue only**
 
 Use this page flow:
 
@@ -876,7 +876,7 @@ if (dialog.ShowDialog() == true && dialog.Confirmed)
 }
 ```
 
-- [ ] **Step 5: Run workflow tests and build**
+- [x] **Step 5: Run workflow tests and build**
 
 Run: `dotnet test AkashaNavigator.Tests --filter "FullyQualifiedName~ProfileDeletionWorkflowTests"`
 Expected: PASS
@@ -884,7 +884,7 @@ Expected: PASS
 Run: `dotnet build`
 Expected: PASS
 
-- [ ] **Step 6: Commit the profile deletion workflow extraction**
+- [x] **Step 6: Commit the profile deletion workflow extraction**
 
 ```bash
 git add AkashaNavigator/Models/Profile/DeleteProfilePlan.cs AkashaNavigator/Core/Interfaces/IProfileDeletionWorkflow.cs AkashaNavigator/Services/ProfileDeletionWorkflow.cs AkashaNavigator/ViewModels/Pages/MyProfilesPageViewModel.cs AkashaNavigator/Views/Pages/MyProfilesPage.xaml.cs AkashaNavigator/Core/ServiceCollectionExtensions.cs AkashaNavigator.Tests/TestDoubles/PluginRefactorTestDoubles.cs AkashaNavigator.Tests/Services/ProfileDeletionWorkflowTests.cs

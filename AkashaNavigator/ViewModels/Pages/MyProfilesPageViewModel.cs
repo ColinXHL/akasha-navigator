@@ -27,6 +27,7 @@ public partial class MyProfilesPageViewModel : ObservableObject, IDisposable
     private readonly IPluginHost _pluginHost;
     private readonly INotificationService _notificationService;
     private readonly IEventBus _eventBus;
+    private readonly IProfileDeletionWorkflow _profileDeletionWorkflow;
 
     /// <summary>
     /// Profile 列表
@@ -91,7 +92,8 @@ public partial class MyProfilesPageViewModel : ObservableObject, IDisposable
     /// </summary>
     public MyProfilesPageViewModel(IProfileManager profileManager, IPluginAssociationManager pluginAssociationManager,
                                    IPluginLibrary pluginLibrary, IPluginHost pluginHost,
-                                   INotificationService notificationService, IEventBus eventBus)
+                                   INotificationService notificationService, IEventBus eventBus,
+                                   IProfileDeletionWorkflow profileDeletionWorkflow)
     {
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
         _pluginAssociationManager =
@@ -100,6 +102,7 @@ public partial class MyProfilesPageViewModel : ObservableObject, IDisposable
         _pluginHost = pluginHost ?? throw new ArgumentNullException(nameof(pluginHost));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _profileDeletionWorkflow = profileDeletionWorkflow ?? throw new ArgumentNullException(nameof(profileDeletionWorkflow));
 
         // 订阅 Profile 列表变化事件
         _eventBus.Subscribe<ProfileListChangedEvent>(OnProfileListChanged);
@@ -444,6 +447,40 @@ public partial class MyProfilesPageViewModel : ObservableObject, IDisposable
 
         // 此命令由 Code-behind 的 DeleteProfileRequested 事件处理
         DeleteProfileRequested?.Invoke(this, CurrentProfileId);
+    }
+
+    public DeleteProfilePlan PrepareDeleteProfile(string profileId)
+    {
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            return new DeleteProfilePlan();
+        }
+
+        if (_profileManager.IsDefaultProfile(profileId))
+        {
+            _notificationService.Warning("默认 Profile 不能删除");
+            return new DeleteProfilePlan();
+        }
+
+        var profile = _profileManager.GetProfileById(profileId);
+        if (profile == null)
+        {
+            _notificationService.Error("Profile 不存在");
+            return new DeleteProfilePlan();
+        }
+
+        return _profileDeletionWorkflow.PrepareDeletePlan(profileId);
+    }
+
+    public async System.Threading.Tasks.Task ConfirmDeleteProfileAsync(DeleteProfilePlan plan, IReadOnlyList<string> selectedPluginIds)
+    {
+        if (string.IsNullOrWhiteSpace(plan.ProfileId))
+        {
+            return;
+        }
+
+        await _profileDeletionWorkflow.ExecuteDeleteAsync(plan, selectedPluginIds);
+        RefreshProfileList();
     }
 
     /// <summary>

@@ -108,6 +108,9 @@ public static class ServiceCollectionExtensions
         // PluginLibrary, ProfileRegistry）
         services.AddSingleton<IProfileManager, ProfileManager>();
 
+        // ProfileDeletionWorkflow（依赖 ProfileManager + PluginAssociationManager + PluginLibrary + NotificationService + EventBus）
+        services.AddSingleton<IProfileDeletionWorkflow, ProfileDeletionWorkflow>();
+
         // ============================================================
         // Level 3: 依赖 LogService + ProfileManager（必须在ProfileManager之后注册）
         // ============================================================
