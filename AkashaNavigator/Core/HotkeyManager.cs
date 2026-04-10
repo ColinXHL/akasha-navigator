@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Services;
@@ -16,9 +15,9 @@ namespace AkashaNavigator.Core
 /// </summary>
 public class HotkeyManager
 {
-    private static readonly ILogger Logger = Log.ForContext("SourceContext", "HotkeyManager");
+    private static readonly ILogger Logger = Log.ForContext("SourceContext", nameof(HotkeyManager));
 
-    private HotkeyService? _hotkeyService;
+    private readonly HotkeyService _hotkeyService;
     private PlayerWindow? _playerWindow;
     private AppConfig _config = null!;
     private Action<string, string?>? _showOsdAction;
@@ -30,8 +29,9 @@ public class HotkeyManager
     private readonly Dictionary<string, DateTime> _lastActionTime = new(StringComparer.OrdinalIgnoreCase);
     private const int ToggleActionDebounceMs = 180;
 
-    public HotkeyManager()
+    public HotkeyManager(HotkeyService hotkeyService)
     {
+        _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _seekFlushTimer = new DispatcherTimer();
         _seekFlushTimer.Tick += OnSeekFlushTimerTick;
     }
@@ -48,39 +48,28 @@ public class HotkeyManager
         _config = config;
         _showOsdAction = showOsdAction;
 
-        // 从 DI 容器获取 HotkeyService（确保与插件使用同一个实例）
-        _hotkeyService = App.Services?.GetService<HotkeyService>();
-        if (_hotkeyService == null)
+        // 不要替换整个配置，而是合并内置快捷键到现有配置
+        var currentConfig = _hotkeyService.GetConfig();
+        var newConfig = _config.ToHotkeyConfig();
+
+        // 将新配置的绑定添加到当前配置（如果不存在）
+        var activeProfile = currentConfig.GetActiveProfile();
+        if (activeProfile != null)
         {
-            Logger.Warning("Failed to get HotkeyService from DI container, creating new instance");
-            _hotkeyService = new HotkeyService();
-            _hotkeyService.UpdateConfig(_config.ToHotkeyConfig());
-        }
-        else
-        {
-            // 不要替换整个配置，而是合并内置快捷键到现有配置
-            var currentConfig = _hotkeyService.GetConfig();
-            var newConfig = _config.ToHotkeyConfig();
-            
-            // 将新配置的绑定添加到当前配置（如果不存在）
-            var activeProfile = currentConfig.GetActiveProfile();
-            if (activeProfile != null)
+            var newProfile = newConfig.GetActiveProfile();
+            if (newProfile != null)
             {
-                var newProfile = newConfig.GetActiveProfile();
-                if (newProfile != null)
+                foreach (var binding in newProfile.Bindings)
                 {
-                    foreach (var binding in newProfile.Bindings)
+                    // 检查是否已存在相同的绑定
+                    var exists = activeProfile.Bindings.Any(b =>
+                        b.Key == binding.Key &&
+                        b.Modifiers == binding.Modifiers &&
+                        b.Action == binding.Action);
+
+                    if (!exists)
                     {
-                        // 检查是否已存在相同的绑定
-                        var exists = activeProfile.Bindings.Any(b => 
-                            b.Key == binding.Key && 
-                            b.Modifiers == binding.Modifiers && 
-                            b.Action == binding.Action);
-                        
-                        if (!exists)
-                        {
-                            activeProfile.Bindings.Add(binding);
-                        }
+                        activeProfile.Bindings.Add(binding);
                     }
                 }
             }
@@ -104,9 +93,6 @@ public class HotkeyManager
     /// </summary>
     private void SetupHotkeyBindings()
     {
-        if (_hotkeyService == null)
-            return;
-
         _hotkeyService.SeekBackward += (s, e) =>
         {
             Logger.Debug("SeekBackward event received, _playerWindow is null: {IsNull}", _playerWindow == null);
@@ -235,13 +221,10 @@ public class HotkeyManager
         _hotkeyService.SuspendHotkeys += (s, e) =>
         {
             Logger.Debug("SuspendHotkeys event received");
-            if (_hotkeyService != null)
-            {
-                _hotkeyService.ToggleSuspend();
-                var isSuspended = _hotkeyService.IsSuspended;
-                var msg = isSuspended ? "热键已暂停" : "热键已恢复";
-                ShowOsd(msg, isSuspended ? "⏸" : "▶");
-            }
+            _hotkeyService.ToggleSuspend();
+            var isSuspended = _hotkeyService.IsSuspended;
+            var msg = isSuspended ? "热键已暂停" : "热键已恢复";
+            ShowOsd(msg, isSuspended ? "⏸" : "▶");
         };
     }
 
@@ -325,8 +308,7 @@ public class HotkeyManager
     {
         _seekFlushTimer.Stop();
         _seekFlushTimer.Tick -= OnSeekFlushTimerTick;
-        _hotkeyService?.Dispose();
-        _hotkeyService = null;
+        _hotkeyService.Dispose();
     }
 }
 }

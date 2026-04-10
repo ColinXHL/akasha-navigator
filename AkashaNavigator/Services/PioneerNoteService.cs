@@ -16,39 +16,6 @@ namespace AkashaNavigator.Services
 /// </summary>
 public class PioneerNoteService : IPioneerNoteService
 {
-#region Singleton
-
-    private static IPioneerNoteService? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static IPioneerNoteService Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                var profileManager = App.Services?.GetService(typeof(IProfileManager)) as IProfileManager;
-                if (profileManager == null)
-                    throw new InvalidOperationException("IProfileManager is not available.");
-
-                _instance = new PioneerNoteService(LogService.Instance, profileManager);
-            }
-            return _instance;
-        }
-        set => _instance = value;
-    }
-
-    /// <summary>
-    /// 重置单例实例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance()
-    {
-        _instance = null;
-    }
-
-#endregion
-
 #region Fields
 
     private readonly ILogService _logService;

@@ -50,6 +50,9 @@ public static class ServiceCollectionExtensions
         // HotkeyService（无依赖，使用Win32钩子）
         services.AddSingleton<HotkeyService>();
 
+        // HotkeyManager（依赖 HotkeyService）
+        services.AddSingleton<HotkeyManager>();
+
         // OsdManager（无依赖，用于显示屏幕提示）
         services.AddSingleton<OsdManager>();
 
@@ -121,17 +124,8 @@ public static class ServiceCollectionExtensions
         // WindowStateService（依赖LogService + ProfileManager）
         services.AddSingleton<IWindowStateService, WindowStateService>();
 
-        // PioneerNoteService（使用静态单例实例，确保与 Instance 属性一致）
-        services.AddSingleton<IPioneerNoteService>(sp =>
-                                                   {
-                                                       // 确保 DI 和静态 Instance 使用同一个实例
-                                                       var logService = sp.GetRequiredService<ILogService>();
-                                                       var profileManager = sp.GetRequiredService<IProfileManager>();
-                                                       var instance =
-                                                           new PioneerNoteService(logService, profileManager);
-                                                       PioneerNoteService.Instance = instance;
-                                                       return instance;
-                                                   });
+        // PioneerNoteService（依赖LogService + ProfileManager）
+        services.AddSingleton<IPioneerNoteService, PioneerNoteService>();
 
         // DataService（依赖LogService + ProfileManager，必须在ProfileManager之后）
         services.AddSingleton<IDataService, DataService>();
@@ -226,8 +220,9 @@ public static class ServiceCollectionExtensions
             sp => viewModel =>
             {
                 var coordinator = sp.GetRequiredService<IPluginSettingsEditSessionCoordinator>();
+                var overlayManager = sp.GetRequiredService<IOverlayManager>();
                 var logService = sp.GetRequiredService<ILogService>();
-                return new PluginSettingsWindow(viewModel, coordinator, logService);
+                return new PluginSettingsWindow(viewModel, coordinator, overlayManager, logService);
             });
 
         services.AddSingleton<IPluginSettingsWindowService, PluginSettingsWindowService>();

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Profile;
@@ -178,38 +177,6 @@ public class ProfileInstallResult
 /// </summary>
 public class ProfileMarketplaceService
 {
-#region Singleton
-
-    private static ProfileMarketplaceService? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static ProfileMarketplaceService Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                // 使用 DI 容器中的实例，确保与注入的实例一致
-                var services = App.Services;
-                _instance = new ProfileMarketplaceService(
-                    services?.GetRequiredService<ILogService>() ?? LogService.Instance,
-                    services?.GetRequiredService<IProfileManager>() ??
-                        throw new InvalidOperationException("IProfileManager is not available."),
-                    services?.GetRequiredService<IPluginAssociationManager>() ?? PluginAssociationManager.Instance,
-                    services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance);
-            }
-            return _instance;
-        }
-    }
-
-    /// <summary>
-    /// 重置单例实例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance() => _instance = null;
-
-#endregion
-
 #region Fields
 
     private MarketplaceSourceConfig _sourceConfig;
@@ -259,13 +226,16 @@ public class ProfileMarketplaceService
     /// <summary>
     /// 用于测试的构造函数
     /// </summary>
-    internal ProfileMarketplaceService(ILogService logService, IProfileManager profileManager, string configFilePath,
+    internal ProfileMarketplaceService(ILogService logService, IProfileManager profileManager,
+                                       IPluginAssociationManager pluginAssociationManager,
+                                       IPluginLibrary pluginLibrary, string configFilePath,
                                        HttpClient? httpClient = null)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
-        _pluginAssociationManager = PluginAssociationManager.Instance;
-        _pluginLibrary = PluginLibrary.Instance;
+        _pluginAssociationManager =
+            pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
+        _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _configFilePath = configFilePath;
         _sourceConfig = LoadConfig();
         _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };

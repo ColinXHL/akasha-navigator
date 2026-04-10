@@ -57,4 +57,15 @@ public class ServiceRegistrationTests
         Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
         Assert.Equal(typeof(PanelManager), descriptor.ImplementationType);
     }
+
+    [Fact]
+    public void ConfigureAppServices_ShouldResolveHotkeyManager()
+    {
+        var services = new ServiceCollection();
+        services.ConfigureAppServices();
+        using var provider = services.BuildServiceProvider();
+
+        var manager = provider.GetRequiredService<HotkeyManager>();
+        Assert.NotNull(manager);
+    }
 }

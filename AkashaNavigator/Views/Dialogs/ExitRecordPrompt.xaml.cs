@@ -2,7 +2,6 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using AkashaNavigator.Helpers;
-using AkashaNavigator.Services;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.ViewModels.Dialogs;
 
@@ -55,17 +54,16 @@ namespace AkashaNavigator.Views.Dialogs
         /// 检查是否需要显示退出记录提示
         /// </summary>
         /// <param name="url">当前页面 URL</param>
-        /// <param name="pioneerNoteService">开荒笔记服务（可选，用于测试）</param>
+        /// <param name="pioneerNoteService">开荒笔记服务</param>
         /// <returns>如果 URL 未记录且非空，返回 true</returns>
-        public static bool ShouldShowPrompt(string url, IPioneerNoteService? pioneerNoteService = null)
+        public static bool ShouldShowPrompt(string url, IPioneerNoteService pioneerNoteService)
         {
             // 如果 URL 为空，不显示提示
             if (string.IsNullOrWhiteSpace(url))
                 return false;
 
-            var service = pioneerNoteService ?? PioneerNoteService.Instance;
             // 检查 URL 是否已记录
-            return !service.IsUrlRecorded(url);
+            return !pioneerNoteService.IsUrlRecorded(url);
         }
     }
 }

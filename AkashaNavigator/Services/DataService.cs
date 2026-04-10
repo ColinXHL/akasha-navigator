@@ -15,32 +15,6 @@ namespace AkashaNavigator.Services
 /// </summary>
 public class DataService : IDataService
 {
-#region Singleton
-
-    private static IDataService? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static IDataService Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                var profileManager = App.Services?.GetService(typeof(IProfileManager)) as IProfileManager;
-                if (profileManager == null)
-                    throw new InvalidOperationException("IProfileManager is not available.");
-
-                _instance = new DataService(LogService.Instance, profileManager);
-            }
-            return _instance;
-        }
-        set => _instance = value;
-    }
-
-#endregion
-
 #region Fields
 
     private readonly ILogService _logService;

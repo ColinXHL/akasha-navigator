@@ -51,6 +51,7 @@ public partial class PlayerWindow : Window
     private readonly OsdManager _osdManager;
     private readonly Func<PioneerNoteWindow> _pioneerNoteWindowFactory;
     private readonly ScriptExecutionQueue _scriptQueue;
+    private readonly IPioneerNoteService _pioneerNoteService;
 
     /// <summary>
     /// 是否最大化
@@ -132,7 +133,7 @@ public partial class PlayerWindow : Window
                         ICursorDetectionService cursorDetectionService, IEventBus eventBus,
                         IDialogFactory dialogFactory, OsdManager osdManager,
                         Func<PioneerNoteWindow> pioneerNoteWindowFactory,
-                        ScriptExecutionQueue scriptQueue)
+                        ScriptExecutionQueue scriptQueue, IPioneerNoteService pioneerNoteService)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
@@ -150,6 +151,7 @@ public partial class PlayerWindow : Window
         _pioneerNoteWindowFactory =
             pioneerNoteWindowFactory ?? throw new ArgumentNullException(nameof(pioneerNoteWindowFactory));
         _scriptQueue = scriptQueue ?? throw new ArgumentNullException(nameof(scriptQueue));
+        _pioneerNoteService = pioneerNoteService ?? throw new ArgumentNullException(nameof(pioneerNoteService));
 
         _resizeHintHoverTimer = new DispatcherTimer
                                 {
@@ -1367,7 +1369,7 @@ public partial class PlayerWindow : Window
                 !currentUrl.StartsWith("data:"))
             {
                 // 检查 URL 是否已记录
-                if (ExitRecordPrompt.ShouldShowPrompt(currentUrl))
+                if (ExitRecordPrompt.ShouldShowPrompt(currentUrl, _pioneerNoteService))
                 {
                     // 显示退出记录提示窗口
                     var exitPrompt = _dialogFactory.CreateExitRecordPrompt(currentUrl, currentTitle);

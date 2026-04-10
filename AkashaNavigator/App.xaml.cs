@@ -371,7 +371,7 @@ public partial class App : System.Windows.Application
         // 从 DI 容器获取 OsdManager
         _osdManager = Services.GetRequiredService<OsdManager>();
 
-        _hotkeyManager = new HotkeyManager();
+        _hotkeyManager = Services.GetRequiredService<HotkeyManager>();
         _hotkeyManager.Initialize(playerWindow, _config, _osdManager.ShowMessage);
     }
 

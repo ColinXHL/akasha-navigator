@@ -6,7 +6,6 @@ using System.Text.Json;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Core.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Services
 {
@@ -101,39 +100,6 @@ public class PluginEnabledChangedEventArgs : EventArgs
 /// </summary>
 public class PluginAssociationManager : IPluginAssociationManager
 {
-#region Singleton
-
-    private static IPluginAssociationManager? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// 使用 DI 容器中的实例，确保与注入的 PluginLibrary 实例一致
-    /// </summary>
-    public static IPluginAssociationManager Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                // 使用 DI 容器中的实例，避免创建单独的 PluginLibrary.Instance
-                var logService = App.Services?.GetRequiredService<ILogService>() ?? LogService.Instance;
-                var pluginLibrary = App.Services?.GetRequiredService<IPluginLibrary>() ?? PluginLibrary.Instance;
-                _instance = new PluginAssociationManager(logService, pluginLibrary);
-            }
-            return _instance;
-        }
-        set => _instance = value;
-    }
-
-    /// <summary>
-    /// 重置单例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance()
-    {
-        _instance = null;
-    }
-
-#endregion
-
 #region Fields
 
     private readonly ILogService _logService;

@@ -8,7 +8,6 @@ using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Services;
 using AkashaNavigator.ViewModels.Windows;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AkashaNavigator.Views.Windows;
 
@@ -16,6 +15,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
 {
     private readonly PluginSettingsViewModel _viewModel;
     private readonly IPluginSettingsEditSessionCoordinator _editSessionCoordinator;
+    private readonly IOverlayManager _overlayManager;
     private readonly ILogService _logService;
 
     private SettingsUiRenderer? _renderer;
@@ -23,10 +23,12 @@ public partial class PluginSettingsWindow : AnimatedWindow
     public PluginSettingsWindow(
         PluginSettingsViewModel viewModel,
         IPluginSettingsEditSessionCoordinator editSessionCoordinator,
+        IOverlayManager overlayManager,
         ILogService logService)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _editSessionCoordinator = editSessionCoordinator ?? throw new ArgumentNullException(nameof(editSessionCoordinator));
+        _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
 
         InitializeComponent();
@@ -106,8 +108,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
             return;
         }
 
-        var overlayManager = App.Services.GetRequiredService<IOverlayManager>();
-        var overlay = overlayManager.GetOverlay(_viewModel.PluginId);
+        var overlay = _overlayManager.GetOverlay(_viewModel.PluginId);
 
         if (overlay == null)
         {
@@ -116,7 +117,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
             var size = _viewModel.Config.Get("overlay.size", 200.0);
 
             var options = new OverlayOptions { X = x, Y = y, Width = size, Height = size };
-            overlay = overlayManager.CreateOverlay(_viewModel.PluginId, options);
+            overlay = _overlayManager.CreateOverlay(_viewModel.PluginId, options);
         }
 
         overlay.EditModeExited += OnOverlayEditModeExited;
