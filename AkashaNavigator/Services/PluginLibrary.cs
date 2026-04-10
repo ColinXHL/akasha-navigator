@@ -47,41 +47,6 @@ public class PluginLibraryChangedEventArgs : EventArgs
 /// </summary>
 public class PluginLibrary : IPluginLibrary
 {
-#region Singleton
-
-    private static PluginLibrary? _instance;
-    private static readonly object _lock = new();
-
-    /// <summary>
-    /// 获取单例实例
-    /// </summary>
-    public static PluginLibrary Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                lock (_lock)
-                {
-                    _instance ??= new PluginLibrary();
-                }
-            }
-            return _instance;
-        }
-    }
-
-    /// <summary>
-    /// 重置单例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance()
-    {
-        lock (_lock)
-        {
-            _instance = null;
-        }
-    }
-
-#endregion
-
 #region Properties
 
     /// <summary>

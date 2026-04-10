@@ -9,32 +9,11 @@ using AkashaNavigator.Core.Interfaces;
 namespace AkashaNavigator.Services
 {
 /// <summary>
-/// 通知服务（单例）
+/// 通知服务
 /// 负责管理和显示应用内通知，替代系统原生 MessageBox
 /// </summary>
 public class NotificationService : INotificationService
 {
-#region Singleton
-
-    private static INotificationService? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static INotificationService Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                _instance = new NotificationService(LogService.Instance, null);
-            }
-            return _instance;
-        }
-        set => _instance = value;
-    }
-
-#endregion
-
 #region Fields
 
     private readonly ILogService _logService;

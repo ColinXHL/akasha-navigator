@@ -88,28 +88,6 @@ public class MigrationBackup
 /// </summary>
 public class DataMigration
 {
-#region Singleton
-
-    private static DataMigration? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static DataMigration Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                // 使用 LogService.Instance 获取日志服务（插件系统专用）
-                _instance = new DataMigration(LogService.Instance);
-            }
-            return _instance;
-        }
-    }
-
-#endregion
-
 #region Properties
 
     /// <summary>

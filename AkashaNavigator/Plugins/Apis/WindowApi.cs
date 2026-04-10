@@ -18,6 +18,7 @@ public class WindowApi
     private EventManager? _eventManager;
     private ICursorDetectionService _cursorDetectionService;
     private bool _isCursorDetectionStartedByThisApi;
+    private bool _cursorDetectionHandlersAttached;
 
     public WindowApi(PluginContext context, IPlayerRuntimeBridge runtimeBridge, ICursorDetectionService cursorDetectionService)
     {
@@ -213,12 +214,26 @@ public class WindowApi
         }
 
         // 订阅事件
-        _cursorDetectionService.CursorShown += OnCursorShown;
-        _cursorDetectionService.CursorHidden += OnCursorHidden;
+        if (!_cursorDetectionHandlersAttached)
+        {
+            _cursorDetectionService.CursorShown += OnCursorShown;
+            _cursorDetectionService.CursorHidden += OnCursorHidden;
+            _cursorDetectionHandlersAttached = true;
+        }
+
+        // 如果全局检测已运行且不是由此 API 启动，仅附加处理器，不覆盖现有配置
+        if (_cursorDetectionService.IsRunning && !_isCursorDetectionStartedByThisApi)
+        {
+            Services.LogService.Instance.Info(nameof(WindowApi),
+                                              "Cursor detection already running globally; handlers attached without restart");
+            return true;
+        }
 
         // 启动检测
+        var wasRunningBeforeStart = _cursorDetectionService.IsRunning;
         _cursorDetectionService.StartWithWhitelist(whitelist, intervalMs);
-        _isCursorDetectionStartedByThisApi = true;
+        _isCursorDetectionStartedByThisApi = _isCursorDetectionStartedByThisApi ||
+                                             (!wasRunningBeforeStart && _cursorDetectionService.IsRunning);
 
         Services.LogService.Instance.Info(nameof(WindowApi),
                                           "Cursor detection started: whitelist=[{Whitelist}], interval={Interval}ms",
@@ -234,14 +249,31 @@ public class WindowApi
     public void StopCursorDetection()
     {
         // 取消订阅事件
-        _cursorDetectionService.CursorShown -= OnCursorShown;
-        _cursorDetectionService.CursorHidden -= OnCursorHidden;
+        if (_cursorDetectionHandlersAttached)
+        {
+            _cursorDetectionService.CursorShown -= OnCursorShown;
+            _cursorDetectionService.CursorHidden -= OnCursorHidden;
+            _cursorDetectionHandlersAttached = false;
+        }
 
-        // 停止检测
-        _cursorDetectionService.Stop();
+        // 仅在此 API 启动时停止检测
+        if (_isCursorDetectionStartedByThisApi)
+        {
+            _cursorDetectionService.Stop();
+            Services.LogService.Instance.Info(nameof(WindowApi), "Cursor detection stopped");
+        }
+        else
+        {
+            Services.LogService.Instance.Info(nameof(WindowApi), "Cursor detection handlers detached without stopping global service");
+        }
+
         _isCursorDetectionStartedByThisApi = false;
+    }
 
-        Services.LogService.Instance.Info(nameof(WindowApi), "Cursor detection stopped");
+    internal void Cleanup()
+    {
+        if (_isCursorDetectionStartedByThisApi || _cursorDetectionHandlersAttached)
+            StopCursorDetection();
     }
 
     /// <summary>

@@ -10,6 +10,7 @@ using AkashaNavigator.ViewModels.Dialogs;
 using AkashaNavigator.ViewModels.Pages;
 using AkashaNavigator.ViewModels.Pages.Settings;
 using AkashaNavigator.ViewModels.Windows;
+using AkashaNavigator.Plugins.Core;
 
 namespace AkashaNavigator.Core
 {
@@ -109,6 +110,9 @@ public static class ServiceCollectionExtensions
 
         // PluginHost（依赖LogService + PluginAssociationManager + PluginLibrary）
         services.AddSingleton<IPluginHost, PluginHost>();
+
+        // PluginHostObjectFactory（插件宿主对象工厂）
+        services.AddSingleton<IPluginHostObjectFactory, PluginHostObjectFactory>();
 
         // ProfileManager（依赖ConfigService, LogService, PluginHost, PluginAssociationManager, SubscriptionManager,
         // PluginLibrary, ProfileRegistry）

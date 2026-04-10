@@ -1,10 +1,12 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
+using Moq;
 using Xunit;
 
 namespace AkashaNavigator.Tests
@@ -226,6 +228,38 @@ public class ProfileManagerTests : IDisposable
 #endregion
 
 #region Unit Tests
+
+    [Fact]
+    public void SavePluginConfig_ShouldReturnFalse_WhenJsonHelperSaveFails()
+    {
+        // Arrange
+        var configService = new Mock<IConfigService>();
+        configService.Setup(x => x.Config).Returns(new AppConfig { CurrentProfileId = "default" });
+
+        var logService = new Mock<ILogService>();
+        var pluginHost = new Mock<IPluginHost>();
+        var pluginAssociationManager = new Mock<IPluginAssociationManager>();
+        var subscriptionManager = new Mock<ISubscriptionManager>();
+        subscriptionManager.Setup(x => x.GetSubscribedProfiles()).Returns(new List<string> { "default" });
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        var profileRegistry = new Mock<IProfileRegistry>();
+
+        var templateDirectory = Path.Combine(_tempDir, "templates", "default");
+        Directory.CreateDirectory(templateDirectory);
+        profileRegistry.Setup(x => x.GetProfileTemplateDirectory(It.IsAny<string>())).Returns(templateDirectory);
+
+        var profileManager = new ProfileManager(configService.Object, logService.Object, pluginHost.Object,
+                                                pluginAssociationManager.Object, subscriptionManager.Object,
+                                                pluginLibrary.Object, profileRegistry.Object);
+
+        var config = new Dictionary<string, object> { ["overlay.x"] = 100.0 };
+
+        // Act
+        var result = profileManager.SavePluginConfig("default", "invalid:plugin", config);
+
+        // Assert
+        Assert.False(result);
+    }
 
     /// <summary>
     /// UnsubscribeResult.Succeeded 应该返回成功结果

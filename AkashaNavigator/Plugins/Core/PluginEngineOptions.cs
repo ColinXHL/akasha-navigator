@@ -27,29 +27,43 @@ public class PluginEngineOptions
     public string? ProfileDirectory { get; set; }
 
     /// <summary>
-    /// 运行时 PlayerWindow 桥接
+    /// Legacy fallback only. Prefer HostObjectFactory.
     /// </summary>
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public IPlayerRuntimeBridge? RuntimeBridge { get; set; }
 
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public IOverlayManager? OverlayManager { get; set; }
 
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public IPanelManager? PanelManager { get; set; }
 
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public ICursorDetectionService? CursorDetectionService { get; set; }
 
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public ISubtitleService? SubtitleService { get; set; }
 
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public ScriptExecutionQueue? ScriptExecutionQueue { get; set; }
 
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public HotkeyService? HotkeyService { get; set; }
 
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public ActionDispatcher? ActionDispatcher { get; set; }
 
     public ILogService? LogService { get; set; }
 
     /// <summary>
-    /// OSD 管理器（用于显示屏幕提示）
+    /// Preferred API construction path.
     /// </summary>
+    public IPluginHostObjectFactory? HostObjectFactory { get; set; }
+
+    /// <summary>
+    /// Legacy fallback only. Prefer HostObjectFactory.
+    /// </summary>
+    [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public AkashaNavigator.Core.OsdManager? OsdManager { get; set; }
 }
 }

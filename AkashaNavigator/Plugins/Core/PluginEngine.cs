@@ -121,8 +121,10 @@ public static class PluginEngine
         engine.DocumentSettings.AccessFlags =
             DocumentAccessFlags.EnableFileLoading | DocumentAccessFlags.AllowCategoryMismatch;
 
+        var pluginRoot = Path.GetFullPath(pluginDir);
+
         // 构建搜索路径
-        var searchPaths = new List<string> { pluginDir };
+        var searchPaths = new List<string> { pluginRoot };
 
         if (libraryPaths != null)
         {
@@ -132,9 +134,18 @@ public static class PluginEngine
                     continue;
 
                 // 解析相对路径
-                var fullPath = Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(pluginDir, path));
+                var fullPath = Path.IsPathRooted(path)
+                    ? Path.GetFullPath(path)
+                    : Path.GetFullPath(Path.Combine(pluginRoot, path));
 
-                if (Directory.Exists(fullPath) && !searchPaths.Contains(fullPath))
+                if (!IsPathUnderRoot(fullPath, pluginRoot))
+                {
+                    LogService.Instance.Warn(nameof(PluginEngine),
+                                             "Ignoring library path outside plugin root: {LibraryPath}", fullPath);
+                    continue;
+                }
+
+                if (Directory.Exists(fullPath) && !searchPaths.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
                 {
                     searchPaths.Add(fullPath);
                 }
@@ -142,10 +153,75 @@ public static class PluginEngine
         }
 
         // 设置搜索路径
-        engine.DocumentSettings.SearchPath = string.Join(";", searchPaths);
+        engine.DocumentSettings.SearchPath = string.Join(Path.PathSeparator.ToString(), searchPaths);
 
         LogService.Instance.Debug(nameof(PluginEngine), "Module search paths: {SearchPath}",
                                   engine.DocumentSettings.SearchPath);
+    }
+
+    private static bool IsPathUnderRoot(string path, string root)
+    {
+        var normalizedRootWithoutTrailing = Path.GetFullPath(root)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedRoot = normalizedRootWithoutTrailing + Path.DirectorySeparatorChar;
+        var normalizedPath = Path.GetFullPath(path);
+
+        if (!normalizedPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return !ContainsReparsePointInPath(normalizedRootWithoutTrailing, normalizedPath);
+    }
+
+    private static bool ContainsReparsePointInPath(string normalizedRootWithoutTrailing, string normalizedPath)
+    {
+        try
+        {
+            if (HasReparsePoint(normalizedRootWithoutTrailing))
+            {
+                return true;
+            }
+
+            var relativePath = Path.GetRelativePath(normalizedRootWithoutTrailing, normalizedPath);
+            if (relativePath == ".")
+            {
+                return false;
+            }
+
+            var parts = relativePath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                                           StringSplitOptions.RemoveEmptyEntries);
+
+            var current = normalizedRootWithoutTrailing;
+            foreach (var part in parts)
+            {
+                current = Path.Combine(current, part);
+                if (HasReparsePoint(current))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    private static bool HasReparsePoint(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path))
+        {
+            return false;
+        }
+
+        return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
     }
 
 #endregion
@@ -194,16 +270,22 @@ public static class PluginEngine
                                          EventManager eventManager, PluginManifest manifest,
                                          PluginEngineOptions options)
     {
+#pragma warning disable CS0618
         var permissions = manifest.Permissions ?? new List<string>();
         var pluginId = context.PluginId;
+        var hostObjectFactory = options.HostObjectFactory;
+        var useFactoryPath = hostObjectFactory != null;
 
         // overlay API
         if (permissions.Contains(PluginPermissions.Overlay, StringComparer.OrdinalIgnoreCase))
         {
-            if (options.OverlayManager == null)
-                throw new InvalidOperationException("OverlayManager is required when overlay permission is granted.");
-
-            var overlayApi = new OverlayApi(context, configApi, options.OverlayManager);
+            var overlayApi = useFactoryPath
+                ? hostObjectFactory!.CreateOverlayApi(context, configApi)
+                : new OverlayApi(
+                    context,
+                    configApi,
+                    RequireLegacyOption(options.OverlayManager, nameof(PluginEngineOptions.OverlayManager),
+                                        nameof(OverlayApi)));
             engine.AddHostObject("overlay", overlayApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: overlay");
         }
@@ -211,11 +293,17 @@ public static class PluginEngine
         // player API
         if (permissions.Contains(PluginPermissions.Player, StringComparer.OrdinalIgnoreCase))
         {
-            if (options.RuntimeBridge == null)
-                throw new InvalidOperationException("RuntimeBridge is required when player permission is granted.");
+            var playerApi = useFactoryPath
+                ? hostObjectFactory!.CreatePlayerApi(context, eventManager)
+                : new PlayerApi(
+                    context,
+                    RequireLegacyOption(options.RuntimeBridge, nameof(PluginEngineOptions.RuntimeBridge),
+                                        nameof(PlayerApi)).GetPlayerWindow);
+            if (!useFactoryPath)
+            {
+                playerApi.SetEventManager(eventManager);
+            }
 
-            var playerApi = new PlayerApi(context, options.RuntimeBridge.GetPlayerWindow);
-            playerApi.SetEventManager(eventManager);
             engine.AddHostObject("player", playerApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: player");
         }
@@ -223,11 +311,20 @@ public static class PluginEngine
         // window API
         if (permissions.Contains(PluginPermissions.Window, StringComparer.OrdinalIgnoreCase))
         {
-            if (options.RuntimeBridge == null || options.CursorDetectionService == null)
-                throw new InvalidOperationException("RuntimeBridge and CursorDetectionService are required for WindowApi.");
+            var windowApi = useFactoryPath
+                ? hostObjectFactory!.CreateWindowApi(context, eventManager)
+                : new WindowApi(
+                    context,
+                    RequireLegacyOption(options.RuntimeBridge, nameof(PluginEngineOptions.RuntimeBridge),
+                                        nameof(WindowApi)),
+                    RequireLegacyOption(options.CursorDetectionService,
+                                        nameof(PluginEngineOptions.CursorDetectionService),
+                                        nameof(WindowApi)));
+            if (!useFactoryPath)
+            {
+                windowApi.SetEventManager(eventManager);
+            }
 
-            var windowApi = new WindowApi(context, options.RuntimeBridge, options.CursorDetectionService);
-            windowApi.SetEventManager(eventManager);
             engine.AddHostObject("window", windowApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: window");
         }
@@ -235,10 +332,13 @@ public static class PluginEngine
         // panel API
         if (permissions.Contains(PluginPermissions.Panel, StringComparer.OrdinalIgnoreCase))
         {
-            if (options.PanelManager == null)
-                throw new InvalidOperationException("PanelManager is required when panel permission is granted.");
-
-            var panelApi = new PanelApi(context, configApi, options.PanelManager);
+            var panelApi = useFactoryPath
+                ? hostObjectFactory!.CreatePanelApi(context, configApi)
+                : new PanelApi(
+                    context,
+                    configApi,
+                    RequireLegacyOption(options.PanelManager, nameof(PluginEngineOptions.PanelManager),
+                                        nameof(PanelApi)));
             engine.AddHostObject("panel", panelApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: panel");
         }
@@ -262,11 +362,18 @@ public static class PluginEngine
         // subtitle API
         if (permissions.Contains(PluginPermissions.Subtitle, StringComparer.OrdinalIgnoreCase))
         {
-            if (options.SubtitleService == null)
-                throw new InvalidOperationException("SubtitleService is required when subtitle permission is granted.");
+            var subtitleApi = useFactoryPath
+                ? hostObjectFactory!.CreateSubtitleApi(context, engine, eventManager)
+                : new SubtitleApi(
+                    context,
+                    engine,
+                    RequireLegacyOption(options.SubtitleService, nameof(PluginEngineOptions.SubtitleService),
+                                        nameof(SubtitleApi)));
+            if (!useFactoryPath)
+            {
+                subtitleApi.SetEventManager(eventManager);
+            }
 
-            var subtitleApi = new SubtitleApi(context, engine, options.SubtitleService);
-            subtitleApi.SetEventManager(eventManager);
             engine.AddHostObject("subtitle", subtitleApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: subtitle");
         }
@@ -279,10 +386,15 @@ public static class PluginEngine
         // hotkey API
         if (permissions.Contains(PluginPermissions.Hotkey, StringComparer.OrdinalIgnoreCase))
         {
-            if (options.HotkeyService == null || options.ActionDispatcher == null)
-                throw new InvalidOperationException("HotkeyService and ActionDispatcher are required for HotkeyApi.");
-
-            var hotkeyApi = new HotkeyApi(pluginId, options.HotkeyService, options.ActionDispatcher);
+            var hotkeyApi = useFactoryPath
+                ? hostObjectFactory!.CreateHotkeyApi(pluginId)
+                : new HotkeyApi(
+                    pluginId,
+                    RequireLegacyOption(options.HotkeyService, nameof(PluginEngineOptions.HotkeyService),
+                                        nameof(HotkeyApi)),
+                    options.ActionDispatcher ??
+                    RequireLegacyOption(options.HotkeyService, nameof(PluginEngineOptions.HotkeyService),
+                                        nameof(HotkeyApi)).GetDispatcher());
             engine.AddHostObject("hotkey", hotkeyApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: hotkey");
         }
@@ -290,22 +402,45 @@ public static class PluginEngine
         // webview API（需要 player 权限）
         if (permissions.Contains(PluginPermissions.Player, StringComparer.OrdinalIgnoreCase))
         {
-            if (options.RuntimeBridge == null || options.ScriptExecutionQueue == null || options.LogService == null)
-                throw new InvalidOperationException("RuntimeBridge, ScriptExecutionQueue and LogService are required for WebViewApi.");
-
-            var webviewApi = new WebViewApi(pluginId, options.RuntimeBridge, options.ScriptExecutionQueue,
-                                            options.LogService);
+            var webviewApi = useFactoryPath
+                ? hostObjectFactory!.CreateWebViewApi(pluginId)
+                : new WebViewApi(
+                    pluginId,
+                    RequireLegacyOption(options.RuntimeBridge, nameof(PluginEngineOptions.RuntimeBridge),
+                                        nameof(WebViewApi)),
+                    RequireLegacyOption(options.ScriptExecutionQueue, nameof(PluginEngineOptions.ScriptExecutionQueue),
+                                        nameof(WebViewApi)),
+                    options.LogService ?? LogService.Instance);
             engine.AddHostObject("webview", webviewApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: webview");
         }
 
         // osd API（始终暴露，用于显示提示）
-        if (options.OsdManager != null)
+        if (useFactoryPath)
+        {
+            var osdApi = hostObjectFactory!.CreateOsdApi(pluginId);
+            engine.AddHostObject("osd", osdApi);
+            LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: osd");
+        }
+        else if (options.OsdManager != null)
         {
             var osdApi = new OsdApi(pluginId, options.OsdManager);
             engine.AddHostObject("osd", osdApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: osd");
         }
+#pragma warning restore CS0618
+    }
+
+    private static T RequireLegacyOption<T>(T? value, string optionName, string apiName)
+        where T : class
+    {
+        if (value != null)
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException(
+            $"{apiName} requires PluginEngineOptions.{optionName} when HostObjectFactory is not provided.");
     }
 
     /// <summary>

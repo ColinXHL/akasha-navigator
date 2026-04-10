@@ -414,6 +414,74 @@ public class WindowApiTests : IDisposable
         Assert.True(mockService.StopCalled);
     }
 
+    [Fact]
+    public void StopCursorDetection_WhenServiceWasAlreadyRunning_DoesNotStopGlobalService()
+    {
+        var windowApi = CreateWindowApi();
+        var mockService = new MockCursorDetectionService();
+        mockService.SetRunningState(true);
+        windowApi.SetCursorDetectionService(mockService);
+
+        dynamic options = new ExpandoObject();
+        options.processWhitelist = new List<string> { "TestProcess" };
+        options.intervalMs = 200;
+
+        windowApi.StartCursorDetection(options);
+
+        Assert.Equal(1, mockService.CursorShownHandlerCount);
+        Assert.Equal(1, mockService.CursorHiddenHandlerCount);
+
+        windowApi.StopCursorDetection();
+
+        Assert.False(mockService.StopCalled);
+        Assert.Equal(0, mockService.CursorShownHandlerCount);
+        Assert.Equal(0, mockService.CursorHiddenHandlerCount);
+    }
+
+    [Fact]
+    public void StartCursorDetection_WhenServiceAlreadyRunning_DoesNotRestartGlobalService()
+    {
+        var windowApi = CreateWindowApi();
+        var mockService = new MockCursorDetectionService();
+        mockService.SetRunningState(true);
+        windowApi.SetCursorDetectionService(mockService);
+
+        dynamic options = new ExpandoObject();
+        options.processWhitelist = new List<string> { "TestProcess" };
+        options.intervalMs = 200;
+
+        var result = windowApi.StartCursorDetection(options);
+
+        Assert.True(result);
+        Assert.Equal(0, mockService.StartWithWhitelistCallCount);
+        Assert.Equal(1, mockService.CursorShownHandlerCount);
+        Assert.Equal(1, mockService.CursorHiddenHandlerCount);
+    }
+
+    [Fact]
+    public void StartCursorDetection_CalledTwiceByOwner_StopStillStopsService()
+    {
+        var windowApi = CreateWindowApi();
+        var mockService = new MockCursorDetectionService();
+        windowApi.SetCursorDetectionService(mockService);
+
+        dynamic options = new ExpandoObject();
+        options.processWhitelist = new List<string> { "TestProcess" };
+        options.intervalMs = 200;
+
+        var first = windowApi.StartCursorDetection(options);
+        var second = windowApi.StartCursorDetection(options);
+
+        Assert.True(first);
+        Assert.True(second);
+        Assert.True(mockService.IsRunning);
+
+        windowApi.StopCursorDetection();
+
+        Assert.True(mockService.StopCalled);
+        Assert.False(mockService.IsRunning);
+    }
+
     /// <summary>
     /// **Feature: smart-cursor-detection-plugin, Property 5: 空白名单验证**
     /// **Validates: Requirements 2.4, 6.5**
@@ -451,8 +519,36 @@ public class WindowApiTests : IDisposable
 /// </summary>
 internal class MockCursorDetectionService : ICursorDetectionService
 {
-    public event EventHandler? CursorShown;
-    public event EventHandler? CursorHidden;
+    private EventHandler? _cursorShown;
+    private EventHandler? _cursorHidden;
+
+    public event EventHandler? CursorShown
+    {
+        add
+        {
+            _cursorShown += value;
+            CursorShownHandlerCount++;
+        }
+        remove
+        {
+            _cursorShown -= value;
+            CursorShownHandlerCount--;
+        }
+    }
+
+    public event EventHandler? CursorHidden
+    {
+        add
+        {
+            _cursorHidden += value;
+            CursorHiddenHandlerCount++;
+        }
+        remove
+        {
+            _cursorHidden -= value;
+            CursorHiddenHandlerCount--;
+        }
+    }
 
     public bool IsRunning { get; private set; }
     public bool IsCursorCurrentlyVisible => true;
@@ -461,11 +557,14 @@ internal class MockCursorDetectionService : ICursorDetectionService
     public bool IsSuspended { get; private set; }
 
     public bool StartWithWhitelistCalled { get; private set; }
+    public int StartWithWhitelistCallCount { get; private set; }
     public bool StopCalled { get; private set; }
     public bool SuspendCalled { get; private set; }
     public bool ResumeCalled { get; private set; }
     public bool RefreshStateCalled { get; private set; }
     public HashSet<string>? LastWhitelist { get; private set; }
+    public int CursorShownHandlerCount { get; private set; }
+    public int CursorHiddenHandlerCount { get; private set; }
 
     public void Start(string? targetProcessName = null, int intervalMs = 200, bool enableDebugLog = false)
     {
@@ -476,8 +575,10 @@ internal class MockCursorDetectionService : ICursorDetectionService
     public void StartWithWhitelist(HashSet<string> whitelist, int intervalMs = 200, bool enableDebugLog = false)
     {
         StartWithWhitelistCalled = true;
+        StartWithWhitelistCallCount++;
         LastWhitelist = whitelist;
-        IsRunning = true;
+        if (!IsRunning)
+            IsRunning = true;
     }
 
     public void Stop()
@@ -509,9 +610,14 @@ internal class MockCursorDetectionService : ICursorDetectionService
         Stop();
     }
 
+    public void SetRunningState(bool isRunning)
+    {
+        IsRunning = isRunning;
+    }
+
     // 用于测试触发事件
-    public void TriggerCursorShown() => CursorShown?.Invoke(this, EventArgs.Empty);
-    public void TriggerCursorHidden() => CursorHidden?.Invoke(this, EventArgs.Empty);
+    public void TriggerCursorShown() => _cursorShown?.Invoke(this, EventArgs.Empty);
+    public void TriggerCursorHidden() => _cursorHidden?.Invoke(this, EventArgs.Empty);
 }
 
 internal sealed class TestPlayerRuntimeBridge : IPlayerRuntimeBridge

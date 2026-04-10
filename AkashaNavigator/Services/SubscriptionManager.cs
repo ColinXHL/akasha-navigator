@@ -9,45 +9,11 @@ using AkashaNavigator.Core.Interfaces;
 namespace AkashaNavigator.Services
 {
 /// <summary>
-/// 订阅管理服务（单例）
+/// 订阅管理服务
 /// 管理用户的 Profile 和插件订阅
 /// </summary>
 public class SubscriptionManager : ISubscriptionManager
 {
-#region Singleton
-
-    private static ISubscriptionManager? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static ISubscriptionManager Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                _instance = new SubscriptionManager(
-                    LogService.Instance,
-                    ProfileRegistry.Instance,
-                    PluginRegistry.Instance
-                );
-            }
-            return _instance;
-        }
-        set => _instance = value;
-    }
-
-    /// <summary>
-    /// 重置单例实例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance()
-    {
-        _instance = null;
-    }
-
-#endregion
-
 #region Fields
 
     private readonly ILogService _logService;

@@ -30,6 +30,7 @@ public class PluginHost : IPluginHost, IDisposable
     private readonly ScriptExecutionQueue _scriptExecutionQueue;
     private readonly HotkeyService _hotkeyService;
     private readonly Core.OsdManager _osdManager;
+    private readonly IPluginHostObjectFactory _hostObjectFactory;
 
 #endregion
 
@@ -84,7 +85,7 @@ public class PluginHost : IPluginHost, IDisposable
                       IOverlayManager overlayManager, IPanelManager panelManager,
                       ICursorDetectionService cursorDetectionService, ISubtitleService subtitleService,
                       ScriptExecutionQueue scriptExecutionQueue, HotkeyService hotkeyService,
-                      Core.OsdManager osdManager)
+                      Core.OsdManager osdManager, IPluginHostObjectFactory hostObjectFactory)
     {
         _logService = logService;
         _pluginAssociationManager = pluginAssociationManager;
@@ -97,6 +98,7 @@ public class PluginHost : IPluginHost, IDisposable
         _scriptExecutionQueue = scriptExecutionQueue;
         _hotkeyService = hotkeyService;
         _osdManager = osdManager;
+        _hostObjectFactory = hostObjectFactory;
 
         // 订阅插件启用状态变化事件
         _pluginAssociationManager.PluginEnabledChanged += OnPluginEnabledChanged;
@@ -116,7 +118,7 @@ public class PluginHost : IPluginHost, IDisposable
                         IOverlayManager overlayManager, IPanelManager panelManager,
                         ICursorDetectionService cursorDetectionService, ISubtitleService subtitleService,
                         ScriptExecutionQueue scriptExecutionQueue, HotkeyService hotkeyService,
-                        Core.OsdManager osdManager)
+                        Core.OsdManager osdManager, IPluginHostObjectFactory hostObjectFactory)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _pluginAssociationManager =
@@ -130,6 +132,7 @@ public class PluginHost : IPluginHost, IDisposable
         _scriptExecutionQueue = scriptExecutionQueue ?? throw new ArgumentNullException(nameof(scriptExecutionQueue));
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _osdManager = osdManager ?? throw new ArgumentNullException(nameof(osdManager));
+        _hostObjectFactory = hostObjectFactory ?? throw new ArgumentNullException(nameof(hostObjectFactory));
         // 测试用构造函数，不订阅事件
     }
 
@@ -525,11 +528,24 @@ public class PluginHost : IPluginHost, IDisposable
             // 从配置字典移除
             _pluginConfigs.Remove(pluginId);
 
-            // 删除插件目录
+            // 仅删除已安装插件目录下的插件
             if (Directory.Exists(pluginDir))
             {
-                Directory.Delete(pluginDir, recursive: true);
-                Log("已删除插件目录: {PluginDir}", pluginDir);
+                var pluginDirFullPath = Path.GetFullPath(pluginDir)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var installedRootFullPath = Path.GetFullPath(AppPaths.InstalledPluginsDirectory)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var installedRootPrefix = installedRootFullPath + Path.DirectorySeparatorChar;
+
+                if (pluginDirFullPath.StartsWith(installedRootPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    Directory.Delete(pluginDirFullPath, recursive: true);
+                    Log("已删除插件目录: {PluginDir}", pluginDirFullPath);
+                }
+                else
+                {
+                    Log("插件目录不在已安装目录下，跳过删除: {PluginDir}", pluginDir);
+                }
             }
 
             Log("插件 {PluginId} 已取消订阅", pluginId);
@@ -619,16 +635,8 @@ public class PluginHost : IPluginHost, IDisposable
         var engineOptions = new PluginEngineOptions {
             ProfileId = _currentProfileId ?? string.Empty, ProfileName = _currentProfileId ?? string.Empty,
             ProfileDirectory = GetPluginConfigDirectory(_currentProfileId ?? string.Empty, pluginId),
-            RuntimeBridge = _runtimeBridge,
-            OverlayManager = _overlayManager,
-            PanelManager = _panelManager,
-            CursorDetectionService = _cursorDetectionService,
-            SubtitleService = _subtitleService,
-            ScriptExecutionQueue = _scriptExecutionQueue,
-            HotkeyService = _hotkeyService,
-            ActionDispatcher = _hotkeyService.GetDispatcher(),
             LogService = _logService,
-            OsdManager = _osdManager
+            HostObjectFactory = _hostObjectFactory
         };
 
         // 创建插件上下文

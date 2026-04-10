@@ -983,27 +983,29 @@ git commit -m "refactor(control-bar): extract visibility rules into a decision c
 - Modify: none unless verification reveals breakage
 - Test: `AkashaNavigator.Tests`
 
-- [ ] **Step 1: Run the full test suite**
+- [x] **Step 1: Run the full test suite**
 
 Run: `dotnet test`
-Expected: PASS
+Result: PASS (`Failed: 0, Passed: 1016, Skipped: 32, Total: 1048`)
 
-- [ ] **Step 2: Run a release build**
+- [x] **Step 2: Run a release build**
 
 Run: `dotnet build AkashaNavigator/AkashaNavigator.csproj -c Release`
-Expected: PASS
+Result: PASS (`0 warnings, 0 errors`)
 
 - [ ] **Step 3: Manually smoke-test the high-risk runtime flows**
 
 Run: `dotnet run --project AkashaNavigator`
 
-Verify manually:
-- A plugin with `player` permission still gets `player`, `window`, and `webview` host objects.
-- A plugin with `overlay` permission still opens and closes overlay windows.
-- Plugin settings still render dynamic controls from `settings_ui.json`.
-- Entering and exiting overlay edit mode still restores parent windows correctly.
-- Deleting a profile still shows the correct uninstall confirmation flow.
-- The control bar still expands, delays hiding, and fully hides correctly.
+Blocked note: Manual smoke-test remains pending in the current CLI session because elevation/runtime GUI interaction is unavailable.
+
+Pending manual verification checklist:
+- [ ] A plugin with `player` permission still gets `player`, `window`, and `webview` host objects.
+- [ ] A plugin with `overlay` permission still opens and closes overlay windows.
+- [ ] Plugin settings still render dynamic controls from `settings_ui.json`.
+- [ ] Entering and exiting overlay edit mode still restores parent windows correctly.
+- [ ] Deleting a profile still shows the correct uninstall confirmation flow.
+- [ ] The control bar still expands, delays hiding, and fully hides correctly.
 
 - [ ] **Step 4: Create the final integration commit**
 

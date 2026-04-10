@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Services;
 using Xunit;
 
@@ -18,7 +19,7 @@ namespace AkashaNavigator.Tests
         private readonly string _builtInProfilesDir;
         private readonly string _builtInPluginsDir;
         private readonly string _subscriptionsFilePath;
-        private readonly LogService _logService;
+        private readonly ILogService _logService;
         private readonly ProfileRegistry _profileRegistry;
         private readonly PluginRegistry _pluginRegistry;
 
@@ -36,28 +37,17 @@ namespace AkashaNavigator.Tests
             Directory.CreateDirectory(_builtInProfilesDir);
             Directory.CreateDirectory(_builtInPluginsDir);
 
-            // 初始化 LogService
+            // 初始化日志服务
             _logService = new LogService();
-            LogService.Instance = _logService;
 
             // 初始化 ProfileRegistry 和 PluginRegistry
-            _profileRegistry = new ProfileRegistry(_logService);
-            ProfileRegistry.Instance = _profileRegistry;
+            _profileRegistry = new ProfileRegistry(_builtInProfilesDir, _logService);
 
-            _pluginRegistry = new PluginRegistry(_logService);
-            PluginRegistry.Instance = _pluginRegistry;
-
-            // 重置单例实例
-            SubscriptionManager.ResetInstance();
+            _pluginRegistry = new PluginRegistry(_builtInPluginsDir, _logService);
         }
 
         public void Dispose()
         {
-            // 重置单例实例
-            SubscriptionManager.ResetInstance();
-            ProfileRegistry.ResetInstance();
-            PluginRegistry.ResetInstance();
-
             if (Directory.Exists(_tempDir))
             {
                 try
@@ -207,20 +197,6 @@ namespace AkashaNavigator.Tests
         {
             return new SubscriptionManager(_logService, _profileRegistry, _pluginRegistry,
                                           _subscriptionsFilePath, _profilesDir);
-        }
-
-        /// <summary>
-        /// 创建带有 ProfileRegistry 和 PluginRegistry 的完整测试环境
-        /// 注意：这会设置全局单例，需要在测试后重置
-        /// </summary>
-        private SubscriptionManager CreateManagerWithRegistries()
-        {
-            SetupStandardTestData();
-            
-            // 由于 SubscriptionManager 依赖 ProfileRegistry 和 PluginRegistry 的单例
-            // 我们需要使用反射或其他方式来设置测试环境
-            // 这里我们直接使用测试构造函数创建 manager
-            return CreateManager();
         }
 
         #endregion

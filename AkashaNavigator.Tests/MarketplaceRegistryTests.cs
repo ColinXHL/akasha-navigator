@@ -79,7 +79,7 @@ public class MarketplaceRegistryTests
         Assert.False(string.IsNullOrWhiteSpace(genshinProfile.Description));
         Assert.Equal("AkashaNavigator", genshinProfile.Author);
         Assert.Equal("原神", genshinProfile.TargetGame);
-        Assert.Equal("1.0.0", genshinProfile.Version);
+        Assert.Equal("2.0.0", genshinProfile.Version);
         Assert.NotEmpty(genshinProfile.PluginIds);
         Assert.Contains("genshin-direction-marker", genshinProfile.PluginIds);
     }
@@ -121,7 +121,7 @@ public class MarketplaceRegistryTests
         Assert.Equal("原神", marketplaceProfile.Name);
         Assert.Equal("AkashaNavigator", marketplaceProfile.Author);
         Assert.Equal("原神", marketplaceProfile.TargetGame);
-        Assert.Equal("1.0.0", marketplaceProfile.Version);
+        Assert.Equal("2.0.0", marketplaceProfile.Version);
         Assert.Equal(sourceUrl, marketplaceProfile.SourceUrl);
         Assert.Contains("genshin-direction-marker", marketplaceProfile.PluginIds);
     }

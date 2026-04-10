@@ -11,27 +11,6 @@ namespace AkashaNavigator.Services
 /// </summary>
 public class ConfigService : IConfigService
 {
-#region Singleton
-
-    private static IConfigService? _instance;
-
-    /// <summary>
-    /// 单例实例（插件系统使用）
-    /// </summary>
-    public static IConfigService Instance
-    {
-        get {
-            if (_instance == null)
-            {
-                _instance = new ConfigService(LogService.Instance);
-            }
-            return _instance;
-        }
-        set => _instance = value;
-    }
-
-#endregion
-
 #region Events
 
     /// <summary>

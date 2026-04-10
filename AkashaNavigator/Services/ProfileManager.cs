@@ -1015,7 +1015,14 @@ public class ProfileManager : IProfileManager
             if (!string.IsNullOrEmpty(configDir))
                 Directory.CreateDirectory(configDir);
 
-            JsonHelper.SaveToFile(configPath, config);
+            var saveResult = JsonHelper.SaveToFile(configPath, config);
+            if (!saveResult.IsSuccess)
+            {
+                _logService.Debug(nameof(ProfileManager), "保存插件配置失败 [{ConfigPath}]: {ErrorMessage}", configPath,
+                                  saveResult.Error?.Message ?? "Unknown error");
+                return false;
+            }
+
             return true;
         }
         catch (Exception ex)

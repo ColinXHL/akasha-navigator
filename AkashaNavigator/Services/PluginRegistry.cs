@@ -81,36 +81,6 @@ internal class PluginRegistryData
 /// </summary>
 public class PluginRegistry : IPluginRegistry
 {
-#region Singleton
-
-    private static IPluginRegistry? _instance;
-
-    /// <summary>
-    /// 获取单例实例（插件系统使用）
-    /// </summary>
-    public static IPluginRegistry Instance
-    {
-        get
-        {
-            if (_instance == null)
-            {
-                _instance = new PluginRegistry(LogService.Instance);
-            }
-            return _instance;
-        }
-        set => _instance = value;
-    }
-
-    /// <summary>
-    /// 重置单例实例（仅用于测试）
-    /// </summary>
-    internal static void ResetInstance()
-    {
-        _instance = null;
-    }
-
-#endregion
-
 #region Properties
 
     /// <summary>
@@ -155,13 +125,54 @@ public class PluginRegistry : IPluginRegistry
     /// 用于测试的构造函数
     /// </summary>
     /// <param name="builtInPluginsDirectory">内置插件目录路径</param>
-    internal PluginRegistry(string builtInPluginsDirectory)
+    internal PluginRegistry(string builtInPluginsDirectory, ILogService? logService = null)
     {
-        _logService = LogService.Instance;
+        _logService = logService ?? new NullLogService();
         BuiltInPluginsDirectory = builtInPluginsDirectory;
     }
 
 #endregion
+
+    private sealed class NullLogService : ILogService
+    {
+        public string LogDirectory => string.Empty;
+
+        public void Debug(string source, string message)
+        {
+        }
+
+        public void Debug(string source, string messageTemplate, params object?[] args)
+        {
+        }
+
+        public void Info(string source, string message)
+        {
+        }
+
+        public void Info(string source, string messageTemplate, params object?[] args)
+        {
+        }
+
+        public void Warn(string source, string message)
+        {
+        }
+
+        public void Warn(string source, string messageTemplate, params object?[] args)
+        {
+        }
+
+        public void Error(string source, string message)
+        {
+        }
+
+        public void Error(string source, string messageTemplate, params object?[] args)
+        {
+        }
+
+        public void Error(string source, Exception ex, string messageTemplate, params object?[] args)
+        {
+        }
+    }
 
 #region Public Methods
 

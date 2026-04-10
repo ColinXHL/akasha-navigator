@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace AkashaNavigator.Tests.Architecture;
@@ -29,7 +30,7 @@ public class ServiceLocatorEradicationTests
 
         var offenders = Directory.GetFiles(appDir, "*.cs", SearchOption.AllDirectories)
             .Where(p => !p.EndsWith("App.xaml.cs", StringComparison.OrdinalIgnoreCase))
-            .Where(p => File.ReadAllText(p).Contains("App.Services", StringComparison.Ordinal))
+            .Where(p => ContainsAppServicesUsage(File.ReadAllText(p)))
             .ToList();
 
         Assert.True(offenders.Count == 0, $"Found App.Services usage:\n{string.Join("\n", offenders)}");
@@ -47,7 +48,40 @@ public class ServiceLocatorEradicationTests
         var path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
         var text = File.ReadAllText(path);
 
-        Assert.DoesNotContain(" Instance", text);
-        Assert.DoesNotContain("ResetInstance", text);
+        Assert.False(ContainsSingletonEntrypoint(text), $"Found singleton entrypoint in {relativePath}");
+    }
+
+    [Theory]
+    [InlineData("AkashaNavigator/Services/ConfigService.cs")]
+    [InlineData("AkashaNavigator/Services/NotificationService.cs")]
+    [InlineData("AkashaNavigator/Services/PluginLibrary.cs")]
+    [InlineData("AkashaNavigator/Services/SubscriptionManager.cs")]
+    [InlineData("AkashaNavigator/Services/ProfileRegistry.cs")]
+    [InlineData("AkashaNavigator/Services/PluginRegistry.cs")]
+    [InlineData("AkashaNavigator/Services/DataMigration.cs")]
+    public void TargetServices_ShouldNotContainStaticInstanceEntrypoints(string relativePath)
+    {
+        var root = GetRepositoryRoot();
+        var path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var text = File.ReadAllText(path);
+
+        Assert.False(ContainsSingletonEntrypoint(text), $"Found singleton entrypoint in {relativePath}");
+    }
+
+    private static bool ContainsAppServicesUsage(string text)
+    {
+        return Regex.IsMatch(text, @"\bApp\s*\.\s*Services\b", RegexOptions.CultureInvariant);
+    }
+
+    private static bool ContainsSingletonEntrypoint(string text)
+    {
+        var options = RegexOptions.CultureInvariant;
+
+        return Regex.IsMatch(text,
+                             @"\b(?:public|internal)\s+static\s+[\w<>,\.\[\]\?\s]+\bInstance\b",
+                             options) ||
+               Regex.IsMatch(text,
+                             @"\b(?:public|internal)\s+static\s+[\w<>,\.\[\]\?\s]+\bResetInstance\s*\(",
+                             options);
     }
 }

@@ -193,7 +193,16 @@ public class PluginContext : IDisposable
         if (_disposed || _jsEngine == null)
             return false;
 
-        var mainFile = Path.Combine(PluginDirectory, Manifest.Main ?? "main.js");
+        var pluginRoot = Path.GetFullPath(PluginDirectory);
+        var mainFile = Path.GetFullPath(Path.Combine(pluginRoot, Manifest.Main ?? "main.js"));
+
+        if (!IsPathUnderRoot(mainFile, pluginRoot))
+        {
+            LastError = "入口文件路径非法";
+            Log("入口文件路径越界: {MainFile}", mainFile);
+            return false;
+        }
+
         if (!File.Exists(mainFile))
         {
             LastError = "入口文件不存在";
@@ -219,6 +228,71 @@ public class PluginContext : IDisposable
             Log("加载脚本失败: {ErrorMessage}", ex.Message);
             return false;
         }
+    }
+
+    private static bool IsPathUnderRoot(string path, string root)
+    {
+        var normalizedRootWithoutTrailing = Path.GetFullPath(root)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedRoot = normalizedRootWithoutTrailing + Path.DirectorySeparatorChar;
+        var normalizedPath = Path.GetFullPath(path);
+
+        if (!normalizedPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return !ContainsReparsePointInPath(normalizedRootWithoutTrailing, normalizedPath);
+    }
+
+    private static bool ContainsReparsePointInPath(string normalizedRootWithoutTrailing, string normalizedPath)
+    {
+        try
+        {
+            if (HasReparsePoint(normalizedRootWithoutTrailing))
+            {
+                return true;
+            }
+
+            var relativePath = Path.GetRelativePath(normalizedRootWithoutTrailing, normalizedPath);
+            if (relativePath == ".")
+            {
+                return false;
+            }
+
+            var parts = relativePath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                                           StringSplitOptions.RemoveEmptyEntries);
+
+            var current = normalizedRootWithoutTrailing;
+            foreach (var part in parts)
+            {
+                current = Path.Combine(current, part);
+                if (HasReparsePoint(current))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    private static bool HasReparsePoint(string path)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path))
+        {
+            return false;
+        }
+
+        return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
     }
 
     /// <summary>
