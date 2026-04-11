@@ -150,3 +150,7 @@ docs/superpowers/**
 
 # opencode
 opencode.json
+
+# openspec
+.opencode/
+openspec/
