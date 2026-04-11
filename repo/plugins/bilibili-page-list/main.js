@@ -501,6 +501,52 @@ function ensurePageListReady() {
 }
 
 /**
+ * 校验分P导航上下文是否与当前页面一致。
+ * 如果缓存中的视频ID与当前URL不匹配，先刷新上下文再判断。
+ * 快捷键导航前必须调用此函数，防止跳转到旧视频。
+ * @returns {boolean} 上下文是否有效且可用于导航
+ */
+function syncNavigationContext() {
+    var currentUrl = player.getUrl();
+    if (!currentUrl || currentUrl === 'about:blank') {
+        log.info('syncNavigationContext: 播放器尚未就绪');
+        return false;
+    }
+
+    var parseResult = parseUrl(currentUrl);
+
+    if (!parseResult.isBilibili) {
+        log.info('syncNavigationContext: 当前页面不是B站视频');
+        return false;
+    }
+
+    // 缓存的视频ID与当前URL不一致 → 上下文已过期，必须刷新
+    if (state.currentVideoId !== parseResult.videoId) {
+        log.info('syncNavigationContext: 检测到视频上下文变化 (' +
+            (state.currentVideoId || 'null') + ' -> ' + parseResult.videoId + ')，刷新状态');
+        onUrlChanged(currentUrl);
+
+        // 刷新后再次校验
+        if (state.currentVideoId !== parseResult.videoId) {
+            log.warn('syncNavigationContext: 状态刷新后仍不匹配，同步失败');
+            return false;
+        }
+    }
+
+    // 视频ID一致但分P列表为空 → 尝试加载
+    if (!state.pageList || state.pageList.length === 0) {
+        log.info('syncNavigationContext: 分P列表为空，尝试加载');
+        onUrlChanged(currentUrl);
+        if (!state.pageList || state.pageList.length === 0) {
+            log.warn('syncNavigationContext: 无法获取分P列表');
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * 从页面同步弹幕开关状态（最佳努力）
  */
 function syncDanmakuStateFromPage() {
@@ -799,15 +845,13 @@ function navigateToPage(page) {
  * 跳转到下一个分P
  */
 function goToNextPage() {
-    if (!state.pageList || state.pageList.length === 0) {
-        log.info('分P列表为空，尝试在快捷键触发时同步加载');
-        if (!ensurePageListReady()) {
-            log.info('分P列表同步失败，无法切换');
-            if (typeof osd !== 'undefined') {
-                osd.show('无法获取分P信息', '⚠️');
-            }
-            return;
+    // 强制校验当前导航上下文是否与页面一致，防止跳转到旧视频
+    if (!syncNavigationContext()) {
+        log.warn('goToNextPage: 导航上下文无效，无法切换');
+        if (typeof osd !== 'undefined') {
+            osd.show('无法获取分P信息', '⚠️');
         }
+        return;
     }
 
     if (state.pageList.length <= 1) {
@@ -837,15 +881,13 @@ function goToNextPage() {
  * 跳转到上一个分P
  */
 function goToPreviousPage() {
-    if (!state.pageList || state.pageList.length === 0) {
-        log.info('分P列表为空，尝试在快捷键触发时同步加载');
-        if (!ensurePageListReady()) {
-            log.info('分P列表同步失败，无法切换');
-            if (typeof osd !== 'undefined') {
-                osd.show('无法获取分P信息', '⚠️');
-            }
-            return;
+    // 强制校验当前导航上下文是否与页面一致，防止跳转到旧视频
+    if (!syncNavigationContext()) {
+        log.warn('goToPreviousPage: 导航上下文无效，无法切换');
+        if (typeof osd !== 'undefined') {
+            osd.show('无法获取分P信息', '⚠️');
         }
+        return;
     }
 
     if (state.pageList.length <= 1) {
@@ -921,7 +963,11 @@ function onUrlChanged(url) {
         return;
     }
     
-    // 新视频，获取分P列表
+// 新视频：先失效旧缓存，再按新上下文重建
+    state.pageList = [];
+    state.pendingNavigationPage = 0;
+    state.currentPage = 1;
+    
     state.currentVideoId = parseResult.videoId;
     state.currentVideoIdType = parseResult.videoIdType;
     
