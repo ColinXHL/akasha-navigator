@@ -121,7 +121,6 @@ public class AppUpdateService : IAppUpdateService
         {
             stableCandidate = new UpdateCandidate {
                 Version = notice.Stable!.Version!,
-                Source = notice.Stable.Source,
                 Notes = notice.Stable.Notes,
                 IsPrerelease = false
             };
@@ -132,12 +131,11 @@ public class AppUpdateService : IAppUpdateService
             return stableCandidate;
         }
 
-        var alphaCandidate = new UpdateCandidate {
-            Version = notice.Alpha!.Version!,
-            Source = notice.Alpha.Source,
-            Notes = notice.Alpha.Notes,
-            IsPrerelease = true
-        };
+var alphaCandidate = new UpdateCandidate {
+                Version = notice.Alpha!.Version!,
+                Notes = notice.Alpha.Notes,
+                IsPrerelease = true
+            };
 
         if (stableCandidate == null)
         {
@@ -280,12 +278,9 @@ public class AppUpdateService : IAppUpdateService
 
     private static string ResolveSourceId(UpdateCandidate candidate)
     {
-        if (!string.IsNullOrWhiteSpace(candidate.Source))
-        {
-            return candidate.Source!;
-        }
-
-        return candidate.Version.Contains("-alpha", StringComparison.OrdinalIgnoreCase)
+        // 注意：NoticeVersion.Source 是下载源（如 "qiniu"），不是 kachina 更新频道 ID。
+        // kachina 只识别 "cnb"、"cnb-alpha"、"github"，必须根据 IsPrerelease 决定频道。
+        return candidate.IsPrerelease
             ? "cnb-alpha"
             : "cnb";
     }
@@ -301,6 +296,10 @@ public class AppUpdateService : IAppUpdateService
     {
         public string? Version { get; set; }
 
+        /// <summary>
+        /// 下载源标识（如 "qiniu"），不是 kachina 更新频道 ID。
+        /// kachina 更新频道由 IsPrerelease 决定，不使用此字段。
+        /// </summary>
         public string? Source { get; set; }
 
         public string? Notes { get; set; }
@@ -309,8 +308,6 @@ public class AppUpdateService : IAppUpdateService
     private sealed class UpdateCandidate
     {
         public string Version { get; set; } = string.Empty;
-
-        public string? Source { get; set; }
 
         public string? Notes { get; set; }
 
