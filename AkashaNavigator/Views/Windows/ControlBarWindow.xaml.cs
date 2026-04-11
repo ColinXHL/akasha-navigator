@@ -2,6 +2,8 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Services;
 using AkashaNavigator.ViewModels.Windows;
@@ -32,14 +34,20 @@ public partial class ControlBarWindow : Window
 
 #region Fields
 
-    private readonly ControlBarViewModel _viewModel;
+private readonly ControlBarViewModel _viewModel;
     private readonly PlayerWindow _playerWindow;
     private readonly ControlBarDisplayController _displayController;
+    private readonly IEventBus _eventBus;
 
     /// <summary>
     /// 是否正在拖动
     /// </summary>
     private bool _isDragging;
+
+    /// <summary>
+    /// 是否处于穿透抑制模式（穿透模式激活时，控制栏不响应鼠标）
+    /// </summary>
+    private bool _isClickThroughSuppressed;
 
     /// <summary>
     /// 拖动起始点的 X 坐标（屏幕坐标）
@@ -70,19 +78,24 @@ public partial class ControlBarWindow : Window
 
 #region Constructor
 
-    public ControlBarWindow(ControlBarViewModel viewModel,
+public ControlBarWindow(ControlBarViewModel viewModel,
                             PlayerWindow playerWindow,
-                            ControlBarDisplayController displayController)
+                            ControlBarDisplayController displayController,
+                            IEventBus eventBus)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _playerWindow = playerWindow ?? throw new ArgumentNullException(nameof(playerWindow));
         _displayController = displayController ?? throw new ArgumentNullException(nameof(displayController));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
 
         InitializeComponent();
         DataContext = _viewModel;
 
         InitializeWindowPosition();
         InitializeAutoShowHide();
+
+        // 订阅穿透状态变化事件（穿透模式激活时抑制控制栏自动显示）
+        _eventBus.Subscribe<ClickThroughChangedEvent>(OnClickThroughChanged);
 
         // 窗口失去激活状态时清除输入框焦点
         Deactivated += (s, e) =>
@@ -364,7 +377,41 @@ public partial class ControlBarWindow : Window
 
 #endregion
 
-#region Auto Show / Hide Logic
+#region Click-Through Suppression
+
+    /// <summary>
+    /// 穿透状态变化事件处理
+    /// 穿透模式激活时隐藏控制栏并停止检测；穿透模式关闭时恢复自动显示
+    /// </summary>
+    private void OnClickThroughChanged(ClickThroughChangedEvent e)
+    {
+        // 确保在 UI 线程执行
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnClickThroughChanged(e));
+            return;
+        }
+
+        if (e.IsEffectiveClickThrough)
+        {
+            // 穿透模式激活：抑制控制栏自动显示
+            _isClickThroughSuppressed = true;
+            _hideDelayTimer?.Stop();
+            SetDisplayState(ControlBarDisplayState.Hidden);
+        }
+        else
+        {
+            // 穿透模式关闭：恢复控制栏正常行为
+            _isClickThroughSuppressed = false;
+            // 重置显示控制器状态，避免残留状态影响恢复后的行为
+            _displayController.SetState(ControlBarDisplayState.Hidden, DateTime.UtcNow);
+            _mouseCheckTimer?.Start();
+        }
+    }
+
+    #endregion
+
+    #region Auto Show / Hide Logic
 
     /// <summary>
     /// 鼠标位置检测定时器回调
@@ -373,6 +420,10 @@ public partial class ControlBarWindow : Window
     {
         // 防止在窗口关闭后操作
         if (!IsLoaded)
+            return;
+
+        // 穿透抑制模式下不处理鼠标检测
+        if (_isClickThroughSuppressed)
             return;
 
         // 拖动过程中不处理
@@ -451,6 +502,10 @@ public partial class ControlBarWindow : Window
     private void HideDelayTimer_Tick(object? sender, EventArgs e)
     {
         _hideDelayTimer?.Stop();
+
+        // 穿透抑制模式下直接停止并返回
+        if (_isClickThroughSuppressed)
+            return;
 
         // 再次检查鼠标位置，确保真的要隐藏
         if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPos))
@@ -601,6 +656,9 @@ public partial class ControlBarWindow : Window
             _hideDelayTimer.Tick -= HideDelayTimer_Tick;
             _hideDelayTimer = null;
         }
+
+        // 取消订阅穿透状态变化事件，防止内存泄漏
+        _eventBus.Unsubscribe<ClickThroughChangedEvent>(OnClickThroughChanged);
     }
 
 #endregion

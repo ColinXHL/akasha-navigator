@@ -641,6 +641,15 @@ public partial class PlayerWindow : Window
             Width = workArea.Width;
             Height = workArea.Height;
             _isMaximized = true;
+
+            // 最大化时穿透已暂停，通知控制栏恢复自动显示
+            // 注意：SuspendClickThroughForMaximize 保留了 _isClickThrough 标志但实际穿透已禁用，
+            // 因此需要发送 IsEffectiveClickThrough = false 表示穿透实际未生效
+            _eventBus.Publish(new Core.Events.Events.ClickThroughChangedEvent
+            {
+                IsEffectiveClickThrough = false,
+                Source = "maximize_suspend"
+            });
         }
         else
         {
@@ -655,6 +664,14 @@ public partial class PlayerWindow : Window
 
             // 恢复鼠标检测（会立即检测当前状态）
             _cursorDetectionService.Resume();
+
+            // 还原后通知控制栏当前的穿透状态
+            // 如果穿透模式恢复，控制栏应被抑制；否则恢复正常显示
+            _eventBus.Publish(new Core.Events.Events.ClickThroughChangedEvent
+            {
+                IsEffectiveClickThrough = IsEffectiveClickThrough,
+                Source = "maximize_resume"
+            });
         }
     }
 
@@ -932,7 +949,7 @@ public partial class PlayerWindow : Window
     /// </summary>
     public bool IsEffectiveClickThrough => _windowBehavior.IsEffectiveClickThrough;
 
-    private void BroadcastClickThroughChanged(string source)
+private void BroadcastClickThroughChanged(string source)
     {
         var payload = new {
             enabled = IsEffectiveClickThrough,
@@ -943,6 +960,13 @@ public partial class PlayerWindow : Window
 
         _pluginHost.BroadcastEvent(AkashaNavigator.Plugins.Utils.EventManager.ClickThroughChanged, payload);
         _pluginHost.BroadcastEvent($"window.{AkashaNavigator.Plugins.Utils.EventManager.ClickThroughChanged}", payload);
+
+        // 通知 ControlBarWindow 穿透状态变化（用于抑制控制栏自动显示）
+        _eventBus.Publish(new Core.Events.Events.ClickThroughChangedEvent
+        {
+            IsEffectiveClickThrough = IsEffectiveClickThrough,
+            Source = source
+        });
     }
 
     /// <summary>

@@ -42,4 +42,21 @@ public class OpacityQueryEvent
     /// </summary>
     public System.Action<double>? Callback { get; set; }
 }
+
+/// <summary>
+/// 鼠标穿透状态变化事件
+/// 用于 PlayerWindow 与 ControlBarWindow 之间的通信
+/// </summary>
+public class ClickThroughChangedEvent
+{
+    /// <summary>
+    /// 是否处于有效穿透模式（手动或自动）
+    /// </summary>
+    public bool IsEffectiveClickThrough { get; set; }
+
+    /// <summary>
+    /// 变化来源："manual"、"auto" 或 "reset"
+    /// </summary>
+    public string Source { get; set; } = string.Empty;
+}
 }
