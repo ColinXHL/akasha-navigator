@@ -59,4 +59,16 @@ public class ClickThroughChangedEvent
     /// </summary>
     public string Source { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// 老板键隐藏模式变化事件
+/// 窗口隐藏时通知其他组件（ControlBarWindow 等）抑制显示行为
+/// </summary>
+public class BossKeyHiddenModeChangedEvent
+{
+    /// <summary>
+    /// 是否处于老板键隐藏模式
+    /// </summary>
+    public bool IsHidden { get; set; }
+}
 }

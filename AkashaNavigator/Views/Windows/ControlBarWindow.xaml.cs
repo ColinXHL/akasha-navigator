@@ -50,6 +50,11 @@ private readonly ControlBarViewModel _viewModel;
     private bool _isClickThroughSuppressed;
 
     /// <summary>
+    /// 是否处于老板键隐藏模式（窗口隐藏时，控制栏不得自动出现）
+    /// </summary>
+    private bool _isBossKeyHidden;
+
+    /// <summary>
     /// 拖动起始点的 X 坐标（屏幕坐标）
     /// </summary>
     private double _dragStartX;
@@ -96,6 +101,9 @@ public ControlBarWindow(ControlBarViewModel viewModel,
 
         // 订阅穿透状态变化事件（穿透模式激活时抑制控制栏自动显示）
         _eventBus.Subscribe<ClickThroughChangedEvent>(OnClickThroughChanged);
+
+        // 订阅老板键隐藏模式变化事件（窗口隐藏时抑制控制栏自动显示）
+        _eventBus.Subscribe<BossKeyHiddenModeChangedEvent>(OnBossKeyHiddenModeChanged);
 
         // 窗口失去激活状态时清除输入框焦点
         Deactivated += (s, e) =>
@@ -409,6 +417,36 @@ public ControlBarWindow(ControlBarViewModel viewModel,
         }
     }
 
+    /// <summary>
+    /// 老板键隐藏模式变化事件处理
+    /// 窗口隐藏时强制隐藏控制栏并停止检测；窗口显示时恢复控制栏正常行为
+    /// </summary>
+    private void OnBossKeyHiddenModeChanged(BossKeyHiddenModeChangedEvent e)
+    {
+        // 确保在 UI 线程执行
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnBossKeyHiddenModeChanged(e));
+            return;
+        }
+
+        if (e.IsHidden)
+        {
+            // 老板键隐藏模式激活：强制隐藏控制栏并停止自动检测
+            _isBossKeyHidden = true;
+            _hideDelayTimer?.Stop();
+            SetDisplayState(ControlBarDisplayState.Hidden);
+        }
+        else
+        {
+            // 老板键隐藏模式关闭：恢复控制栏正常行为
+            _isBossKeyHidden = false;
+            // 重置显示控制器状态，避免残留状态影响恢复后的行为
+            _displayController.SetState(ControlBarDisplayState.Hidden, DateTime.UtcNow);
+            _mouseCheckTimer?.Start();
+        }
+    }
+
     #endregion
 
     #region Auto Show / Hide Logic
@@ -420,6 +458,10 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     {
         // 防止在窗口关闭后操作
         if (!IsLoaded)
+            return;
+
+        // 老板键隐藏模式下不处理鼠标检测
+        if (_isBossKeyHidden)
             return;
 
         // 穿透抑制模式下不处理鼠标检测
@@ -502,6 +544,10 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     private void HideDelayTimer_Tick(object? sender, EventArgs e)
     {
         _hideDelayTimer?.Stop();
+
+        // 老板键隐藏模式下直接停止并返回
+        if (_isBossKeyHidden)
+            return;
 
         // 穿透抑制模式下直接停止并返回
         if (_isClickThroughSuppressed)

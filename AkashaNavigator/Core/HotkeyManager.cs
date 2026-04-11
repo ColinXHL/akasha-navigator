@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AkashaNavigator.Core.Events;
+using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Services;
@@ -17,7 +19,8 @@ public class HotkeyManager
 {
     private static readonly ILogger Logger = Log.ForContext("SourceContext", nameof(HotkeyManager));
 
-    private readonly HotkeyService _hotkeyService;
+private readonly HotkeyService _hotkeyService;
+    private readonly IEventBus _eventBus;
     private PlayerWindow? _playerWindow;
     private AppConfig _config = null!;
     private Action<string, string?>? _showOsdAction;
@@ -29,9 +32,10 @@ public class HotkeyManager
     private readonly Dictionary<string, DateTime> _lastActionTime = new(StringComparer.OrdinalIgnoreCase);
     private const int ToggleActionDebounceMs = 180;
 
-    public HotkeyManager(HotkeyService hotkeyService)
+    public HotkeyManager(HotkeyService hotkeyService, IEventBus eventBus)
     {
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _seekFlushTimer = new DispatcherTimer();
         _seekFlushTimer.Tick += OnSeekFlushTimerTick;
     }
@@ -214,7 +218,10 @@ public class HotkeyManager
         {
             Logger.Debug("ToggleWindowVisibility event received, _playerWindow is null: {IsNull}", _playerWindow == null);
             _playerWindow?.ToggleVisibility();
-            var msg = _playerWindow?.IsHidden == true ? "窗口已隐藏" : "窗口已显示";
+            var isHidden = _playerWindow?.IsHidden == true;
+            _hotkeyService.IsBossKeyHidden = isHidden;
+            _eventBus.Publish(new BossKeyHiddenModeChangedEvent { IsHidden = isHidden });
+            var msg = isHidden ? "窗口已隐藏" : "窗口已显示";
             ShowOsd(msg, "👁");
         };
 

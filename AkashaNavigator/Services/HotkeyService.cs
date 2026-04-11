@@ -50,6 +50,12 @@ public class HotkeyService : IDisposable
     /// </summary>
     public bool IsSuspended => _isSuspended;
 
+    /// <summary>
+    /// 是否处于老板键隐藏模式
+    /// 隐藏模式下仅允许 ToggleWindowVisibility 动作通过，其他所有快捷键被拦截
+    /// </summary>
+    public bool IsBossKeyHidden { get; set; }
+
 #endregion
 
 #region Events(兼容旧 API，代理到 ActionDispatcher)
@@ -333,6 +339,13 @@ public class HotkeyService : IDisposable
                 return;
             }
 
+            // 老板键隐藏模式：仅允许 ToggleWindowVisibility 动作通过
+            if (IsBossKeyHidden &&
+                !string.Equals(binding.Action, ActionDispatcher.ActionToggleWindowVisibility, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             if (!ShouldDispatchKeyboard(vkCode, binding.Action))
             {
                 return;
@@ -407,6 +420,13 @@ public class HotkeyService : IDisposable
             // 检查是否暂停（SuspendHotkeys 动作始终可用）
             if (_isSuspended &&
                 !string.Equals(binding.Action, ActionSuspendHotkeys, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // 老板键隐藏模式：仅允许 ToggleWindowVisibility 动作通过
+            if (IsBossKeyHidden &&
+                !string.Equals(binding.Action, ActionDispatcher.ActionToggleWindowVisibility, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
