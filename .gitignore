@@ -136,7 +136,17 @@ CLAUDE.md
 #dev-docs
 .dev-docs/*
 
+# git worktrees
+.worktrees/
+
 # Python stress scripts
 scripts/__pycache__/
 scripts/*.log
 scripts/stress_log.txt
+
+# superpowers
+docs/superpowers/*
+docs/superpowers/**
+
+# opencode
+opencode.json
