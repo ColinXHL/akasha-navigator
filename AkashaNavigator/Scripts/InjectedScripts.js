@@ -156,6 +156,7 @@
         const PENDING_STORAGE_KEY_PREFIX = 'akasha:playback-pending:v1';
         const GLOBAL_RATE_KEY_PREFIX = 'akasha:playback-global-rate:v1';
         const STATE_TTL_MS = 2 * 60 * 60 * 1000;
+        const NAVIGATION_WINDOW_MS = 5000;
         const RESTORE_MAX_ATTEMPTS = 20;
         const RESTORE_INTERVAL_MS = 220;
         const RESTORE_REASON_THROTTLE_MS = {
@@ -200,6 +201,13 @@
             '[aria-label*="下一"]'
         ];
 
+        const PLAYBACK_RATE_MENU_SELECTORS = [
+            '.bpx-player-ctrl-playbackrate-menu-item',
+            '.bpx-player-ctrl-playbackrate-menu-list .bpx-player-ctrl-playbackrate-menu-item',
+            '.bilibili-player-video-btn-speed-menu-list .bilibili-player-video-btn-speed-menu-list-item',
+            '.bilibili-player-video-btn-speed-menu-list [data-value]'
+        ];
+
         let restoreTimer = null;
         let restoreAttempts = 0;
         let waitingUserGesture = false;
@@ -209,8 +217,10 @@
         let lastObservedMode = null;
         let lastObservedRate = null;
         let activeRestoreTarget = null;
-        let lastUserInteractionAt = 0;
         let lastExplicitRateRequest = null;
+        let lastPostedPlaybackRateSync = null;
+        let navigationWindowUntil = 0;
+        let navigationWindowOpenedForRestoreCycle = false;
 
         function getRestoreReasonThrottleMs(reason) {
             if (!reason) {
@@ -297,12 +307,39 @@
             return snapshot ? snapshot.playbackRate : 1.0;
         }
 
-        function markUserInteraction() {
-            lastUserInteractionAt = Date.now();
+        function beginNavigationWindow() {
+            navigationWindowUntil = Date.now() + NAVIGATION_WINDOW_MS;
+            lastPostedPlaybackRateSync = null;
         }
 
-        function hasRecentUserInteraction() {
-            return (Date.now() - lastUserInteractionAt) <= 2000;
+        function isWithinNavigationWindow() {
+            return navigationWindowUntil > 0 && Date.now() <= navigationWindowUntil;
+        }
+
+        function noteVideoNavigation(reason) {
+            beginNavigationWindow();
+            postPlaybackDebug('navigationWindowOpened', {
+                reason: String(reason || 'unknown')
+            });
+        }
+
+        function shouldOpenNavigationWindowForRestore(reason) {
+            const allowedReasons = {
+                'video-loadedmetadata': true,
+                'host-navigation-completed': true
+            };
+
+            return !!allowedReasons[String(reason || '')];
+        }
+
+        function openNavigationWindowForRestore(reason) {
+            if (!shouldOpenNavigationWindowForRestore(reason) || navigationWindowOpenedForRestoreCycle) {
+                return false;
+            }
+
+            beginNavigationWindow();
+            navigationWindowOpenedForRestoreCycle = true;
+            return true;
         }
 
         function markExplicitRateRequest(rate, source) {
@@ -318,6 +355,22 @@
             };
         }
 
+        function markExplicitRateIntent(rate, source) {
+            markExplicitRateRequest(rate, source);
+        }
+
+        function hasRecentExplicitRateIntent(rate) {
+            if (!lastExplicitRateRequest) {
+                return false;
+            }
+
+            if ((Date.now() - Number(lastExplicitRateRequest.updatedAt || 0)) > 2500) {
+                return false;
+            }
+
+            return approxEqual(lastExplicitRateRequest.playbackRate, rate);
+        }
+
         function matchesRecentExplicitRateRequest(rate) {
             if (!lastExplicitRateRequest) {
                 return false;
@@ -330,6 +383,15 @@
             return approxEqual(lastExplicitRateRequest.playbackRate, rate);
         }
 
+        function shouldPersistRateAsAuthority(rate, reason) {
+            const normalizedRate = Number(rate) || 1.0;
+            if (normalizedRate <= 0) {
+                return false;
+            }
+
+            return hasRecentExplicitRateIntent(normalizedRate);
+        }
+
         function shouldSkipGlobalRateOverwrite(targetRate, reason) {
             const previousRate = readGlobalRate();
             const isDowngradeToDefault = approxEqual(targetRate, 1.0) && previousRate > 1.0;
@@ -337,8 +399,12 @@
                 return false;
             }
 
-            if (hasRecentUserInteraction() || matchesRecentExplicitRateRequest(targetRate)) {
+            if (matchesRecentExplicitRateRequest(targetRate)) {
                 return false;
+            }
+
+            if (isWithinNavigationWindow()) {
+                return true;
             }
 
             const transientReasons = {
@@ -346,6 +412,8 @@
                 'replaceState': true,
                 'beforeunload': true,
                 'pagehide': true,
+                'part-navigation-click': true,
+                'popstate': true,
                 'video-ratechange': true,
                 'video-ended': true,
                 'video-loadedmetadata': true,
@@ -409,6 +477,10 @@
             return false;
         }
 
+        function isBilibiliVideoPage() {
+            return isRuleMatched({ hostSuffix: 'bilibili.com', pathContains: '/video/' });
+        }
+
         function getVideoElement() {
             return document.querySelector('video');
         }
@@ -448,6 +520,56 @@
 
             const className = String(matched.className || '');
             return /prev|next/i.test(className);
+        }
+
+        function isPlaybackRateMenuElement(element) {
+            if (!(element instanceof Element)) {
+                return false;
+            }
+
+            return !!element.closest(PLAYBACK_RATE_MENU_SELECTORS.join(', '));
+        }
+
+        function extractPlaybackRateFromElement(element) {
+            if (!(element instanceof Element)) {
+                return null;
+            }
+
+            const matched = element.closest(PLAYBACK_RATE_MENU_SELECTORS.join(', '));
+            if (!matched) {
+                return null;
+            }
+
+            const dataValueRate = Number(String(matched.getAttribute('data-value') || '').replace(',', '.'));
+            if (dataValueRate > 0) {
+                return dataValueRate;
+            }
+
+            const dataRate = Number(String(matched.getAttribute('data-rate') || '').replace(',', '.'));
+            if (dataRate > 0) {
+                return dataRate;
+            }
+
+            const candidates = [
+                matched.getAttribute('title'),
+                matched.getAttribute('aria-label'),
+                matched.textContent
+            ];
+
+            for (let i = 0; i < candidates.length; i++) {
+                const text = String(candidates[i] || '').replace(',', '.').trim();
+                const match = text.match(/^(\d+(?:\.\d+)?)\s*x$/i) || text.match(/^(\d+(?:\.\d+)?)倍速$/);
+                if (!match) {
+                    continue;
+                }
+
+                const rate = Number(match[1]);
+                if (rate > 0) {
+                    return rate;
+                }
+            }
+
+            return null;
         }
 
         function clickElementRobust(element) {
@@ -670,7 +792,7 @@
             };
         }
 
-        function saveSnapshot(reason, modeOverride, fallbackSnapshot) {
+        function saveSnapshot(reason, modeOverride, fallbackSnapshot, persistGlobalRate) {
             if (!isTargetSite()) {
                 return;
             }
@@ -678,7 +800,9 @@
             try {
                 const snapshot = buildSnapshot(reason, modeOverride, fallbackSnapshot);
                 sessionStorage.setItem(getStorageKey(), JSON.stringify(snapshot));
-                saveGlobalRate(snapshot.playbackRate, reason);
+                if (persistGlobalRate !== false) {
+                    saveGlobalRate(snapshot.playbackRate, reason);
+                }
                 console.log('[SandronePlayer] Playback state saved:', reason, snapshot);
             } catch (err) {
                 console.warn('[SandronePlayer] Failed to save playback state:', err);
@@ -764,6 +888,37 @@
             return Math.abs(Number(a) - Number(b)) < 0.02;
         }
 
+        function postPlaybackRateSync(rate, source) {
+            const normalizedRate = Number(rate) || 0;
+            const normalizedSource = String(source || 'unknown');
+            const currentUrl = String(window.location.href || '');
+            if (normalizedRate <= 0 || !isBilibiliVideoPage()) {
+                return;
+            }
+
+            if (lastPostedPlaybackRateSync
+                && approxEqual(lastPostedPlaybackRateSync.rate, normalizedRate)
+                && lastPostedPlaybackRateSync.source === normalizedSource
+                && lastPostedPlaybackRateSync.url === currentUrl) {
+                return;
+            }
+
+            lastPostedPlaybackRateSync = {
+                rate: normalizedRate,
+                source: normalizedSource,
+                url: currentUrl
+            };
+
+            if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    type: 'playback_rate_sync',
+                    rate: normalizedRate,
+                    source: normalizedSource,
+                    url: window.location.href
+                }));
+            }
+        }
+
         function applyPlaybackRate(snapshot) {
             const video = getVideoElement();
             if (!video) {
@@ -792,10 +947,16 @@
 
             video.addEventListener('ratechange', function () {
                 const rate = Number(video.playbackRate) || 1.0;
-                if (hasRecentUserInteraction()) {
-                    markExplicitRateRequest(rate, 'video-ratechange');
+                if (shouldPersistRateAsAuthority(rate, 'video-ratechange')) {
+                    saveGlobalRate(rate, 'video-ratechange');
+
+                    if (hasRecentExplicitRateIntent(rate)
+                        && lastExplicitRateRequest
+                        && lastExplicitRateRequest.source === 'bilibili-rate-menu') {
+                        postPlaybackRateSync(rate, 'bilibili-rate-menu');
+                    }
                 }
-                saveSnapshot('video-ratechange');
+                saveSnapshot('video-ratechange', null, null, false);
             });
 
             video.addEventListener('loadedmetadata', function () {
@@ -814,6 +975,7 @@
 
             video.addEventListener('ended', function () {
                 // Capture the handoff state before the site resets the next-part player back to 1.0x.
+                noteVideoNavigation('video-ended');
                 savePendingSnapshot('video-ended');
             });
         }
@@ -1062,7 +1224,6 @@
                 };
                 applyGlobalRate = true;
             }
-
             if (!snapshot) {
                 postPlaybackDebug('scheduleRestore-skip-no-snapshot', { reason: reason });
                 return;
@@ -1080,6 +1241,7 @@
 
             if (!activeRestoreTarget) {
                 activeRestoreTarget = snapshot;
+                navigationWindowOpenedForRestoreCycle = false;
                 clearPendingSnapshot();
                 postPlaybackDebug('scheduleRestore-acquire-pending', {
                     reason: reason,
@@ -1089,6 +1251,7 @@
             }
             else if (!isSameRestoreTarget(activeRestoreTarget, snapshot)) {
                 activeRestoreTarget = snapshot;
+                navigationWindowOpenedForRestoreCycle = false;
                 postPlaybackDebug('scheduleRestore-replace-target', {
                     reason: reasonText,
                     targetMode: snapshot.fullscreenMode,
@@ -1109,6 +1272,8 @@
             if (pendingFullscreenSnapshot) {
                 registerUserGestureRetry();
             }
+
+            openNavigationWindowForRestore(reasonText);
 
             clearRestoreTimer();
             restoreAttempts = 0;
@@ -1177,6 +1342,7 @@
                 history.pushState = function () {
                     const previousSnapshot = readPendingSnapshot() || readSnapshot();
                     const result = originalPushState.apply(this, arguments);
+                    noteVideoNavigation('pushState');
                     saveSnapshot('pushState', null, previousSnapshot);
                     savePendingSnapshot('pushState', null, previousSnapshot);
                     return result;
@@ -1184,12 +1350,16 @@
 
                 const originalReplaceState = history.replaceState;
                 history.replaceState = function () {
+                    const previousSnapshot = readPendingSnapshot() || readSnapshot();
                     const result = originalReplaceState.apply(this, arguments);
-                    saveSnapshot('replaceState');
+                    noteVideoNavigation('replaceState');
+                    saveSnapshot('replaceState', null, previousSnapshot);
+                    savePendingSnapshot('replaceState', null, previousSnapshot);
                     return result;
                 };
 
                 window.addEventListener('popstate', function () {
+                    noteVideoNavigation('popstate');
                     savePendingSnapshot('popstate');
                 });
             } catch (err) {
@@ -1209,10 +1379,16 @@
             }, true);
 
             document.addEventListener('click', function (event) {
-                markUserInteraction();
                 const target = event.target;
                 if (!(target instanceof Element)) {
                     return;
+                }
+
+                if (isPlaybackRateMenuElement(target)) {
+                    const rate = extractPlaybackRateFromElement(target);
+                    if (rate) {
+                        markExplicitRateIntent(rate, 'bilibili-rate-menu');
+                    }
                 }
 
                 if (target.closest(WEB_FULLSCREEN_SELECTORS.join(', '))) {
@@ -1230,6 +1406,7 @@
                 }
 
                 if (isPartNavigationElement(target)) {
+                    noteVideoNavigation('part-navigation-click');
                     saveSnapshot('part-navigation-click');
                     savePendingSnapshot('part-navigation-click');
                     postPlaybackDebug('partNavigationClick', {
@@ -1240,18 +1417,16 @@
                         })()
                     });
                 }
-            }, true);
 
-            document.addEventListener('keydown', function () {
-                markUserInteraction();
             }, true);
-
             window.addEventListener('beforeunload', function () {
+                noteVideoNavigation('beforeunload');
                 saveSnapshot('beforeunload');
                 savePendingSnapshot('beforeunload');
             });
 
             window.addEventListener('pagehide', function () {
+                noteVideoNavigation('pagehide');
                 saveSnapshot('pagehide');
                 savePendingSnapshot('pagehide');
             });
@@ -1274,7 +1449,7 @@
             window.addEventListener('akasha:set-playback-rate', function (event) {
                 const detail = event && event.detail ? event.detail : null;
                 const rate = detail && typeof detail.rate !== 'undefined' ? Number(detail.rate) : 1.0;
-                markExplicitRateRequest(rate, 'host-set-playback-rate');
+                markExplicitRateIntent(rate, 'host-set-playback-rate');
                 saveGlobalRate(rate, 'host-set-playback-rate');
                 postPlaybackDebug('explicitGlobalRateUpdate', {
                     source: 'host-set-playback-rate',

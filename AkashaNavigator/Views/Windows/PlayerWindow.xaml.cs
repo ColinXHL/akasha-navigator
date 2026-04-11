@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -451,6 +452,26 @@ public partial class PlayerWindow : Window
                                           debugMessage, debugUrl, debugData);
                         return;
                     }
+
+                    if (type == "playback_rate_sync")
+                    {
+                        var syncSource = doc.RootElement.TryGetProperty("source", out var syncSourceEl)
+                            ? syncSourceEl.GetString() ?? string.Empty
+                            : string.Empty;
+
+                        if (doc.RootElement.TryGetProperty("rate", out var rateEl) &&
+                            rateEl.TryGetDouble(out var rate) &&
+                            double.IsFinite(rate) &&
+                            rate is >= MinPlaybackRate and <= MaxPlaybackRate &&
+                            string.Equals(syncSource, "bilibili-rate-menu", StringComparison.Ordinal) &&
+                            IsBilibiliVideoUrl(e.Source))
+                        {
+                            _currentPlaybackRate = rate;
+                            _logService.Debug(nameof(PlayerWindow), "Playback rate synced from web page: {Rate}", rate);
+                        }
+
+                        return;
+                    }
                 }
             }
             catch
@@ -479,6 +500,18 @@ public partial class PlayerWindow : Window
                                    { Win32Helper.StartMove(this); });
             break;
         }
+    }
+
+    private static bool IsBilibiliVideoUrl(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        return (string.Equals(uri.Host, "bilibili.com", StringComparison.OrdinalIgnoreCase) ||
+                uri.Host.EndsWith(".bilibili.com", StringComparison.OrdinalIgnoreCase)) &&
+               uri.AbsolutePath.StartsWith("/video/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -976,12 +1009,71 @@ public partial class PlayerWindow : Window
         }
     }
 
+    private async Task<double?> TryGetLivePlaybackRateAsync()
+    {
+        if (WebView.CoreWebView2 == null)
+        {
+            return null;
+        }
+
+        const string script = @"
+            (function() {
+                var video = document.querySelector('video');
+                return video ? video.playbackRate : null;
+            })();
+        ";
+
+        try
+        {
+            var raw = await _scriptQueue.ExecuteAsync(WebView.CoreWebView2, script, "GetPlaybackRate", 1200,
+                                                      priority: ScriptExecutionQueue.ScriptExecutionPriority.High,
+                                                      coalesceKey: "playback-rate-read");
+
+            if (string.IsNullOrWhiteSpace(raw) || string.Equals(raw, "null", StringComparison.OrdinalIgnoreCase))
+            {
+                _logService.Debug(nameof(PlayerWindow), "Live playback rate unavailable; falling back to cached rate");
+                return null;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(raw);
+                if (document.RootElement.ValueKind != JsonValueKind.Number || !document.RootElement.TryGetDouble(out var rate))
+                {
+                    _logService.Debug(nameof(PlayerWindow), "Live playback rate payload was not a number; falling back to cached rate");
+                    return null;
+                }
+
+                if (!double.IsFinite(rate) || rate < MinPlaybackRate || rate > MaxPlaybackRate)
+                {
+                    _logService.Debug(nameof(PlayerWindow),
+                                      "Live playback rate was out of range; falling back to cached rate (Rate={Rate})",
+                                      rate);
+                    return null;
+                }
+
+                return rate;
+            }
+            catch (JsonException)
+            {
+                _logService.Debug(nameof(PlayerWindow), "Live playback rate payload could not be parsed; falling back to cached rate");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logService.Error(nameof(PlayerWindow), ex, "TryGetLivePlaybackRateAsync failed");
+            return null;
+        }
+    }
+
     /// <summary>
     /// 增加播放速率 (+0.25)
     /// </summary>
     public async Task IncreasePlaybackRateAsync()
     {
-        await SetPlaybackRateAsync(_currentPlaybackRate + PlaybackRateStep);
+        var currentRate = await TryGetLivePlaybackRateAsync() ?? _currentPlaybackRate;
+        await SetPlaybackRateAsync(currentRate + PlaybackRateStep);
     }
 
     /// <summary>
@@ -989,7 +1081,8 @@ public partial class PlayerWindow : Window
     /// </summary>
     public async Task DecreasePlaybackRateAsync()
     {
-        await SetPlaybackRateAsync(_currentPlaybackRate - PlaybackRateStep);
+        var currentRate = await TryGetLivePlaybackRateAsync() ?? _currentPlaybackRate;
+        await SetPlaybackRateAsync(currentRate - PlaybackRateStep);
     }
 
     /// <summary>
