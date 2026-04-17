@@ -58,6 +58,12 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 窗口隐藏时是否仍然触发快捷键（自动生成属性和通知）
+    /// </summary>
+    [ObservableProperty]
+    private bool _enableHotkeysWhenHidden;
+
+    /// <summary>
     /// 从配置对象加载快捷键
     /// </summary>
     public void LoadHotkeys(AppConfig config)
@@ -69,6 +75,8 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
         WindowBehaviorHotkeys.Clear();
         PlaybackRateHotkeys.Clear();
         WindowControlHotkeys.Clear();
+
+        EnableHotkeysWhenHidden = config.EnableHotkeysWhenHidden;
 
         // 全局控制
         AddHotkeyBinding("SuspendHotkeys", "禁用/启用快捷键", config.HotkeySuspendHotkeys,
@@ -239,6 +247,8 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
                 break;
             }
         }
+
+        config.EnableHotkeysWhenHidden = EnableHotkeysWhenHidden;
     }
 
     /// <summary>
@@ -246,6 +256,8 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
     /// </summary>
     public void ResetSettings(AppConfig config)
     {
+        EnableHotkeysWhenHidden = config.EnableHotkeysWhenHidden;
+
         // 重置快捷键（更新现有 ViewModel 的值）
         foreach (var binding in HotkeyBindings)
         {

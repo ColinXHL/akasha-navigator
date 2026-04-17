@@ -71,6 +71,12 @@ public class AppConfig
     public uint HotkeySuspendHotkeys { get; set; } = 0xC0; // VK_OEM_3 (` 波浪键)
     public ModifierKeys HotkeySuspendHotkeysMod { get; set; } = ModifierKeys.Ctrl;
 
+    /// <summary>
+    /// 窗口隐藏时是否仍然触发快捷键（默认 false，即隐藏时不触发）
+    /// 仅 ToggleWindowVisibility 和 SuspendHotkeys 始终可用
+    /// </summary>
+    public bool EnableHotkeysWhenHidden { get; set; } = false;
+
 #endregion
 
 #region Profile
@@ -142,6 +148,11 @@ public class AppConfig
     /// 退出时是否提示记录（默认 false，即不提示）
     /// </summary>
     public bool PromptRecordOnExit { get; set; } = false;
+
+    /// <summary>
+    /// 是否启用 OSD 悬浮提示（默认开启）
+    /// </summary>
+    public bool EnableOsd { get; set; } = true;
 
 #endregion
 

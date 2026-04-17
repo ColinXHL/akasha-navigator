@@ -29,10 +29,15 @@
                 <TextBlock Grid.Column="2" Text="{Binding SnapThreshold, StringFormat={}{0}px}"
                            Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
             </Grid>
-            <CheckBox x:Name="PromptRecordOnExitCheckBox" Content="退出时提示记录"
-                      Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
-                      IsChecked="{Binding PromptRecordOnExit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+<CheckBox x:Name="PromptRecordOnExitCheckBox" Content="退出时提示记录"
+                       Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
+                       IsChecked="{Binding PromptRecordOnExit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
             <TextBlock Text="关闭窗口时提示记录当前游戏进度笔记"
-                       Foreground="#666" FontSize="11" Margin="0,0,0,24"/>
+                        Foreground="#666" FontSize="11" Margin="0,0,0,24"/>
+            <CheckBox x:Name="EnableOsdCheckBox" Content="启用 OSD 悬浮提示"
+                       Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,8"
+                       IsChecked="{Binding EnableOsd, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="用于显示快捷键操作和窗口状态提示"
+                        Foreground="#666" FontSize="11" Margin="0,0,0,24"/>
         </StackPanel>
 </UserControl>

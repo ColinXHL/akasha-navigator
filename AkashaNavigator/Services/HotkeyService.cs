@@ -56,6 +56,12 @@ public class HotkeyService : IDisposable
     /// </summary>
     public bool IsBossKeyHidden { get; set; }
 
+    /// <summary>
+    /// 窗口隐藏时是否仍然触发快捷键（默认 false）
+    /// 仅 ToggleWindowVisibility 和 SuspendHotkeys 始终可用
+    /// </summary>
+    public bool EnableHotkeysWhenHidden { get; set; }
+
 #endregion
 
 #region Events(兼容旧 API，代理到 ActionDispatcher)
@@ -339,9 +345,8 @@ public class HotkeyService : IDisposable
                 return;
             }
 
-            // 老板键隐藏模式：仅允许 ToggleWindowVisibility 动作通过
-            if (IsBossKeyHidden &&
-                !string.Equals(binding.Action, ActionDispatcher.ActionToggleWindowVisibility, StringComparison.OrdinalIgnoreCase))
+            // 老板键隐藏模式：根据配置决定是否允许派发
+            if (IsBossKeyHidden && !CanDispatchWhenHidden(binding.Action))
             {
                 return;
             }
@@ -424,9 +429,8 @@ public class HotkeyService : IDisposable
                 return;
             }
 
-            // 老板键隐藏模式：仅允许 ToggleWindowVisibility 动作通过
-            if (IsBossKeyHidden &&
-                !string.Equals(binding.Action, ActionDispatcher.ActionToggleWindowVisibility, StringComparison.OrdinalIgnoreCase))
+            // 老板键隐藏模式：根据配置决定是否允许派发
+            if (IsBossKeyHidden && !CanDispatchWhenHidden(binding.Action))
             {
                 return;
             }
@@ -475,6 +479,22 @@ public class HotkeyService : IDisposable
 #endregion
 
 #region Private Methods
+
+    /// <summary>
+    /// 判断在老板键隐藏模式下是否允许派发指定动作
+    /// ToggleWindowVisibility 始终可用，SuspendHotkeys 始终可用
+    /// 其他动作是否允许取决于 EnableHotkeysWhenHidden 配置
+    /// </summary>
+    private bool CanDispatchWhenHidden(string actionName)
+    {
+        if (string.Equals(actionName, ActionDispatcher.ActionToggleWindowVisibility, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (string.Equals(actionName, ActionSuspendHotkeys, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return EnableHotkeysWhenHidden;
+    }
 
     /// <summary>
     /// 检测当前是否处于输入模式（焦点在输入控件上）

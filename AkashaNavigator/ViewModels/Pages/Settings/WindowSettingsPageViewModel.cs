@@ -27,6 +27,12 @@ public partial class WindowSettingsPageViewModel : ObservableObject
     [ObservableProperty]
     private bool _promptRecordOnExit;
 
+    /// <summary>
+    /// 是否启用 OSD 悬浮提示（自动生成属性和通知）
+    /// </summary>
+    [ObservableProperty]
+    private bool _enableOsd;
+
     public WindowSettingsPageViewModel()
     {
         // 默认值，稍后通过 LoadSettings 从 Config 加载
@@ -40,6 +46,7 @@ public partial class WindowSettingsPageViewModel : ObservableObject
         EnableEdgeSnap = config.EnableEdgeSnap;
         SnapThreshold = config.SnapThreshold;
         PromptRecordOnExit = config.PromptRecordOnExit;
+        EnableOsd = config.EnableOsd;
     }
 
     /// <summary>
@@ -50,6 +57,7 @@ public partial class WindowSettingsPageViewModel : ObservableObject
         config.EnableEdgeSnap = EnableEdgeSnap;
         config.SnapThreshold = SnapThreshold;
         config.PromptRecordOnExit = PromptRecordOnExit;
+        config.EnableOsd = EnableOsd;
     }
 
     /// <summary>

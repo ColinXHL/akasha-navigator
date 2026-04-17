@@ -136,6 +136,8 @@ public partial class SettingsViewModel : ObservableObject
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "吸附阈值", "窗口行为"),
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "退出提示", "窗口行为"),
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "记录笔记", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "OSD", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "悬浮提示", "窗口行为"),
         });
 
         // ===== 快捷键设置 =====
@@ -143,6 +145,8 @@ public partial class SettingsViewModel : ObservableObject
             // 全局控制
             new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "禁用快捷键", "全局控制"),
             new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "启用快捷键", "全局控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "隐藏窗口", "全局控制"),
+            new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "隐藏时快捷键", "全局控制"),
             // 视频控制
             new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "播放暂停", "视频控制"),
             new SearchableSetting(SettingsPageType.Hotkeys, "⌨️ 快捷键", "快进", "视频控制"),

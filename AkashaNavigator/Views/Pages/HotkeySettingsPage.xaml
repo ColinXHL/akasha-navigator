@@ -7,11 +7,19 @@
              Cursor="Arrow">
 
     <StackPanel>
-            <!-- 标题 -->
+<!-- 标题 -->
             <TextBlock Text="快捷键设置" FontSize="18" FontWeight="SemiBold"
-                       Foreground="White" Margin="0,0,0,8"/>
+                        Foreground="White" Margin="0,0,0,8"/>
             <TextBlock Text="点击输入框后按下新快捷键即可修改"
-                       Foreground="#666" FontSize="11" Margin="0,0,0,16"/>
+                        Foreground="#666" FontSize="11" Margin="0,0,0,16"/>
+
+            <!-- 隐藏窗口热键策略 -->
+            <TextBlock Text="隐藏窗口行为" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+            <CheckBox Content="窗口隐藏时仍响应快捷键"
+                       Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,8"
+                       IsChecked="{Binding EnableHotkeysWhenHidden, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="关闭后仅影响全局热键，隐藏/显示窗口快捷键始终保留"
+                        Foreground="#666" FontSize="11" Margin="0,0,0,24"/>
 
             <!-- 快捷键全局控制 -->
             <TextBlock Text="快捷键全局控制" Style="{StaticResource SettingsGroupHeaderStyle}"/>

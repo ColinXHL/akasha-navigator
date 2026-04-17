@@ -46,11 +46,14 @@ private readonly HotkeyService _hotkeyService;
     /// <param name="playerWindow">播放器窗口引用</param>
     /// <param name="config">应用配置</param>
     /// <param name="showOsdAction">显示OSD的回调</param>
-    public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<string, string?>? showOsdAction)
+public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<string, string?>? showOsdAction)
     {
         _playerWindow = playerWindow;
         _config = config;
         _showOsdAction = showOsdAction;
+
+        // 同步隐藏态热键策略到 HotkeyService
+        _hotkeyService.EnableHotkeysWhenHidden = _config.EnableHotkeysWhenHidden;
 
         // 不要替换整个配置，而是合并内置快捷键到现有配置
         var currentConfig = _hotkeyService.GetConfig();
@@ -90,6 +93,9 @@ private readonly HotkeyService _hotkeyService;
     {
         _config = config;
         _hotkeyService?.UpdateConfig(_config.ToHotkeyConfig());
+
+        // 同步隐藏态热键策略到 HotkeyService
+        _hotkeyService.EnableHotkeysWhenHidden = _config.EnableHotkeysWhenHidden;
     }
 
     /// <summary>

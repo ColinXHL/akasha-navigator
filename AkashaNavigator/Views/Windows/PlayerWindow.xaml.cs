@@ -1297,7 +1297,10 @@ private void BroadcastClickThroughChanged(string source)
         if (_isMaximized || !_isInResizableEdge || _hasShownResizeHintInCurrentHover)
             return;
 
-        _osdManager.ShowMessage(AppConstants.ResizeHintMessage, AppConstants.ResizeHintIcon);
+if (_config.EnableOsd)
+        {
+            _osdManager.ShowMessage(AppConstants.ResizeHintMessage, AppConstants.ResizeHintIcon);
+        }
         _hasShownResizeHintInCurrentHover = true;
     }
 
