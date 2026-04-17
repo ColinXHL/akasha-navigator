@@ -86,7 +86,7 @@ public partial class HotkeyBindingViewModel : ObservableObject
     {
         Key = key;
         Modifiers = modifiers;
-        InputType = inputType;
+        InputType = key == 0 ? inputType : HotkeyBinding.InferInputType(key);
         OnPropertyChanged(nameof(HotkeyDisplayText));
         // 触发绑定变化事件，以便冲突检测等逻辑能够运行
         BindingChanged?.Invoke(this, EventArgs.Empty);
@@ -110,6 +110,7 @@ public partial class HotkeyBindingViewModel : ObservableObject
     {
         Key = 0;
         Modifiers = ModifierKeys.None;
+        InputType = InputType.Keyboard;
         BindingChanged?.Invoke(this, EventArgs.Empty);
     }
 

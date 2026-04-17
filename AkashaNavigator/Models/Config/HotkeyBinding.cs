@@ -41,8 +41,20 @@ public static class MouseButtonCodes
 public class HotkeyBinding
 {
     /// <summary>
-    /// 输入类型（键盘/鼠标）
+    /// 根据按键值推断输入类型
     /// </summary>
+    /// <param name="key">虚拟键码或鼠标按钮值</param>
+    /// <returns>推断后的输入类型</returns>
+    public static InputType InferInputType(uint key)
+    {
+        return key == MouseButtonCodes.XButton1 || key == MouseButtonCodes.XButton2
+            ? InputType.Mouse
+            : InputType.Keyboard;
+    }
+
+    /// <summary>
+     /// 输入类型（键盘/鼠标）
+     /// </summary>
     public InputType InputType { get; set; } = InputType.Keyboard;
 
     /// <summary>

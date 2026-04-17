@@ -36,6 +36,7 @@
                             <controls:HotkeyTextBox Grid.Column="2"
                                                    HotkeyValue="{Binding Key, Mode=TwoWay}"
                                                    Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   InputType="{Binding InputType, Mode=TwoWay}"
                                                    ToolTip="{Binding ConflictTooltip}"
                                                    Style="{StaticResource HotkeyTextBoxStyle}"/>
                         </Grid>
@@ -58,6 +59,7 @@
                             <controls:HotkeyTextBox Grid.Column="2"
                                                    HotkeyValue="{Binding Key, Mode=TwoWay}"
                                                    Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   InputType="{Binding InputType, Mode=TwoWay}"
                                                    ToolTip="{Binding ConflictTooltip}"
                                                    Style="{StaticResource HotkeyTextBoxStyle}"/>
                         </Grid>
@@ -80,6 +82,7 @@
                             <controls:HotkeyTextBox Grid.Column="2"
                                                    HotkeyValue="{Binding Key, Mode=TwoWay}"
                                                    Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   InputType="{Binding InputType, Mode=TwoWay}"
                                                    ToolTip="{Binding ConflictTooltip}"
                                                    Style="{StaticResource HotkeyTextBoxStyle}"/>
                         </Grid>
@@ -102,6 +105,7 @@
                             <controls:HotkeyTextBox Grid.Column="2"
                                                    HotkeyValue="{Binding Key, Mode=TwoWay}"
                                                    Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   InputType="{Binding InputType, Mode=TwoWay}"
                                                    ToolTip="{Binding ConflictTooltip}"
                                                    Style="{StaticResource HotkeyTextBoxStyle}"/>
                         </Grid>
@@ -124,6 +128,7 @@
                             <controls:HotkeyTextBox Grid.Column="2"
                                                    HotkeyValue="{Binding Key, Mode=TwoWay}"
                                                    Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   InputType="{Binding InputType, Mode=TwoWay}"
                                                    ToolTip="{Binding ConflictTooltip}"
                                                    Style="{StaticResource HotkeyTextBoxStyle}"/>
                         </Grid>
@@ -146,6 +151,7 @@
                             <controls:HotkeyTextBox Grid.Column="2"
                                                    HotkeyValue="{Binding Key, Mode=TwoWay}"
                                                    Modifiers="{Binding Modifiers, Mode=TwoWay}"
+                                                   InputType="{Binding InputType, Mode=TwoWay}"
                                                    ToolTip="{Binding ConflictTooltip}"
                                                    Style="{StaticResource HotkeyTextBoxStyle}"/>
                         </Grid>

@@ -180,5 +180,17 @@ public class HotkeyBindingPropertyTests
         // Assert
         Assert.Equal(string.Empty, displayText);
     }
+
+    [Fact]
+    public void InferInputType_XButton1_ReturnsMouse()
+    {
+        Assert.Equal(InputType.Mouse, HotkeyBinding.InferInputType(MouseButtonCodes.XButton1));
+    }
+
+    [Fact]
+    public void InferInputType_RegularKey_ReturnsKeyboard()
+    {
+        Assert.Equal(InputType.Keyboard, HotkeyBinding.InferInputType(0x41));
+    }
 }
 }

@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using ConfigModifierKeys = AkashaNavigator.Models.Config.ModifierKeys;
+using ConfigInputType = AkashaNavigator.Models.Config.InputType;
 
 namespace AkashaNavigator.Controls
 {
@@ -36,6 +37,16 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
             typeof(HotkeyTextBox),
             new PropertyMetadata(ConfigModifierKeys.None, OnModifiersPropertyChanged));
 
+    /// <summary>
+    /// 输入类型依赖属性
+    /// </summary>
+    public static readonly DependencyProperty InputTypeProperty =
+        DependencyProperty.Register(
+            nameof(InputType),
+            typeof(ConfigInputType),
+            typeof(HotkeyTextBox),
+            new PropertyMetadata(ConfigInputType.Keyboard, OnInputTypePropertyChanged));
+
     #endregion
 
     #region Properties
@@ -56,6 +67,15 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
     {
         get => (ConfigModifierKeys)GetValue(ModifiersProperty);
         set => SetValue(ModifiersProperty, value);
+    }
+
+    /// <summary>
+    /// 输入类型（双向绑定）
+    /// </summary>
+    public ConfigInputType InputType
+    {
+        get => (ConfigInputType)GetValue(InputTypeProperty);
+        set => SetValue(InputTypeProperty, value);
     }
 
     #endregion
@@ -86,6 +106,7 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
 
         PreviewKeyDown += OnPreviewKeyDown;
         KeyDown += OnKeyDown;
+        PreviewMouseDown += OnPreviewMouseDown;
         PreviewTextInput += OnPreviewTextInput;  // 阻止文本输入
         GotFocus += OnGotFocus;
         LostFocus += OnLostFocus;
@@ -177,16 +198,36 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
             var modifiers = GetModifierKeys(isSystemKey);
 
             e.Handled = true;
+            SetHotkey(vkCode, modifiers, ConfigInputType.Keyboard);
+        }
+        finally
+        {
+            _isProcessingKey = false;
+        }
+    }
 
-            // 更新绑定属性（触发双向绑定）
-            HotkeyValue = vkCode;
-            Modifiers = modifiers;
+    private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_isProcessingKey)
+            return;
 
-            // 刷新显示
-            UpdateDisplayText();
+        uint mouseButton = e.ChangedButton switch
+        {
+            MouseButton.XButton1 => MouseButtonCodes.XButton1,
+            MouseButton.XButton2 => MouseButtonCodes.XButton2,
+            _ => 0
+        };
 
-            // 将焦点返回给窗口
-            MoveFocusToWindow();
+        if (mouseButton == 0)
+            return;
+
+        _isProcessingKey = true;
+
+        try
+        {
+            e.Handled = true;
+            var modifiers = GetModifierKeys(isSystemKey: false);
+            SetHotkey(mouseButton, modifiers, ConfigInputType.Mouse);
         }
         finally
         {
@@ -212,6 +253,14 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
         if (d is HotkeyTextBox textBox)
         {
             // 总是更新显示文本
+            textBox.UpdateDisplayText();
+        }
+    }
+
+    private static void OnInputTypePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is HotkeyTextBox textBox)
+        {
             textBox.UpdateDisplayText();
         }
     }
@@ -257,6 +306,16 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
     {
         HotkeyValue = 0;
         Modifiers = ConfigModifierKeys.None;
+        InputType = ConfigInputType.Keyboard;
+    }
+
+    private void SetHotkey(uint key, ConfigModifierKeys modifiers, ConfigInputType inputType)
+    {
+        HotkeyValue = key;
+        Modifiers = modifiers;
+        InputType = inputType;
+        UpdateDisplayText();
+        MoveFocusToWindow();
     }
 
     /// <summary>
