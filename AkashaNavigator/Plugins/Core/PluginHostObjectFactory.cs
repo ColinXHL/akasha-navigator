@@ -70,7 +70,7 @@ public sealed class PluginHostObjectFactory : IPluginHostObjectFactory
 
     public PanelApi CreatePanelApi(PluginContext context, ConfigApi configApi)
     {
-        return new PanelApi(context, configApi, _panelManager);
+        return new PanelApi(context, configApi, _panelManager, _runtimeBridge);
     }
 
     public SubtitleApi CreateSubtitleApi(PluginContext context, V8ScriptEngine engine, EventManager eventManager)

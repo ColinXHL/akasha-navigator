@@ -338,6 +338,8 @@ public static class PluginEngine
                     context,
                     configApi,
                     RequireLegacyOption(options.PanelManager, nameof(PluginEngineOptions.PanelManager),
+                                        nameof(PanelApi)),
+                    RequireLegacyOption(options.RuntimeBridge, nameof(PluginEngineOptions.RuntimeBridge),
                                         nameof(PanelApi)));
             engine.AddHostObject("panel", panelApi);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: panel");

@@ -18,15 +18,18 @@ public class PanelApi
     private readonly PluginContext _context;
     private readonly ConfigApi _configApi;
     private readonly IPanelManager _panelManager;
+    private readonly IPlayerRuntimeBridge? _runtimeBridge;
     private readonly EventManager _eventManager;
 
     private PluginPanelWindow? _boundPanel;
 
-    public PanelApi(PluginContext context, ConfigApi configApi, IPanelManager panelManager)
+    public PanelApi(PluginContext context, ConfigApi configApi, IPanelManager panelManager,
+                    IPlayerRuntimeBridge? runtimeBridge = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _configApi = configApi ?? throw new ArgumentNullException(nameof(configApi));
         _panelManager = panelManager ?? throw new ArgumentNullException(nameof(panelManager));
+        _runtimeBridge = runtimeBridge;
         _eventManager = new EventManager();
     }
 
@@ -45,7 +48,24 @@ public class PanelApi
         try
         {
             var panel = EnsurePanel();
-            System.Windows.Application.Current?.Dispatcher.Invoke(() => panel?.Show());
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                if (panel == null)
+                    return;
+
+                // 将面板绑定到播放器窗口，确保面板始终位于播放器之上
+                if (panel.Owner == null)
+                {
+                    var playerWindow = _runtimeBridge?.GetPlayerWindow();
+                    if (playerWindow != null)
+                    {
+                        panel.Owner = playerWindow;
+                        panel.ShowActivated = false;
+                    }
+                }
+
+                panel.Show();
+            });
         }
         catch
         {
