@@ -60,10 +60,12 @@ public class PanelApi
                     if (playerWindow != null)
                     {
                         panel.Owner = playerWindow;
-                        panel.ShowActivated = false;
                     }
                 }
 
+                // 呼出面板时聚焦面板，使鼠标从游戏中释放，可操作面板内容
+                // 游戏会锁定鼠标到中央，必须聚焦面板才能释放鼠标
+                panel.ShowActivated = true;
                 panel.Show();
             });
         }
@@ -78,7 +80,17 @@ public class PanelApi
         try
         {
             var panel = _panelManager.GetPanel(_context.PluginId);
-            System.Windows.Application.Current?.Dispatcher.Invoke(() => panel?.Hide());
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                panel?.Hide();
+
+                // 关闭面板时将焦点还给播放器窗口，使游戏重新捕获鼠标
+                var playerWindow = _runtimeBridge?.GetPlayerWindow();
+                if (playerWindow != null && playerWindow.IsVisible)
+                {
+                    playerWindow.Activate();
+                }
+            });
         }
         catch
         {
@@ -91,6 +103,13 @@ public class PanelApi
         try
         {
             _panelManager.DestroyPanel(_context.PluginId);
+
+            // 销毁面板后将焦点还给播放器窗口，使游戏重新捕获鼠标
+            var playerWindow = _runtimeBridge?.GetPlayerWindow();
+            if (playerWindow != null && playerWindow.IsVisible)
+            {
+                System.Windows.Application.Current?.Dispatcher.Invoke(() => playerWindow.Activate());
+            }
         }
         catch
         {
