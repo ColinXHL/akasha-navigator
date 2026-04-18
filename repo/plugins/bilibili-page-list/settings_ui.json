@@ -83,7 +83,7 @@
           "type": "checkbox",
           "key": "panel.topmost",
           "label": "始终置顶",
-          "default": false
+          "default": true
         }
       ]
     },
