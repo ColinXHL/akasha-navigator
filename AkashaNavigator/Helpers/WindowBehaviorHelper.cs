@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Config;
 using Serilog;
 
@@ -11,6 +12,7 @@ namespace AkashaNavigator.Helpers
 /// <summary>
 /// 窗口行为辅助类
 /// 提取窗口边缘吸附和透明度控制逻辑
+/// 支持多显示器：使用 IMonitorLayoutService 获取当前显示器信息
 /// </summary>
 public class WindowBehaviorHelper
 {
@@ -19,6 +21,7 @@ public class WindowBehaviorHelper
 
     private readonly Window _window;
     private AppConfig _config;
+    private readonly IMonitorLayoutService? _monitorLayoutService;
 
     // 拖动相关
     private Win32Helper.POINT _dragOffset;
@@ -44,11 +47,14 @@ public class WindowBehaviorHelper
     /// <param name="window">目标窗口</param>
     /// <param name="config">应用配置</param>
     /// <param name="initialOpacity">初始透明度</param>
-    public WindowBehaviorHelper(Window window, AppConfig config, double initialOpacity = 1.0)
+    /// <param name="monitorLayoutService">显示器布局服务（可选，为 null 时回退到 SystemParameters）</param>
+    public WindowBehaviorHelper(Window window, AppConfig config, double initialOpacity = 1.0,
+                                IMonitorLayoutService? monitorLayoutService = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _windowOpacity = initialOpacity;
+        _monitorLayoutService = monitorLayoutService;
     }
 
 #endregion
@@ -355,8 +361,8 @@ public class WindowBehaviorHelper
         _isDragging = false;
     }
 
-    /// <summary>
-    /// 处理窗口移动时的边缘吸附
+/// <summary>
+    /// 处理窗口移动时的边缘吸附（多显示器感知）
     /// </summary>
     /// <param name="hwnd">窗口句柄</param>
     /// <param name="lParam">RECT 指针</param>
@@ -377,14 +383,25 @@ public class WindowBehaviorHelper
         int snapThreshold = _config.EnableEdgeSnap ? _config.SnapThreshold : 0;
         int threshold = (int)(snapThreshold * dpiScale);
 
-        // 获取工作区（物理像素）- 排除任务栏
-        var workAreaWpf = SystemParameters.WorkArea;
-        var workArea = Win32Helper.ToPhysicalRect(workAreaWpf, dpiScale);
-
-        // 获取屏幕完整区域（物理像素）- 包括任务栏
-        var screenRect =
-            new Win32Helper.RECT { Left = 0, Top = 0, Right = (int)(SystemParameters.PrimaryScreenWidth * dpiScale),
-                                   Bottom = (int)(SystemParameters.PrimaryScreenHeight * dpiScale) };
+        // 获取当前显示器信息（多显示器感知）
+        Win32Helper.RECT workArea;
+        Win32Helper.RECT screenRect;
+        if (_monitorLayoutService != null)
+        {
+            var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(hwnd);
+            workArea = monitor.WorkAreaRect;
+            screenRect = monitor.MonitorRect;
+        }
+        else
+        {
+            // 回退到 SystemParameters（仅主显示器）
+            var workAreaWpf = SystemParameters.WorkArea;
+            workArea = Win32Helper.ToPhysicalRect(workAreaWpf, dpiScale);
+            screenRect =
+                new Win32Helper.RECT { Left = 0, Top = 0,
+                                       Right = (int)(SystemParameters.PrimaryScreenWidth * dpiScale),
+                                       Bottom = (int)(SystemParameters.PrimaryScreenHeight * dpiScale) };
+        }
 
         // 获取窗口当前大小
         var rect = Marshal.PtrToStructure<Win32Helper.RECT>(lParam);
@@ -436,7 +453,7 @@ public class WindowBehaviorHelper
     }
 
     /// <summary>
-    /// 处理窗口调整大小时的边缘吸附
+    /// 处理窗口调整大小时的边缘吸附（多显示器感知）
     /// </summary>
     /// <param name="wParam">调整方向</param>
     /// <param name="lParam">RECT 指针</param>
@@ -453,9 +470,20 @@ public class WindowBehaviorHelper
         int snapThreshold = _config.EnableEdgeSnap ? _config.SnapThreshold : 0;
         int threshold = (int)(snapThreshold * dpiScale);
 
-        // 获取工作区（物理像素）
-        var workAreaWpf = SystemParameters.WorkArea;
-        var workArea = Win32Helper.ToPhysicalRect(workAreaWpf, dpiScale);
+        // 获取当前显示器工作区（多显示器感知）
+        Win32Helper.RECT workArea;
+        if (_monitorLayoutService != null)
+        {
+            var hwnd = new WindowInteropHelper(_window).Handle;
+            var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(hwnd);
+            workArea = monitor.WorkAreaRect;
+        }
+        else
+        {
+            // 回退到 SystemParameters（仅主显示器）
+            var workAreaWpf = SystemParameters.WorkArea;
+            workArea = Win32Helper.ToPhysicalRect(workAreaWpf, dpiScale);
+        }
 
         int sizingEdge = wParam.ToInt32();
         var rect = Marshal.PtrToStructure<Win32Helper.RECT>(lParam);

@@ -38,7 +38,7 @@ public partial class PlayerWindow : Window
     // ViewModel
     private readonly PlayerViewModel _viewModel;
 
-    // DI注入的服务（保留用于 Code-Behind UI 逻辑）
+// DI注入的服务（保留用于 Code-Behind UI 逻辑）
     private readonly IConfigService _configService;
     private readonly IProfileManager _profileManager;
     private readonly IWindowStateService _windowStateService;
@@ -53,6 +53,7 @@ public partial class PlayerWindow : Window
     private readonly Func<PioneerNoteWindow> _pioneerNoteWindowFactory;
     private readonly ScriptExecutionQueue _scriptQueue;
     private readonly IPioneerNoteService _pioneerNoteService;
+    private readonly IMonitorLayoutService _monitorLayoutService;
 
     /// <summary>
     /// 是否最大化
@@ -63,6 +64,17 @@ public partial class PlayerWindow : Window
     /// 最大化前的窗口边界
     /// </summary>
     private Rect _restoreBounds;
+
+    /// <summary>
+    /// 当前窗口所在显示器的设备名称
+    /// 用于检测窗口是否移动到了其他显示器
+    /// </summary>
+    private string? _currentMonitorDeviceName;
+
+    /// <summary>
+    /// 是否已安排拖动完成后的显示器更新
+    /// </summary>
+    private bool _isMonitorUpdateScheduled;
 
     /// <summary>
     /// 当前配置引用
@@ -128,13 +140,14 @@ public partial class PlayerWindow : Window
 
 #region Constructor
 
-    public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IProfileManager profileManager,
+public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IProfileManager profileManager,
                         IWindowStateService windowStateService, ISubtitleService subtitleService,
                         IDataService dataService, IPluginHost pluginHost, ILogService logService,
                         ICursorDetectionService cursorDetectionService, IEventBus eventBus,
                         IDialogFactory dialogFactory, OsdManager osdManager,
                         Func<PioneerNoteWindow> pioneerNoteWindowFactory,
-                        ScriptExecutionQueue scriptQueue, IPioneerNoteService pioneerNoteService)
+                        ScriptExecutionQueue scriptQueue, IPioneerNoteService pioneerNoteService,
+                        IMonitorLayoutService monitorLayoutService)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
@@ -153,6 +166,7 @@ public partial class PlayerWindow : Window
             pioneerNoteWindowFactory ?? throw new ArgumentNullException(nameof(pioneerNoteWindowFactory));
         _scriptQueue = scriptQueue ?? throw new ArgumentNullException(nameof(scriptQueue));
         _pioneerNoteService = pioneerNoteService ?? throw new ArgumentNullException(nameof(pioneerNoteService));
+        _monitorLayoutService = monitorLayoutService ?? throw new ArgumentNullException(nameof(monitorLayoutService));
 
         _resizeHintHoverTimer = new DispatcherTimer
                                 {
@@ -262,7 +276,8 @@ public partial class PlayerWindow : Window
 
     /// <summary>
     /// 初始化窗口位置和大小
-    /// 从 WindowStateService 加载上次保存的状态
+    /// 从 WindowStateService 加载上次保存的状态，并在可用时恢复到同一显示器
+    /// 如果保存的显示器不可用，自动回退到可见区域
     /// </summary>
     private void InitializeWindowPosition()
     {
@@ -274,17 +289,90 @@ public partial class PlayerWindow : Window
         Width = Math.Max(state.Width, AppConstants.MinWindowWidth);
         Height = Math.Max(state.Height, AppConstants.MinWindowHeight);
 
-        // 确保窗口在屏幕范围内（允许延伸到任务栏区域）
+        // 尝试恢复到保存的显示器
+        if (!string.IsNullOrEmpty(state.MonitorDeviceName))
+        {
+            var monitor = _monitorLayoutService.FindMonitorByDeviceName(state.MonitorDeviceName);
+            if (monitor != null)
+            {
+                // 保存的显示器可用，确保窗口在该显示器的可见范围内
+                var source = PresentationSource.FromVisual(this);
+                double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                var workArea = monitor.GetWorkAreaAsWpfRect(dpiScale);
+
+                // 确保窗口在工作区内
+                if (Left < workArea.Left)
+                    Left = workArea.Left;
+                if (Top < workArea.Top)
+                    Top = workArea.Top;
+                if (Left + Width > workArea.Right)
+                    Left = workArea.Right - Width;
+                if (Top + Height > workArea.Bottom)
+                    Top = workArea.Bottom - Height;
+
+                // 记录当前显示器
+                _currentMonitorDeviceName = monitor.DeviceName;
+            }
+            else
+            {
+                // 保存的显示器不可用，使用当前显示器回退
+                EnsureWindowVisibleOnAnyMonitor();
+            }
+        }
+        else
+        {
+            // 没有保存的显示器信息，使用 SystemParameters 回退（向后兼容）
+            EnsureWindowVisibleOnPrimary();
+        }
+    }
+
+    /// <summary>
+    /// 确保窗口在主显示器可见区域内（向后兼容旧配置）
+    /// </summary>
+    private void EnsureWindowVisibleOnPrimary()
+    {
         var workArea = SystemParameters.WorkArea;
-        double screenHeight = SystemParameters.PrimaryScreenHeight;
         if (Left < workArea.Left)
             Left = workArea.Left;
         if (Top < workArea.Top)
             Top = workArea.Top;
         if (Left + Width > workArea.Right)
             Left = workArea.Right - Width;
-        if (Top + Height > screenHeight)
-            Top = screenHeight - Height; // 使用屏幕高度而非工作区
+        if (Top + Height > workArea.Top + workArea.Height)
+            Top = workArea.Top + workArea.Height - Height;
+    }
+
+    /// <summary>
+    /// 确保窗口在任意可用显示器上可见
+    /// 使用当前窗口位置查找最近显示器，并确保窗口在其可见范围内
+    /// </summary>
+    private void EnsureWindowVisibleOnAnyMonitor()
+    {
+        // 窗口句柄可能尚未创建，延迟到 SourceInitialized 后处理
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            // 窗口句柄还未创建，回退到主显示器
+            EnsureWindowVisibleOnPrimary();
+            return;
+        }
+
+        var source = PresentationSource.FromVisual(this);
+        double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+
+        var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(hwnd);
+        var workArea = monitor.GetWorkAreaAsWpfRect(dpiScale);
+
+        if (Left < workArea.Left)
+            Left = workArea.Left;
+        if (Top < workArea.Top)
+            Top = workArea.Top;
+        if (Left + Width > workArea.Right)
+            Left = workArea.Right - Width;
+        if (Top + Height > workArea.Bottom)
+            Top = workArea.Bottom - Height;
+
+        _currentMonitorDeviceName = monitor.DeviceName;
     }
 
     /// <summary>
@@ -293,10 +381,10 @@ public partial class PlayerWindow : Window
     private void InitializeWindowBehavior()
     {
         var state = _windowStateService.Load();
-        _windowBehavior = new WindowBehaviorHelper(this, _config, state.Opacity);
+        _windowBehavior = new WindowBehaviorHelper(this, _config, state.Opacity, _monitorLayoutService);
     }
 
-    /// <summary>
+/// <summary>
     /// 保存窗口状态
     /// </summary>
     private void SaveWindowState()
@@ -315,6 +403,18 @@ public partial class PlayerWindow : Window
             state.Top = Top;
             state.Width = Width;
             state.Height = Height;
+        }
+
+        // 保存当前显示器信息
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero)
+        {
+            var currentMonitor = _monitorLayoutService.GetMonitorFromWindow(hwnd);
+            state.MonitorDeviceName = currentMonitor?.DeviceName ?? _currentMonitorDeviceName;
+        }
+        else
+        {
+            state.MonitorDeviceName = _currentMonitorDeviceName;
         }
 
         state.Opacity = _windowBehavior.WindowOpacity;
@@ -624,6 +724,7 @@ public partial class PlayerWindow : Window
 
     /// <summary>
     /// 切换最大化/还原
+    /// 使用当前显示器的工作区域，确保最大化到窗口所在显示器而非主显示器
     /// </summary>
     public void ToggleMaximize()
     {
@@ -634,8 +735,16 @@ public partial class PlayerWindow : Window
             // 暂停鼠标检测（全屏时不需要降低透明度）
             _cursorDetectionService.Suspend();
 
+            // 保存当前窗口边界用于还原
             _restoreBounds = new Rect(Left, Top, Width, Height);
-            var workArea = SystemParameters.WorkArea;
+
+            // 使用当前显示器的工作区域进行最大化
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(hwnd);
+            var source = PresentationSource.FromVisual(this);
+            double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            var workArea = monitor.GetWorkAreaAsWpfRect(dpiScale);
+
             Left = workArea.Left;
             Top = workArea.Top;
             Width = workArea.Width;
@@ -673,6 +782,44 @@ public partial class PlayerWindow : Window
                 Source = "maximize_resume"
             });
         }
+
+        // 更新当前显示器信息并发布事件
+        UpdateCurrentMonitor();
+    }
+
+    /// <summary>
+    /// 更新当前显示器信息，如果显示器发生变化则发布事件
+    /// </summary>
+    private void UpdateCurrentMonitor()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+            return;
+
+        var currentMonitor = _monitorLayoutService.GetMonitorFromWindow(hwnd);
+        var newDeviceName = currentMonitor?.DeviceName;
+
+        if (newDeviceName != _currentMonitorDeviceName)
+        {
+            _currentMonitorDeviceName = newDeviceName;
+            _eventBus.Publish(new PlayerMonitorChangedEvent { MonitorInfo = currentMonitor });
+        }
+    }
+
+    /// <summary>
+    /// 在拖动/缩放完全结束并且 UI 稳定后，再更新当前显示器
+    /// </summary>
+    private void ScheduleUpdateCurrentMonitorAfterMoveComplete()
+    {
+        if (_isMonitorUpdateScheduled)
+            return;
+
+        _isMonitorUpdateScheduled = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        {
+            _isMonitorUpdateScheduled = false;
+            UpdateCurrentMonitor();
+        }));
     }
 
 #endregion
@@ -1171,6 +1318,8 @@ private void BroadcastClickThroughChanged(string source)
         case Win32Helper.WM_EXITSIZEMOVE:
             // 结束拖动：委托给 WindowBehaviorHelper
             _windowBehavior.HandleExitSizeMove();
+            // 拖动完全结束后再检测窗口是否移动到了其他显示器，通知控制栏跟随
+            ScheduleUpdateCurrentMonitorAfterMoveComplete();
             break;
 
         case Win32Helper.WM_MOVING:

@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Events.Events;
+using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Services;
 using AkashaNavigator.ViewModels.Windows;
@@ -28,6 +29,7 @@ public enum ControlBarDisplayState
 /// <summary>
 /// ControlBarWindow - URL 控制栏窗口
 /// 采用混合架构：Code-Behind 处理 UI 逻辑，ViewModel 处理业务逻辑
+/// 支持多显示器：跟随播放器窗口所在显示器定位
 /// </summary>
 public partial class ControlBarWindow : Window
 {
@@ -36,8 +38,10 @@ public partial class ControlBarWindow : Window
 
 private readonly ControlBarViewModel _viewModel;
     private readonly PlayerWindow _playerWindow;
-    private readonly ControlBarDisplayController _displayController;
+private readonly ControlBarDisplayController _displayController;
     private readonly IEventBus _eventBus;
+    private readonly IMonitorLayoutService _monitorLayoutService;
+    private readonly IWindowStateService _windowStateService;
 
     /// <summary>
     /// 是否正在拖动
@@ -79,19 +83,29 @@ private readonly ControlBarViewModel _viewModel;
     /// </summary>
     private const double ContentMargin = 4;
 
+    /// <summary>
+    /// 控制栏中心点在当前显示器工作区中的横向比例（0-1）
+    /// 0.5 表示居中；拖动后会更新，用于跨显示器重新计算位置
+    /// </summary>
+    private double _centerAnchorRatio = 0.5;
+
 #endregion
 
 #region Constructor
 
 public ControlBarWindow(ControlBarViewModel viewModel,
-                            PlayerWindow playerWindow,
-                            ControlBarDisplayController displayController,
-                            IEventBus eventBus)
+                             PlayerWindow playerWindow,
+                             ControlBarDisplayController displayController,
+                             IEventBus eventBus,
+                             IMonitorLayoutService monitorLayoutService,
+                             IWindowStateService windowStateService)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _playerWindow = playerWindow ?? throw new ArgumentNullException(nameof(playerWindow));
         _displayController = displayController ?? throw new ArgumentNullException(nameof(displayController));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _monitorLayoutService = monitorLayoutService ?? throw new ArgumentNullException(nameof(monitorLayoutService));
+        _windowStateService = windowStateService ?? throw new ArgumentNullException(nameof(windowStateService));
 
         InitializeComponent();
         DataContext = _viewModel;
@@ -104,6 +118,12 @@ public ControlBarWindow(ControlBarViewModel viewModel,
 
         // 订阅老板键隐藏模式变化事件（窗口隐藏时抑制控制栏自动显示）
         _eventBus.Subscribe<BossKeyHiddenModeChangedEvent>(OnBossKeyHiddenModeChanged);
+
+        // 订阅播放器显示器变化事件，跟随播放器移动到其他显示器
+        _eventBus.Subscribe<PlayerMonitorChangedEvent>(OnPlayerMonitorChanged);
+
+        // 订阅显示拓扑变化事件（显示器热插拔）
+        _eventBus.Subscribe<DisplayTopologyChangedEvent>(OnDisplayTopologyChanged);
 
         // 窗口失去激活状态时清除输入框焦点
         Deactivated += (s, e) =>
@@ -121,8 +141,12 @@ public ControlBarWindow(ControlBarViewModel viewModel,
             }
         };
 
-        // 窗口关闭时停止定时器
-        Closing += (s, e) => StopAutoShowHide();
+        // 窗口关闭时停止定时器并持久化控制栏位置
+        Closing += (s, e) =>
+        {
+            SaveControlBarState(updateAnchorFromWindowPosition: true);
+            StopAutoShowHide();
+        };
 
         // 订阅 ViewModel 属性变化事件以更新 UI
         SubscribeToViewModelChanges();
@@ -178,22 +202,202 @@ public ControlBarWindow(ControlBarViewModel viewModel,
 
     /// <summary>
     /// 初始化窗口位置和大小
-    /// 位置：屏幕顶部，水平居中
-    /// 宽度：屏幕宽度的 1/3
+    /// 位置：播放器所在显示器顶部，水平居中
+    /// 宽度：显示器宽度的 1/3
     /// </summary>
     private void InitializeWindowPosition()
     {
-        // 获取主屏幕工作区域
-        var workArea = SystemParameters.WorkArea;
+        var state = _windowStateService.Load();
+        _centerAnchorRatio = Math.Clamp(state.ControlBarCenterAnchorRatio, 0.0, 1.0);
 
-        // 计算宽度：屏幕宽度的 1/3，最小 400px
-        Width = Math.Max(workArea.Width / 3, 400);
+        // 获取播放器窗口所在显示器信息
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
+        MonitorInfo? monitor = null;
 
-        // 水平居中
-        Left = workArea.Left + (workArea.Width - Width) / 2;
+        if (!string.IsNullOrWhiteSpace(state.ControlBarMonitorDeviceName))
+        {
+            monitor = _monitorLayoutService.FindMonitorByDeviceName(state.ControlBarMonitorDeviceName);
+        }
 
-        // 顶部定位（留 2px 边距）
-        Top = workArea.Top + 2;
+        if (hwnd != IntPtr.Zero)
+        {
+            monitor ??= _monitorLayoutService.GetMonitorFromWindow(hwnd);
+        }
+
+        monitor ??= _monitorLayoutService.GetPrimaryMonitor();
+        ApplyAnchorToMonitor(monitor);
+        SaveControlBarState(monitor, updateAnchorFromWindowPosition: false);
+    }
+
+    /// <summary>
+    /// 播放器显示器变化回调
+    /// 当播放器移动到其他显示器时，控制栏跟随到同一显示器
+    /// </summary>
+    private void OnPlayerMonitorChanged(PlayerMonitorChangedEvent e)
+    {
+        // 确保在 UI 线程执行
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnPlayerMonitorChanged(e));
+            return;
+        }
+
+        if (e.MonitorInfo == null)
+            return;
+
+        ApplyAnchorToMonitor(e.MonitorInfo);
+        SaveControlBarState(e.MonitorInfo, updateAnchorFromWindowPosition: false);
+    }
+
+    /// <summary>
+    /// 显示拓扑变化回调
+    /// 处理显示器热插拔（连接/断开）
+    /// </summary>
+    private void OnDisplayTopologyChanged(DisplayTopologyChangedEvent e)
+    {
+        // 确保在 UI 线程执行
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnDisplayTopologyChanged(e));
+            return;
+        }
+
+        // 重新定位，确保控制栏在有效显示器上
+        RepositionToPlayerMonitor();
+    }
+
+    /// <summary>
+    /// 将控制栏重新定位到播放器所在的显示器
+    /// </summary>
+    private void RepositionToPlayerMonitor()
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
+        if (hwnd == IntPtr.Zero)
+            return;
+
+        var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(hwnd);
+        ApplyAnchorToMonitor(monitor);
+        SaveControlBarState(monitor, updateAnchorFromWindowPosition: false);
+    }
+
+    /// <summary>
+    /// 获取指定显示器对应的 WPF 工作区坐标
+    /// 优先使用播放器窗口的 DPI，上屏切换时更稳定
+    /// </summary>
+    private double GetPlayerDpiScale()
+    {
+        var playerSource = PresentationSource.FromVisual(_playerWindow);
+        return playerSource?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+    }
+
+    /// <summary>
+    /// 根据已保存的中心锚点比例，将控制栏定位到目标显示器（以物理像素为基准，避免累计偏移）
+    /// </summary>
+    private void ApplyAnchorToMonitor(MonitorInfo monitor)
+    {
+        double dpiScale = GetPlayerDpiScale();
+        double workAreaWidthPx = monitor.WorkAreaRect.Right - monitor.WorkAreaRect.Left;
+        double workAreaHeightPx = monitor.WorkAreaRect.Bottom - monitor.WorkAreaRect.Top;
+        double widthPx = Math.Max(workAreaWidthPx / 3.0, 400.0 * dpiScale);
+        double heightPx = ActualHeight > 0 ? ActualHeight * dpiScale : Height * dpiScale;
+        if (heightPx <= 0)
+        {
+            heightPx = 64.0 * dpiScale;
+        }
+
+        double desiredCenterPx = monitor.WorkAreaRect.Left + (workAreaWidthPx * _centerAnchorRatio);
+        double minCenterPx = monitor.WorkAreaRect.Left + widthPx / 2.0;
+        double maxCenterPx = monitor.WorkAreaRect.Right - widthPx / 2.0;
+        double actualCenterPx = Math.Max(minCenterPx, Math.Min(desiredCenterPx, maxCenterPx));
+        double leftPx = actualCenterPx - widthPx / 2.0;
+        double topPx = monitor.WorkAreaRect.Top + (2.0 * dpiScale);
+
+        ApplyPhysicalBounds(leftPx, topPx, widthPx, Math.Min(heightPx, workAreaHeightPx));
+    }
+
+    /// <summary>
+    /// 使用单一物理像素坐标系应用窗口位置和大小
+    /// </summary>
+    private void ApplyPhysicalBounds(double leftPx, double topPx, double widthPx, double heightPx)
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero)
+        {
+            Win32Helper.SetWindowRectangle(hwnd,
+                                           (int)Math.Round(leftPx),
+                                           (int)Math.Round(topPx),
+                                           (int)Math.Round(widthPx),
+                                           (int)Math.Round(heightPx));
+            return;
+        }
+
+        double dpiScale = GetPlayerDpiScale();
+        Width = widthPx / dpiScale;
+        Height = heightPx / dpiScale;
+        Left = leftPx / dpiScale;
+        Top = topPx / dpiScale;
+    }
+
+    /// <summary>
+    /// 根据当前窗口物理位置更新中心锚点比例，用于跨显示器保持相对位置
+    /// </summary>
+    private void UpdateAnchorFromCurrentPosition(MonitorInfo monitor)
+    {
+        double workAreaWidthPx = monitor.WorkAreaRect.Right - monitor.WorkAreaRect.Left;
+        if (workAreaWidthPx <= 0)
+        {
+            _centerAnchorRatio = 0.5;
+            return;
+        }
+
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero && Win32Helper.GetWindowRectangle(hwnd, out Win32Helper.RECT rect))
+        {
+            double centerXPx = rect.Left + ((rect.Right - rect.Left) / 2.0);
+            _centerAnchorRatio = Math.Clamp((centerXPx - monitor.WorkAreaRect.Left) / workAreaWidthPx, 0.0, 1.0);
+            return;
+        }
+    }
+
+    /// <summary>
+    /// 保存控制栏锚点和显示器信息
+    /// </summary>
+    private void SaveControlBarState(MonitorInfo? monitor = null, bool updateAnchorFromWindowPosition = true)
+    {
+        monitor ??= ResolveCurrentControlBarMonitor();
+        if (monitor == null)
+            return;
+
+        if (updateAnchorFromWindowPosition)
+        {
+            UpdateAnchorFromCurrentPosition(monitor);
+        }
+
+        _windowStateService.Update(state =>
+        {
+            state.ControlBarCenterAnchorRatio = _centerAnchorRatio;
+            state.ControlBarMonitorDeviceName = monitor.DeviceName;
+        });
+    }
+
+    /// <summary>
+    /// 获取当前控制栏所在显示器，失败时回退到播放器显示器
+    /// </summary>
+    private MonitorInfo? ResolveCurrentControlBarMonitor()
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero)
+        {
+            return _monitorLayoutService.GetMonitorFromWindow(hwnd);
+        }
+
+        var playerHwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
+        if (playerHwnd != IntPtr.Zero)
+        {
+            return _monitorLayoutService.GetMonitorFromWindowOrDefault(playerHwnd);
+        }
+
+        return _monitorLayoutService.GetPrimaryMonitor();
     }
 
     /// <summary>
@@ -232,8 +436,16 @@ public ControlBarWindow(ControlBarViewModel viewModel,
         if (e.ClickCount == 1)
         {
             _isDragging = true;
-            _dragStartX = PointToScreen(e.GetPosition(this)).X;
-            _windowStartLeft = Left;
+
+            if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPoint))
+                return;
+
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero || !Win32Helper.GetWindowRectangle(hwnd, out Win32Helper.RECT rect))
+                return;
+
+            _dragStartX = cursorPoint.X;
+            _windowStartLeft = rect.Left;
 
             // 捕获鼠标
             Mouse.Capture(DragBar);
@@ -245,31 +457,51 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     }
 
     /// <summary>
-    /// 拖动条鼠标移动：执行水平拖动（带吸附）
+    /// 拖动条鼠标移动：执行水平拖动（带吸附，多显示器感知）
     /// </summary>
     private void DragBar_MouseMove(object sender, MouseEventArgs e)
     {
         if (_isDragging)
         {
-            var currentX = PointToScreen(e.GetPosition(this)).X;
-            var deltaX = currentX - _dragStartX;
+            if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPoint))
+                return;
+
+            var deltaX = cursorPoint.X - _dragStartX;
 
             // 计算新位置
             var newLeft = _windowStartLeft + deltaX;
 
-            // 获取工作区
-            var workArea = SystemParameters.WorkArea;
+            // 获取播放器所在显示器的工作区
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
+            Win32Helper.RECT workArea;
+            if (hwnd != IntPtr.Zero)
+            {
+                var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(hwnd);
+                workArea = monitor.WorkAreaRect;
+            }
+            else
+            {
+                var primary = _monitorLayoutService.GetPrimaryMonitor();
+                workArea = primary.WorkAreaRect;
+            }
 
-            // 限制在屏幕范围内
-            newLeft = Math.Max(workArea.Left, Math.Min(newLeft, workArea.Right - Width));
+            var controlBarHwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (controlBarHwnd == IntPtr.Zero || !Win32Helper.GetWindowRectangle(controlBarHwnd, out Win32Helper.RECT currentRect))
+                return;
+
+            double currentWidthPx = currentRect.Right - currentRect.Left;
+            double currentHeightPx = currentRect.Bottom - currentRect.Top;
+
+            // 限制在显示器工作区范围内
+            newLeft = Math.Max(workArea.Left, Math.Min(newLeft, workArea.Right - currentWidthPx));
 
             // 水平吸附：左侧、居中、右侧
-            const double snapThreshold = 20;
+            double snapThreshold = 20 * GetPlayerDpiScale();
 
             // 计算吸附位置
             double leftSnapPos = workArea.Left;
-            double centerSnapPos = workArea.Left + (workArea.Width - Width) / 2;
-            double rightSnapPos = workArea.Right - Width;
+            double centerSnapPos = workArea.Left + ((workArea.Right - workArea.Left) - currentWidthPx) / 2;
+            double rightSnapPos = workArea.Right - currentWidthPx;
 
             // 检查吸附
             if (Math.Abs(newLeft - leftSnapPos) <= snapThreshold)
@@ -285,7 +517,11 @@ public ControlBarWindow(ControlBarViewModel viewModel,
                 newLeft = rightSnapPos;
             }
 
-            Left = newLeft;
+            Win32Helper.SetWindowRectangle(controlBarHwnd,
+                                           (int)Math.Round(newLeft),
+                                           currentRect.Top,
+                                           (int)Math.Round(currentWidthPx),
+                                           (int)Math.Round(currentHeightPx));
         }
     }
 
@@ -297,6 +533,13 @@ public ControlBarWindow(ControlBarViewModel viewModel,
         if (_isDragging)
         {
             _isDragging = false;
+
+            var playerHwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
+            if (playerHwnd != IntPtr.Zero)
+            {
+                var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(playerHwnd);
+                SaveControlBarState(monitor, updateAnchorFromWindowPosition: true);
+            }
 
             // 释放鼠标捕获
             Mouse.Capture(null);
@@ -451,8 +694,9 @@ public ControlBarWindow(ControlBarViewModel viewModel,
 
     #region Auto Show / Hide Logic
 
-    /// <summary>
+/// <summary>
     /// 鼠标位置检测定时器回调
+    /// 多显示器感知：触发区域基于播放器所在显示器的完整区域
     /// </summary>
     private void MouseCheckTimer_Tick(object? sender, EventArgs e)
     {
@@ -475,9 +719,17 @@ public ControlBarWindow(ControlBarViewModel viewModel,
         if (!Win32Helper.GetCursorPosition(out Win32Helper.POINT cursorPos))
             return;
 
-        // 使用物理像素计算触发区域（避免 DPI 问题）
-        int screenHeight = Win32Helper.GetScreenMetrics(Win32Helper.SM_CYSCREEN);
-        int triggerAreaHeight = (int)(screenHeight * AppConstants.ControlBarTriggerAreaRatio);
+        // 使用播放器所在显示器的完整区域计算触发区域（避免 DPI 问题）
+        var playerHwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
+        MonitorInfo? playerMonitor = null;
+        if (playerHwnd != IntPtr.Zero)
+        {
+            playerMonitor = _monitorLayoutService.GetMonitorFromWindow(playerHwnd);
+        }
+        playerMonitor ??= _monitorLayoutService.GetPrimaryMonitor();
+
+        // 触发区域：显示器顶部的一定高度
+        int triggerAreaHeight = (int)((playerMonitor.MonitorRect.Bottom - playerMonitor.MonitorRect.Top) * AppConstants.ControlBarTriggerAreaRatio);
 
         // 获取窗口的屏幕坐标（物理像素）
         var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
@@ -493,8 +745,11 @@ public ControlBarWindow(ControlBarViewModel viewModel,
                                 cursorPos.Y <= windowRect.Bottom - ContentMargin;
         }
 
-        // 检查鼠标是否在屏幕顶部触发区域（整个屏幕宽度，使用物理像素）
-        bool isInTriggerArea = cursorPos.Y >= 0 && cursorPos.Y <= triggerAreaHeight;
+        // 检查鼠标是否在播放器显示器顶部的触发区域（整个显示器宽度，使用物理像素）
+        bool isInTriggerArea = cursorPos.X >= playerMonitor.MonitorRect.Left &&
+                               cursorPos.X <= playerMonitor.MonitorRect.Right &&
+                               cursorPos.Y >= playerMonitor.MonitorRect.Top &&
+                               cursorPos.Y <= playerMonitor.MonitorRect.Top + triggerAreaHeight;
 
         bool isContextMenuOpen = BtnMenu.ContextMenu?.IsOpen == true;
         bool isUrlTextBoxFocused = UrlTextBox.IsFocused;
@@ -705,6 +960,8 @@ public ControlBarWindow(ControlBarViewModel viewModel,
 
         // 取消订阅穿透状态变化事件，防止内存泄漏
         _eventBus.Unsubscribe<ClickThroughChangedEvent>(OnClickThroughChanged);
+        _eventBus.Unsubscribe<PlayerMonitorChangedEvent>(OnPlayerMonitorChanged);
+        _eventBus.Unsubscribe<DisplayTopologyChangedEvent>(OnDisplayTopologyChanged);
     }
 
 #endregion

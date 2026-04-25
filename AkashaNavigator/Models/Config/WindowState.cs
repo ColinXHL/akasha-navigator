@@ -45,5 +45,24 @@ public class WindowState
     /// 是否静音
     /// </summary>
     public bool IsMuted { get; set; }
+
+    /// <summary>
+    /// 窗口所在显示器的设备名称（如 "\\.\DISPLAY1"）
+    /// 用于跨会话持久化显示器身份，确保恢复到同一显示器
+    /// 为空时表示没有保存显示器信息（向后兼容旧配置）
+    /// </summary>
+    public string? MonitorDeviceName { get; set; }
+
+    /// <summary>
+    /// 控制栏中心点在显示器工作区中的横向比例（0-1）
+    /// 0.5 表示居中；用于跨显示器和跨会话恢复控制栏位置
+    /// </summary>
+    public double ControlBarCenterAnchorRatio { get; set; } = 0.5;
+
+    /// <summary>
+    /// 控制栏上次所在显示器的设备名称（如 "\\.\DISPLAY1"）
+    /// 用于跨会话优先恢复到同一显示器
+    /// </summary>
+    public string? ControlBarMonitorDeviceName { get; set; }
 }
 }

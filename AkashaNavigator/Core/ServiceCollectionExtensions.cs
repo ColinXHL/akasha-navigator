@@ -101,8 +101,11 @@ public static class ServiceCollectionExtensions
         // PluginStateCoordinator（桥接底层插件状态变化到 UI 刷新事件）
         services.AddSingleton<PluginStateCoordinator>();
 
-        // CrashRecoveryService（依赖LogService）
+// CrashRecoveryService（依赖LogService）
         services.AddSingleton<ICrashRecoveryService, CrashRecoveryService>();
+
+        // MonitorLayoutService（依赖 LogService + EventBus，用于多显示器布局管理）
+        services.AddSingleton<IMonitorLayoutService, MonitorLayoutService>();
 
         // ============================================================
         // Level 2: 依赖 LogService + ProfileManager（复杂依赖）

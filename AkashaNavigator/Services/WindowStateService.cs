@@ -10,6 +10,7 @@ namespace AkashaNavigator.Services
 /// <summary>
 /// 窗口状态服务
 /// 负责保存和加载窗口位置、大小、最后访问 URL 等
+/// 支持多显示器：持久化显示器身份，恢复时优先还原到同一显示器
 /// </summary>
 public class WindowStateService : IWindowStateService
 {
@@ -17,6 +18,7 @@ public class WindowStateService : IWindowStateService
 
     private readonly ILogService _logService;
     private readonly IProfileManager _profileManager;
+    private readonly IMonitorLayoutService _monitorLayoutService;
     private WindowState? _cachedState;
 
 #endregion
@@ -26,10 +28,12 @@ public class WindowStateService : IWindowStateService
     /// <summary>
     /// DI 容器使用的构造函数
     /// </summary>
-    public WindowStateService(ILogService logService, IProfileManager profileManager)
+    public WindowStateService(ILogService logService, IProfileManager profileManager,
+                              IMonitorLayoutService monitorLayoutService)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _profileManager = profileManager ?? throw new ArgumentNullException(nameof(profileManager));
+        _monitorLayoutService = monitorLayoutService ?? throw new ArgumentNullException(nameof(monitorLayoutService));
     }
 
 #endregion
@@ -38,6 +42,7 @@ public class WindowStateService : IWindowStateService
 
     /// <summary>
     /// 加载窗口状态
+    /// 如果保存的显示器不可用，自动将窗口位置调整到可用显示器
     /// </summary>
     public WindowState Load()
     {
@@ -113,13 +118,13 @@ public class WindowStateService : IWindowStateService
 
     private WindowState CreateDefaultState()
     {
-        // 获取主屏幕工作区域
-        var workArea = System.Windows.SystemParameters.WorkArea;
-        // 获取主屏幕完整高度（包含任务栏）
-        double screenHeight = System.Windows.SystemParameters.PrimaryScreenHeight;
+        // 使用 MonitorLayoutService 获取主显示器工作区
+        var primaryMonitor = _monitorLayoutService.GetPrimaryMonitor();
+        var workAreaWpf = primaryMonitor.GetWorkAreaAsWpfRect(1.0);
+        var monitorRectWpf = primaryMonitor.GetMonitorRectAsWpfRect(1.0);
 
-        // 计算默认大小：宽度为屏幕的 1/4，高度按 16:9 比例计算
-        double defaultWidth = Math.Max(workArea.Width / 4, AppConstants.MinWindowWidth);
+        // 计算默认大小：宽度为工作区宽度的 1/4，高度按 16:9 比例计算
+        double defaultWidth = Math.Max(workAreaWpf.Width / 4, AppConstants.MinWindowWidth);
         double defaultHeight = defaultWidth * 9 / 16;
 
         if (defaultHeight < AppConstants.MinWindowHeight)
@@ -128,14 +133,21 @@ public class WindowStateService : IWindowStateService
             defaultWidth = defaultHeight * 16 / 9;
         }
 
-        return new WindowState { Left = workArea.Left,
-                                 Top = screenHeight - defaultHeight, // 贴到屏幕最底部（任务栏底部）
-                                 Width = defaultWidth,
-                                 Height = defaultHeight,
-                                 Opacity = AppConstants.MaxOpacity,
-                                 IsMaximized = false,
-                                 LastUrl = AppConstants.DefaultHomeUrl,
-                                 IsMuted = false };
+        // 定位到主显示器底部
+        double left = workAreaWpf.Left;
+        double top = monitorRectWpf.Bottom - defaultHeight;
+
+        return new WindowState { Left = left,
+                                Top = top,
+                                Width = defaultWidth,
+                                Height = defaultHeight,
+                                Opacity = AppConstants.MaxOpacity,
+                                IsMaximized = false,
+                                LastUrl = AppConstants.DefaultHomeUrl,
+                                IsMuted = false,
+                                MonitorDeviceName = primaryMonitor.DeviceName,
+                                ControlBarCenterAnchorRatio = 0.5,
+                                ControlBarMonitorDeviceName = primaryMonitor.DeviceName };
     }
 
 #endregion

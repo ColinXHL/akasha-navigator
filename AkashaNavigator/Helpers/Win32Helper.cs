@@ -102,6 +102,13 @@ public static class Win32Helper
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFOEX lpmi);
+
 #endregion
 
 #region Win32 API - Keyboard Hook
@@ -200,6 +207,20 @@ public static class Win32Helper
         public POINT ptScreenPos;
     }
 
+    /// <summary>
+    /// 显示器信息结构体（GetMonitorInfoW 使用）
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct MONITORINFOEX
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string szDevice;
+    }
+
 #endregion
 
 #region Constants - Window
@@ -244,11 +265,97 @@ public static class Win32Helper
     public const int SM_CXSCREEN = 0;
     public const int SM_CYSCREEN = 1;
 
+    // 多显示器常量
+    public const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+    public const uint MONITORINFOF_PRIMARY = 0x00000001;
+
     // 虚拟键码
     public const int VK_LBUTTON = 0x01;
 
     // 光标信息标志
     public const int CURSOR_SHOWING = 0x00000001;
+
+#endregion
+
+    #region Monitor Methods
+
+    /// <summary>
+    /// 获取包含指定窗口的显示器句柄
+    /// 如果窗口跨越多个显示器，返回包含窗口最大面积的显示器
+    /// </summary>
+    /// <param name="hwnd">窗口句柄</param>
+    /// <returns>显示器句柄，失败返回 IntPtr.Zero</returns>
+    public static IntPtr GetMonitorFromWindow(IntPtr hwnd)
+    {
+        return MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    }
+
+    /// <summary>
+    /// 获取显示器的详细信息（工作区、完整区域、设备名称、是否为主显示器）
+    /// </summary>
+    /// <param name="hMonitor">显示器句柄</param>
+    /// <returns>显示器快照信息，失败返回 null</returns>
+    public static MonitorInfo? GetMonitorInfo(IntPtr hMonitor)
+    {
+        if (hMonitor == IntPtr.Zero)
+            return null;
+
+        var info = new MONITORINFOEX();
+        info.cbSize = Marshal.SizeOf<MONITORINFOEX>();
+
+        if (!GetMonitorInfoW(hMonitor, ref info))
+            return null;
+
+        return new MonitorInfo
+        {
+            MonitorRect = info.rcMonitor,
+            WorkAreaRect = info.rcWork,
+            IsPrimary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0,
+            DeviceName = info.szDevice ?? string.Empty
+        };
+    }
+
+    /// <summary>
+    /// 获取包含指定窗口的显示器信息
+    /// </summary>
+    /// <param name="hwnd">窗口句柄</param>
+    /// <returns>显示器快照信息，失败返回 null</returns>
+    public static MonitorInfo? GetMonitorInfoFromWindow(IntPtr hwnd)
+    {
+        IntPtr hMonitor = GetMonitorFromWindow(hwnd);
+        return GetMonitorInfo(hMonitor);
+    }
+
+    /// <summary>
+    /// 枚举所有活动显示器
+    /// 使用 Win32 EnumDisplayMonitors API 遍历所有连接的显示器
+    /// </summary>
+    /// <returns>显示器信息列表</returns>
+    public static List<MonitorInfo> EnumerateMonitors()
+    {
+        var monitors = new List<MonitorInfo>();
+
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (hMonitor, hdcMonitor, lprcMonitor, lParam) =>
+        {
+            var info = GetMonitorInfo(hMonitor);
+            if (info != null)
+            {
+                monitors.Add(info);
+            }
+            return true;
+        }, IntPtr.Zero);
+
+        return monitors;
+    }
+
+    /// <summary>
+    /// 显示器枚举回调委托
+    /// </summary>
+    private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, IntPtr lprcMonitor, IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
 
 #endregion
 
@@ -579,6 +686,20 @@ public static class Win32Helper
     public static bool GetWindowRectangle(IntPtr hwnd, out RECT rect)
     {
         return GetWindowRect(hwnd, out rect);
+    }
+
+    /// <summary>
+    /// 以物理像素设置窗口位置和大小
+    /// </summary>
+    /// <param name="hwnd">窗口句柄</param>
+    /// <param name="x">左边界（物理像素）</param>
+    /// <param name="y">上边界（物理像素）</param>
+    /// <param name="width">宽度（物理像素）</param>
+    /// <param name="height">高度（物理像素）</param>
+    /// <returns>是否成功</returns>
+    public static bool SetWindowRectangle(IntPtr hwnd, int x, int y, int width, int height)
+    {
+        return SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
     }
 
     /// <summary>
