@@ -730,6 +730,9 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
     {
         if (!_isMaximized)
         {
+            // 最大化前强制结束窥视
+            ForceEndPeek();
+
             _windowBehavior.SuspendClickThroughForMaximize();
 
             // 暂停鼠标检测（全屏时不需要降低透明度）
@@ -1087,6 +1090,11 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
     public int OpacityPercent => _windowBehavior.OpacityPercent;
 
     /// <summary>
+    /// 获取当前实际窗口透明度（通过 Win32 API 设置的值，非 WPF Window.Opacity）
+    /// </summary>
+    public double ActualOpacity => _windowBehavior.WindowOpacity;
+
+    /// <summary>
     /// 是否处于鼠标穿透模式
     /// </summary>
     public bool IsClickThrough => _windowBehavior.IsClickThrough;
@@ -1124,7 +1132,29 @@ private void BroadcastClickThroughChanged(string source)
     {
         _config = config;
         _windowBehavior.UpdateConfig(config);
+        _windowBehavior.SetPeekConfig(config.EnableHoldToPeek, config.PeekOpacity);
     }
+
+#region Peek
+
+    /// <summary>
+    /// 设置窥视按键 held 状态
+    /// </summary>
+    /// <param name="held">是否按住窥视按键</param>
+    public void SetPeekHeld(bool held)
+    {
+        _windowBehavior.SetPeekHeld(held);
+    }
+
+    /// <summary>
+    /// 强制结束窥视（最大化、隐藏、关闭时调用）
+    /// </summary>
+    public void ForceEndPeek()
+    {
+        _windowBehavior.ForceEndPeek();
+    }
+
+#endregion
 
     /// <summary>
     /// 重置透明度到 100%
@@ -1276,6 +1306,8 @@ private void BroadcastClickThroughChanged(string source)
         }
         else
         {
+            // 隐藏前强制结束窥视
+            ForceEndPeek();
             Hide();
             _isHidden = true;
         }

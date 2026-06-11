@@ -5,7 +5,7 @@ namespace AkashaNavigator.ViewModels.Pages.Settings;
 
 /// <summary>
 /// 窗口设置页面 ViewModel
-/// 包含：边缘吸附、吸附阈值、退出时提示记录
+/// 包含：边缘吸附、吸附阈值、退出时提示记录、按住窥视
 /// </summary>
 public partial class WindowSettingsPageViewModel : ObservableObject
 {
@@ -33,6 +33,18 @@ public partial class WindowSettingsPageViewModel : ObservableObject
     [ObservableProperty]
     private bool _enableOsd;
 
+    /// <summary>
+    /// 是否启用按住窥视（自动生成属性和通知）
+    /// </summary>
+    [ObservableProperty]
+    private bool _enableHoldToPeek;
+
+    /// <summary>
+    /// 窥视透明度百分比（10-100，用于滑块绑定）
+    /// </summary>
+    [ObservableProperty]
+    private double _peekOpacityPercent;
+
     public WindowSettingsPageViewModel()
     {
         // 默认值，稍后通过 LoadSettings 从 Config 加载
@@ -47,6 +59,8 @@ public partial class WindowSettingsPageViewModel : ObservableObject
         SnapThreshold = config.SnapThreshold;
         PromptRecordOnExit = config.PromptRecordOnExit;
         EnableOsd = config.EnableOsd;
+        EnableHoldToPeek = config.EnableHoldToPeek;
+        PeekOpacityPercent = config.PeekOpacity * 100.0;
     }
 
     /// <summary>
@@ -58,6 +72,8 @@ public partial class WindowSettingsPageViewModel : ObservableObject
         config.SnapThreshold = SnapThreshold;
         config.PromptRecordOnExit = PromptRecordOnExit;
         config.EnableOsd = EnableOsd;
+        config.EnableHoldToPeek = EnableHoldToPeek;
+        config.PeekOpacity = Math.Clamp(PeekOpacityPercent / 100.0, AppConstants.MinOpacity, AppConstants.MaxOpacity);
     }
 
     /// <summary>

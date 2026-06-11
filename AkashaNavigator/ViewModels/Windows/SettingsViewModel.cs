@@ -138,6 +138,10 @@ public partial class SettingsViewModel : ObservableObject
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "记录笔记", "窗口行为"),
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "OSD", "窗口行为"),
             new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "悬浮提示", "窗口行为"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "按住窥视", "窥视"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "窥视按键", "窥视"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "窥视透明度", "窥视"),
+            new SearchableSetting(SettingsPageType.Window, "🔲 窗口", "鼠标穿透", "窥视"),
         });
 
         // ===== 快捷键设置 =====

@@ -157,6 +157,18 @@ public class HotkeyService : IDisposable
         remove => _dispatcher.SuspendHotkeys -= value;
     }
 
+    /// <summary>窥视按下事件（HotkeyService 原生事件，非代理）</summary>
+    public event EventHandler? PeekPressed;
+
+    /// <summary>窥视释放事件（HotkeyService 原生事件，非代理）</summary>
+    public event EventHandler? PeekReleased;
+
+    /// <summary>窥视按键配置</summary>
+    private uint _peekKey;
+    private Models.Config.ModifierKeys _peekModifiers;
+    private bool _isPeekEnabled;
+    private bool _isPeekHeld;
+
 #endregion
 
 #region Constructor
@@ -250,6 +262,26 @@ public class HotkeyService : IDisposable
     public ActionDispatcher GetDispatcher() => _dispatcher;
 
     /// <summary>
+    /// 配置窥视按键
+    /// </summary>
+    /// <param name="key">虚拟键码</param>
+    /// <param name="modifiers">修饰键</param>
+    /// <param name="enabled">是否启用窥视</param>
+    public void SetPeekConfig(uint key, Models.Config.ModifierKeys modifiers, bool enabled)
+    {
+        _peekKey = key;
+        _peekModifiers = modifiers;
+        _isPeekEnabled = enabled;
+
+        // 配置变化时清理 held 状态
+        if (_isPeekHeld)
+        {
+            _isPeekHeld = false;
+            PeekReleased?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
     /// 注册插件快捷键（添加到当前激活的 Profile）
     /// </summary>
     /// <param name="vkCode">虚拟键码</param>
@@ -307,6 +339,25 @@ public class HotkeyService : IDisposable
     public void ToggleSuspend()
     {
         _isSuspended = !_isSuspended;
+
+        // 暂停时清理 peek held 状态
+        if (_isSuspended && _isPeekHeld)
+        {
+            _isPeekHeld = false;
+            PeekReleased?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
+    /// 清理窥视按键 held 状态（用于窗口隐藏、失去焦点等场景）
+    /// </summary>
+    public void ClearPeekHeld()
+    {
+        if (_isPeekHeld)
+        {
+            _isPeekHeld = false;
+            PeekReleased?.Invoke(this, EventArgs.Empty);
+        }
     }
 
 #endregion
@@ -325,6 +376,21 @@ public class HotkeyService : IDisposable
 
         // 获取当前修饰键状态
         var modifiers = Win32Helper.GetCurrentModifiers();
+
+        // 窥视按键检测（在暂停检查前，但 boss key 模式下不处理）
+        if (_isPeekEnabled && !IsBossKeyHidden &&
+            vkCode == _peekKey && modifiers == _peekModifiers &&
+            HotkeyBinding.InferInputType(vkCode) == Models.Config.InputType.Keyboard)
+        {
+            // 自动重复 KeyDown 不反复切换状态
+            if (!_isPeekHeld)
+            {
+                _isPeekHeld = true;
+                Serilog.Log.Debug("OnKeyDown: Peek key pressed (VK={VkCode})", vkCode);
+                PeekPressed?.Invoke(this, EventArgs.Empty);
+            }
+            return;
+        }
 
         // 获取前台进程名
         var processName = Win32Helper.GetForegroundWindowProcessName();
@@ -379,6 +445,17 @@ public class HotkeyService : IDisposable
     {
         // 不设置 Handled，让事件继续传递
         var vkCode = (uint)e.KeyCode;
+
+        // 窥视按键释放检测
+        if (_isPeekEnabled && _isPeekHeld &&
+            vkCode == _peekKey &&
+            HotkeyBinding.InferInputType(vkCode) == Models.Config.InputType.Keyboard)
+        {
+            _isPeekHeld = false;
+            Serilog.Log.Debug("OnKeyUp: Peek key released (VK={VkCode})", vkCode);
+            PeekReleased?.Invoke(this, EventArgs.Empty);
+        }
+
         lock (_pressedLock)
         {
             _pressedKeyboardKeys.Remove(vkCode);
@@ -408,6 +485,19 @@ public class HotkeyService : IDisposable
         {
             // 不处理其他鼠标按钮
             return;
+        }
+
+        // 窥视鼠标侧键检测
+        if (_isPeekEnabled && !IsBossKeyHidden && mouseButton == _peekKey)
+        {
+            var peekMods = Win32Helper.GetCurrentModifiers();
+            if (peekMods == _peekModifiers && !_isPeekHeld)
+            {
+                _isPeekHeld = true;
+                Serilog.Log.Debug("OnMouseDown: Peek mouse button pressed (Button={Button})", mouseButton);
+                PeekPressed?.Invoke(this, EventArgs.Empty);
+                return;
+            }
         }
 
         // 获取当前修饰键状态
@@ -458,6 +548,24 @@ public class HotkeyService : IDisposable
     private void OnMouseUp(object? sender, MouseEventExtArgs e)
     {
         // 不设置 Handled，让事件继续传递
+
+        // 窥视鼠标侧键释放检测
+        if (_isPeekEnabled && _isPeekHeld)
+        {
+            uint mouseButton = 0;
+            if (e.Button == System.Windows.Forms.MouseButtons.XButton1)
+                mouseButton = MouseButtonCodes.XButton1;
+            else if (e.Button == System.Windows.Forms.MouseButtons.XButton2)
+                mouseButton = MouseButtonCodes.XButton2;
+
+            if (mouseButton == _peekKey)
+            {
+                _isPeekHeld = false;
+                Serilog.Log.Debug("OnMouseUp: Peek mouse button released (Button={Button})", mouseButton);
+                PeekReleased?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
         if (e.Button == System.Windows.Forms.MouseButtons.XButton1)
         {
             lock (_pressedLock)

@@ -37,6 +37,12 @@ public class WindowBehaviorHelper
 
     private bool _clickThroughSuspendedByMaximize;
 
+    // 窥视相关
+    private bool _isPeekHeld;
+    private bool _isPeekActive; // 当前是否实际处于窥视透明度
+    private double _peekOpacity = AppConstants.DefaultPeekOpacity;
+    private bool _enablePeek = true;
+
 #endregion
 
 #region Constructor
@@ -336,6 +342,89 @@ public class WindowBehaviorHelper
 
 #endregion
 
+#region Public Methods - Peek
+
+    /// <summary>
+    /// 设置窥视按键 held 状态
+    /// </summary>
+    /// <param name="held">是否按住窥视按键</param>
+    public void SetPeekHeld(bool held)
+    {
+        if (_isPeekHeld == held)
+            return;
+
+        _isPeekHeld = held;
+        Logger.Debug("SetPeekHeld: held={Held}, enablePeek={EnablePeek}, effectiveCT={EffectiveCT}",
+                     held, _enablePeek, IsEffectiveClickThrough);
+
+        if (!held && _isPeekActive)
+        {
+            // 按键释放，立即恢复透明度
+            RestoreFromPeek();
+        }
+    }
+
+    /// <summary>
+    /// 更新窥视配置
+    /// </summary>
+    /// <param name="enabled">是否启用窥视</param>
+    /// <param name="peekOpacity">窥视透明度</param>
+    public void SetPeekConfig(bool enabled, double peekOpacity)
+    {
+        _enablePeek = enabled;
+        _peekOpacity = Math.Clamp(peekOpacity, AppConstants.MinOpacity, AppConstants.MaxOpacity);
+
+        if (!enabled && _isPeekActive)
+        {
+            RestoreFromPeek();
+        }
+
+        _isPeekHeld = false;
+    }
+
+    /// <summary>
+    /// 强制结束窥视（最大化、隐藏、关闭穿透时调用）
+    /// </summary>
+    public void ForceEndPeek()
+    {
+        if (_isPeekActive)
+        {
+            RestoreFromPeek();
+        }
+        _isPeekHeld = false;
+    }
+
+    /// <summary>
+    /// 判断是否应处于窥视状态
+    /// </summary>
+    private bool ShouldPeek()
+    {
+        if (!_enablePeek || !_isPeekHeld || !IsEffectiveClickThrough)
+            return false;
+
+        if (!_window.IsVisible)
+            return false;
+
+        // 最大化时不窥视
+        if (_window.WindowState == System.Windows.WindowState.Maximized)
+            return false;
+
+        return Win32Helper.IsCursorInWindow(_window);
+    }
+
+    /// <summary>
+    /// 从窥视状态恢复正常透明度
+    /// </summary>
+    private void RestoreFromPeek()
+    {
+        _isPeekActive = false;
+        double restoreOpacity = IsEffectiveClickThrough ? _opacityBeforeClickThrough : _windowOpacity;
+        Logger.Debug("RestoreFromPeek: restoring opacity to {Opacity}", restoreOpacity);
+        Win32Helper.SetWindowOpacity(_window, restoreOpacity);
+    }
+
+#endregion
+
 #region Public Methods - Edge Snapping
 
     /// <summary>
@@ -524,7 +613,8 @@ public class WindowBehaviorHelper
 
     /// <summary>
     /// 更新穿透模式下的透明度
-    /// 注意：自动穿透模式下由插件控制透明度，此方法不做处理
+    /// 窥视模式：仅在按住窥视键且鼠标在窗口内时降低透明度
+    /// 普通鼠标进入不再自动降低透明度
     /// </summary>
     private void UpdateClickThroughOpacity()
     {
@@ -536,22 +626,31 @@ public class WindowBehaviorHelper
 
         bool cursorInWindow = Win32Helper.IsCursorInWindow(_window);
 
-        // 只有状态变化时才更新透明度
-        if (cursorInWindow != _isCursorInWindowWhileClickThrough)
-        {
-            _isCursorInWindowWhileClickThrough = cursorInWindow;
+        // 窥视逻辑：按住窥视键 + 鼠标在窗口内 → 降低透明度
+        bool shouldPeek = _enablePeek && _isPeekHeld && IsEffectiveClickThrough &&
+                          cursorInWindow && _window.IsVisible &&
+                          _window.WindowState != System.Windows.WindowState.Maximized;
 
-            if (cursorInWindow)
+        if (shouldPeek)
+        {
+            if (!_isPeekActive)
             {
-                // 鼠标进入窗口，降至最低透明度
-                Win32Helper.SetWindowOpacity(_window, AppConstants.MinOpacity);
+                _isPeekActive = true;
+                Logger.Debug("UpdateClickThroughOpacity: entering peek at {PeekOpacity}", _peekOpacity);
+                Win32Helper.SetWindowOpacity(_window, _peekOpacity);
             }
-            else
-            {
-                // 鼠标离开窗口，恢复正常透明度
-                Win32Helper.SetWindowOpacity(_window, _opacityBeforeClickThrough);
-            }
+            _isCursorInWindowWhileClickThrough = cursorInWindow;
+            return;
         }
+
+        // 窥视结束时恢复透明度
+        if (_isPeekActive)
+        {
+            RestoreFromPeek();
+        }
+
+        // 仅跟踪鼠标位置变化（用于状态记录），不再自动修改透明度
+        _isCursorInWindowWhileClickThrough = cursorInWindow;
     }
 
     /// <summary>
@@ -661,6 +760,9 @@ public class WindowBehaviorHelper
         }
         else
         {
+            // 关闭穿透时强制结束窥视
+            ForceEndPeek();
+
             // 停止定时器
             StopClickThroughTimer();
 

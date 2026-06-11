@@ -55,6 +55,9 @@ public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<strin
         // 同步隐藏态热键策略到 HotkeyService
         _hotkeyService.EnableHotkeysWhenHidden = _config.EnableHotkeysWhenHidden;
 
+        // 配置窥视按键
+        _hotkeyService.SetPeekConfig(config.HotkeyPeek, config.HotkeyPeekMod, config.EnableHoldToPeek);
+
         // 不要替换整个配置，而是合并内置快捷键到现有配置
         var currentConfig = _hotkeyService.GetConfig();
         var newConfig = _config.ToHotkeyConfig();
@@ -96,6 +99,9 @@ public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<strin
 
         // 同步隐藏态热键策略到 HotkeyService
         _hotkeyService.EnableHotkeysWhenHidden = _config.EnableHotkeysWhenHidden;
+
+        // 更新窥视按键配置
+        _hotkeyService.SetPeekConfig(config.HotkeyPeek, config.HotkeyPeekMod, config.EnableHoldToPeek);
     }
 
     /// <summary>
@@ -238,6 +244,18 @@ public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<strin
             var isSuspended = _hotkeyService.IsSuspended;
             var msg = isSuspended ? "热键已暂停" : "热键已恢复";
             ShowOsd(msg, isSuspended ? "⏸" : "▶");
+        };
+
+        _hotkeyService.PeekPressed += (s, e) =>
+        {
+            Logger.Debug("PeekPressed event received");
+            _playerWindow?.SetPeekHeld(true);
+        };
+
+        _hotkeyService.PeekReleased += (s, e) =>
+        {
+            Logger.Debug("PeekReleased event received");
+            _playerWindow?.SetPeekHeld(false);
         };
     }
 

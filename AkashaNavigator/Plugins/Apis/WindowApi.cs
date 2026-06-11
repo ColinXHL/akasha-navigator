@@ -46,7 +46,7 @@ public class WindowApi
     }
 
     [ScriptMember("getOpacity")]
-    public double GetOpacity() => GetPlayerWindow()?.Opacity ?? 1.0;
+    public double GetOpacity() => GetPlayerWindow()?.ActualOpacity ?? 1.0;
 
     [ScriptMember("isClickThrough")]
     public bool IsClickThrough() => GetPlayerWindow()?.IsClickThrough ?? false;

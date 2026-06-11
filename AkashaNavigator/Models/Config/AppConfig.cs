@@ -71,11 +71,25 @@ public class AppConfig
     public uint HotkeySuspendHotkeys { get; set; } = 0xC0; // VK_OEM_3 (` 波浪键)
     public ModifierKeys HotkeySuspendHotkeysMod { get; set; } = ModifierKeys.Ctrl;
 
+    // 按住窥视热键 (默认: G 键)
+    public uint HotkeyPeek { get; set; } = 0x47; // VK_G
+    public ModifierKeys HotkeyPeekMod { get; set; } = ModifierKeys.None;
+
     /// <summary>
     /// 窗口隐藏时是否仍然触发快捷键（默认 false，即隐藏时不触发）
     /// 仅 ToggleWindowVisibility 和 SuspendHotkeys 始终可用
     /// </summary>
     public bool EnableHotkeysWhenHidden { get; set; } = false;
+
+    /// <summary>
+    /// 是否启用按住窥视功能（默认 true）
+    /// </summary>
+    public bool EnableHoldToPeek { get; set; } = true;
+
+    /// <summary>
+    /// 窥视时的透明度（默认 0.2，范围 MinOpacity - MaxOpacity）
+    /// </summary>
+    public double PeekOpacity { get; set; } = AppConstants.DefaultPeekOpacity;
 
 #endregion
 

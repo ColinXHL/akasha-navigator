@@ -81,6 +81,11 @@ public static class AppConstants
     /// </summary>
     public const double OpacityStep = 0.1;
 
+    /// <summary>
+    /// 默认窥视透明度
+    /// </summary>
+    public const double DefaultPeekOpacity = 0.2;
+
 #endregion
 
 #region Video Control

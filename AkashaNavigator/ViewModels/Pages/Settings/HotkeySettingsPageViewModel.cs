@@ -103,6 +103,8 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
                          config.HotkeyToggleClickThroughMod, WindowBehaviorHotkeys);
         AddHotkeyBinding("ToggleMaximize", "切换最大化", config.HotkeyToggleMaximize, config.HotkeyToggleMaximizeMod,
                          WindowBehaviorHotkeys);
+        AddHotkeyBinding("Peek", "按住窥视", config.HotkeyPeek, config.HotkeyPeekMod,
+                         WindowBehaviorHotkeys);
 
         // 播放速率控制
         AddHotkeyBinding("DecreasePlaybackRate", "减少播放速率", config.HotkeyDecreasePlaybackRate,
@@ -180,6 +182,7 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
                                    "ToggleWindowVisibility" => "隐藏/显示窗口",
                                    "SuspendHotkeys" => "禁用/启用快捷键",
                                    "ToggleMaximize" => "切换最大化",
+                                   "Peek" => "按住窥视",
                                    _ => actionName };
     }
 
@@ -245,6 +248,10 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
                 config.HotkeySuspendHotkeys = binding.Key;
                 config.HotkeySuspendHotkeysMod = binding.Modifiers;
                 break;
+            case "Peek":
+                config.HotkeyPeek = binding.Key;
+                config.HotkeyPeekMod = binding.Modifiers;
+                break;
             }
         }
 
@@ -301,6 +308,9 @@ public partial class HotkeySettingsPageViewModel : ObservableObject
                 break;
             case "SuspendHotkeys":
                 binding.LoadFromConfig(config.HotkeySuspendHotkeys, config.HotkeySuspendHotkeysMod);
+                break;
+            case "Peek":
+                binding.LoadFromConfig(config.HotkeyPeek, config.HotkeyPeekMod);
                 break;
             }
         }

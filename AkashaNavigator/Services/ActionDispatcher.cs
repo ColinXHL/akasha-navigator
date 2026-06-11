@@ -38,6 +38,10 @@ public class ActionDispatcher
     public const string ActionToggleWindowVisibility = "ToggleWindowVisibility";
     /// <summary>暂停/恢复热键</summary>
     public const string ActionSuspendHotkeys = "SuspendHotkeys";
+    /// <summary>窥视按下</summary>
+    public const string ActionPeekPressed = "PeekPressed";
+    /// <summary>窥视释放</summary>
+    public const string ActionPeekReleased = "PeekReleased";
 
 #endregion
 
@@ -75,6 +79,10 @@ public class ActionDispatcher
     public event EventHandler? ToggleWindowVisibility;
     /// <summary>暂停/恢复热键事件</summary>
     public event EventHandler? SuspendHotkeys;
+    /// <summary>窥视按下事件</summary>
+    public event EventHandler? PeekPressed;
+    /// <summary>窥视释放事件</summary>
+    public event EventHandler? PeekReleased;
 
 #endregion
 
@@ -176,6 +184,8 @@ public class ActionDispatcher
         RegisterAction(ActionResetPlaybackRate, () => ResetPlaybackRate?.Invoke(this, EventArgs.Empty));
         RegisterAction(ActionToggleWindowVisibility, () => ToggleWindowVisibility?.Invoke(this, EventArgs.Empty));
         RegisterAction(ActionSuspendHotkeys, () => SuspendHotkeys?.Invoke(this, EventArgs.Empty));
+        RegisterAction(ActionPeekPressed, () => PeekPressed?.Invoke(this, EventArgs.Empty));
+        RegisterAction(ActionPeekReleased, () => PeekReleased?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>
