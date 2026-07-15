@@ -32,6 +32,11 @@ public class UpdateCheckResult
     public string? SourcePath { get; set; }
 
     /// <summary>
+    /// 更新源无效时的错误信息。
+    /// </summary>
+    public string? ErrorMessage { get; set; }
+
+    /// <summary>
     /// 创建无更新的结果
     /// </summary>
     /// <param name="pluginId">插件 ID</param>
@@ -40,6 +45,20 @@ public class UpdateCheckResult
     public static UpdateCheckResult NoUpdate(string pluginId, string currentVersion)
     {
         return new UpdateCheckResult { PluginId = pluginId, CurrentVersion = currentVersion, HasUpdate = false };
+    }
+
+    /// <summary>
+    /// 创建更新源无效的结果。
+    /// </summary>
+    public static UpdateCheckResult Invalid(string pluginId, string currentVersion, string errorMessage)
+    {
+        return new UpdateCheckResult
+        {
+            PluginId = pluginId,
+            CurrentVersion = currentVersion,
+            HasUpdate = false,
+            ErrorMessage = errorMessage
+        };
     }
 
     /// <summary>

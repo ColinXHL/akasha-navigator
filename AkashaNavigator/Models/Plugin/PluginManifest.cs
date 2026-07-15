@@ -34,12 +34,19 @@ public static class PluginPermissions
     public const string Hotkey = "hotkey";
     /// <summary>面板权限 - 访问 Panel API 创建普通可交互窗口</summary>
     public const string Panel = "panel";
+    /// <summary>伴生进程权限 - 启动清单固定的高风险本地进程</summary>
+    public const string Companion = "companion";
 
     /// <summary>
     /// 所有支持的权限列表
     /// </summary>
     public static readonly string[] AllPermissions =
-        new[] { Audio, Overlay, Subtitle, Player, Window, Storage, Network, Events, Hotkey, Panel };
+        new[] { Audio, Overlay, Subtitle, Player, Window, Storage, Network, Events, Hotkey, Panel, Companion };
+
+    /// <summary>
+    /// 需要安装或首次启用时明确确认的高风险权限列表
+    /// </summary>
+    public static readonly string[] HighRiskPermissions = new[] { Companion };
 
     /// <summary>
     /// 检查权限名称是否有效
@@ -49,6 +56,20 @@ public static class PluginPermissions
     public static bool IsValidPermission(string permission)
     {
         return AllPermissions.Contains(permission, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static bool IsHighRiskPermission(string permission)
+    {
+        return HighRiskPermissions.Contains(permission, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static IReadOnlyList<string> GetHighRiskPermissions(IEnumerable<string>? permissions)
+    {
+        return permissions?
+                   .Where(IsHighRiskPermission)
+                   .Distinct(StringComparer.OrdinalIgnoreCase)
+                   .ToArray()
+               ?? Array.Empty<string>();
     }
 }
 
@@ -106,6 +127,12 @@ public class PluginManifest
     public List<string>? Permissions { get; set; }
 
     /// <summary>
+    /// 固定伴生进程声明。插件运行时不能覆盖可执行文件、参数、工作目录或环境变量。
+    /// </summary>
+    [JsonPropertyName("companion")]
+    public CompanionManifest? Companion { get; set; }
+
+    /// <summary>
     /// 默认配置
     /// </summary>
     [JsonPropertyName("defaultConfig")]
@@ -145,6 +172,10 @@ public class PluginManifest
         {
             result.AddError("id", "插件 ID 是必需字段");
         }
+        else if (!PluginIdValidator.IsValid(Id))
+        {
+            result.AddError("id", "插件 ID 必须是安全的单段标识，只能包含 ASCII 字母、数字、点、下划线和连字符");
+        }
 
         if (string.IsNullOrWhiteSpace(Name))
         {
@@ -161,7 +192,55 @@ public class PluginManifest
             result.AddError("main", "入口文件是必需字段");
         }
 
+        ValidateCompanion(result);
+
         return result;
+    }
+
+    private void ValidateCompanion(PluginManifestValidationResult result)
+    {
+        var hasPermission = Permissions?.Contains(PluginPermissions.Companion, StringComparer.OrdinalIgnoreCase) == true;
+        if (Companion == null)
+        {
+            if (hasPermission)
+            {
+                result.AddError("companion", "声明 companion 权限时必须提供 companion 配置");
+            }
+
+            return;
+        }
+
+        if (!hasPermission)
+        {
+            result.AddError("permissions", "companion 配置需要 companion 权限");
+        }
+
+        if (string.IsNullOrWhiteSpace(Companion.Executable) ||
+            Path.IsPathRooted(Companion.Executable) ||
+            Companion.Executable.Contains(':') ||
+            Companion.Executable.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries).Contains(".."))
+        {
+            result.AddError("companion.executable", "伴生进程路径必须是插件目录内的安全相对路径");
+        }
+        else if (!string.Equals(Path.GetExtension(Companion.Executable), ".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            result.AddError("companion.executable", "伴生进程必须是 EXE 文件");
+        }
+
+        if (Companion.ProtocolVersion != 1)
+        {
+            result.AddError("companion.protocolVersion", "仅支持 companion 协议版本 1");
+        }
+
+        if (!string.Equals(Companion.Lifetime, "plugin", StringComparison.Ordinal))
+        {
+            result.AddError("companion.lifetime", "companion lifetime 必须是 plugin");
+        }
+
+        if (!Companion.SingleInstance)
+        {
+            result.AddError("companion.singleInstance", "companion 必须启用单实例");
+        }
     }
 
 #endregion
@@ -230,6 +309,17 @@ public class PluginManifest
     }
 
 #endregion
+}
+
+public class CompanionManifest
+{
+    public string? Executable { get; set; }
+
+    public int ProtocolVersion { get; set; } = 1;
+
+    public string Lifetime { get; set; } = "plugin";
+
+    public bool SingleInstance { get; set; } = true;
 }
 
 /// <summary>

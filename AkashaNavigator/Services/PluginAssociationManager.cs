@@ -328,7 +328,7 @@ public class PluginAssociationManager : IPluginAssociationManager
     /// <returns>是否成功添加（如果已存在则返回false）</returns>
     public bool AddPluginToProfile(string pluginId, string profileId, bool enabled = true)
     {
-        if (string.IsNullOrEmpty(pluginId) || string.IsNullOrEmpty(profileId))
+        if (!PluginIdValidator.IsValid(pluginId) || string.IsNullOrEmpty(profileId))
             return false;
 
         lock (_indexLock)
@@ -417,7 +417,7 @@ public class PluginAssociationManager : IPluginAssociationManager
     /// <returns>是否成功移除（如果不存在则返回false）</returns>
     public bool RemovePluginFromProfile(string pluginId, string profileId)
     {
-        if (string.IsNullOrEmpty(pluginId) || string.IsNullOrEmpty(profileId))
+        if (!PluginIdValidator.IsValid(pluginId) || string.IsNullOrEmpty(profileId))
             return false;
 
         bool removed = false;
@@ -459,7 +459,7 @@ public class PluginAssociationManager : IPluginAssociationManager
         if (pluginIds == null || string.IsNullOrEmpty(profileId))
             return 0;
 
-        var pluginIdList = pluginIds.Where(id => !string.IsNullOrEmpty(id)).ToList();
+        var pluginIdList = pluginIds.Where(PluginIdValidator.IsValid).ToList();
         if (pluginIdList.Count == 0)
             return 0;
 
@@ -515,7 +515,7 @@ public class PluginAssociationManager : IPluginAssociationManager
     /// <returns>成功添加的数量</returns>
     public int AddPluginToProfiles(string pluginId, IEnumerable<string> profileIds)
     {
-        if (string.IsNullOrEmpty(pluginId) || profileIds == null)
+        if (!PluginIdValidator.IsValid(pluginId) || profileIds == null)
             return 0;
 
         var profileIdList = profileIds.Where(id => !string.IsNullOrEmpty(id)).ToList();
@@ -574,7 +574,7 @@ public class PluginAssociationManager : IPluginAssociationManager
     /// <returns>被移除引用的Profile数量</returns>
     public int RemovePluginFromAllProfiles(string pluginId)
     {
-        if (string.IsNullOrEmpty(pluginId))
+        if (!PluginIdValidator.IsValid(pluginId))
             return 0;
 
         int removedCount = 0;
@@ -626,7 +626,7 @@ public class PluginAssociationManager : IPluginAssociationManager
     /// <returns>是否成功设置</returns>
     public bool SetPluginEnabled(string profileId, string pluginId, bool enabled)
     {
-        if (string.IsNullOrEmpty(profileId) || string.IsNullOrEmpty(pluginId))
+        if (string.IsNullOrEmpty(profileId) || !PluginIdValidator.IsValid(pluginId))
             return false;
 
         bool stateChanged = false;
@@ -699,7 +699,7 @@ public class PluginAssociationManager : IPluginAssociationManager
 
         lock (_indexLock)
         {
-            _index.OriginalPlugins[profileId] = new List<string>(pluginIds);
+            _index.OriginalPlugins[profileId] = pluginIds.Where(PluginIdValidator.IsValid).ToList();
             SaveIndex();
         }
     }
@@ -820,9 +820,9 @@ public class PluginAssociationManager : IPluginAssociationManager
 
         foreach (var (pluginId, settingsConfig) in presetConfigs)
         {
-            if (string.IsNullOrEmpty(pluginId))
+            if (!PluginIdValidator.IsValid(pluginId))
             {
-                _logService.Warn(nameof(PluginAssociationManager), "ApplyPluginPresetConfigs: 跳过空的插件ID");
+                _logService.Warn(nameof(PluginAssociationManager), "ApplyPluginPresetConfigs: 跳过无效的插件ID");
                 continue;
             }
 

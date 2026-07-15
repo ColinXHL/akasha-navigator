@@ -417,6 +417,19 @@ public static class PluginEngine
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: webview");
         }
 
+        // companion API（高风险权限；仅工厂路径支持）
+        if (permissions.Contains(PluginPermissions.Companion, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!useFactoryPath)
+            {
+                throw new InvalidOperationException("CompanionApi requires PluginEngineOptions.HostObjectFactory.");
+            }
+
+            var companionApi = hostObjectFactory!.CreateCompanionApi(context);
+            engine.AddHostObject("companion", companionApi);
+            LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: companion");
+        }
+
         // osd API（始终暴露，用于显示提示）
         if (useFactoryPath)
         {

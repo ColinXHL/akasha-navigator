@@ -23,4 +23,6 @@ public interface IPluginHostObjectFactory
     HotkeyApi CreateHotkeyApi(string pluginId);
 
     OsdApi CreateOsdApi(string pluginId);
+
+    CompanionApi CreateCompanionApi(PluginContext context);
 }

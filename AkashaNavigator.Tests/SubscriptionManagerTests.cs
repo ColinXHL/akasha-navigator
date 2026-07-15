@@ -497,6 +497,18 @@ namespace AkashaNavigator.Tests
             Assert.Equal(expectedPath, path);
         }
 
+        [Theory]
+        [InlineData("../outside")]
+        [InlineData("folder/plugin")]
+        [InlineData("folder\\plugin")]
+        public void UnsafePluginId_ShouldBeRejectedBeforeResolvingOrDeletingConfigDirectory(string pluginId)
+        {
+            var manager = CreateManager();
+
+            Assert.Throws<ArgumentException>(() => manager.GetPluginConfigDirectory("genshin", pluginId));
+            Assert.False(manager.UnsubscribePlugin(pluginId, "genshin"));
+        }
+
         #endregion
 
         #region Edge Cases

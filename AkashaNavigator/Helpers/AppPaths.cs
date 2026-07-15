@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using AkashaNavigator.Models.Plugin;
 
 namespace AkashaNavigator.Helpers
 {
@@ -86,6 +87,11 @@ public static class AppPaths
     /// </summary>
     public static string AssociationsFilePath { get; }
 
+    /// <summary>
+    /// 高风险插件权限授权记录（User/Data/plugin-permission-consents.json）
+    /// </summary>
+    public static string PluginPermissionConsentsFilePath { get; }
+
     static AppPaths()
     {
         // 获取应用程序目录
@@ -127,6 +133,9 @@ public static class AppPaths
         // 插件-Profile关联索引文件路径
         AssociationsFilePath = Path.Combine(DataDirectory, "associations.json");
 
+        // 高风险插件权限授权记录
+        PluginPermissionConsentsFilePath = Path.Combine(DataDirectory, "plugin-permission-consents.json");
+
         // 确保目录存在
         EnsureDirectoriesExist();
     }
@@ -139,6 +148,9 @@ public static class AppPaths
     /// <returns>配置目录路径</returns>
     public static string GetPluginConfigDirectory(string profileId, string pluginId)
     {
+        if (!PluginIdValidator.IsValid(pluginId))
+            throw new ArgumentException("Plugin ID format is invalid.", nameof(pluginId));
+
         return Path.Combine(ProfilesDirectory, profileId, AppConstants.PluginsDirectoryName, pluginId);
     }
 

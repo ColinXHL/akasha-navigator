@@ -72,23 +72,49 @@ public class PluginManifestTests
     public Property ValidManifest_ShouldLoadSuccessfully(NonEmptyString id, NonEmptyString name, NonEmptyString version,
                                                          NonEmptyString main)
     {
+        var safeId = $"plugin-{Math.Abs((long)id.Get.GetHashCode())}";
         // 排除只包含空白字符的字符串（这些不是有效的必需字段值）
-        var allFieldsNonWhitespace = !string.IsNullOrWhiteSpace(id.Get) && !string.IsNullOrWhiteSpace(name.Get) &&
+        var allFieldsNonWhitespace = !string.IsNullOrWhiteSpace(name.Get) &&
                                      !string.IsNullOrWhiteSpace(version.Get) && !string.IsNullOrWhiteSpace(main.Get);
 
         // 构建包含所有必需字段的 JSON
-        var jsonObj = new Dictionary<string, object> { ["id"] = id.Get, ["name"] = name.Get, ["version"] = version.Get,
+        var jsonObj = new Dictionary<string, object> { ["id"] = safeId, ["name"] = name.Get, ["version"] = version.Get,
                                                        ["main"] = main.Get };
 
         var json = JsonSerializer.Serialize(jsonObj);
         var result = PluginManifest.LoadFromJson(json);
 
         // 只有当所有字段都是非空白时才验证
-        var allMatch = result.IsSuccess && result.Manifest?.Id == id.Get && result.Manifest?.Name == name.Get &&
+        var allMatch = result.IsSuccess && result.Manifest?.Id == safeId && result.Manifest?.Name == name.Get &&
                        result.Manifest?.Version == version.Get && result.Manifest?.Main == main.Get;
 
         return allMatch.When(allFieldsNonWhitespace)
-            .Label($"加载成功且字段匹配 (id={id.Get}, name={name.Get}, version={version.Get}, main={main.Get})");
+            .Label($"加载成功且字段匹配 (id={safeId}, name={name.Get}, version={version.Get}, main={main.Get})");
+    }
+
+    [Theory]
+    [InlineData("../outside")]
+    [InlineData("folder/plugin")]
+    [InlineData("folder\\plugin")]
+    [InlineData("C:plugin")]
+    [InlineData(".hidden")]
+    [InlineData("plugin.")]
+    [InlineData("CON")]
+    [InlineData("插件")]
+    public void Manifest_ShouldRejectUnsafePluginId(string pluginId)
+    {
+        var manifest = new PluginManifest
+        {
+            Id = pluginId,
+            Name = "Unsafe Plugin",
+            Version = "1.0.0",
+            Main = "main.js"
+        };
+
+        var validation = manifest.Validate();
+
+        Assert.False(validation.IsValid);
+        Assert.Contains("id", validation.Errors.Keys);
     }
 
     /// <summary>
@@ -334,6 +360,87 @@ public class PluginManifestTests
         Assert.Empty(result.Manifest.HttpAllowedUrls!);
         Assert.NotNull(result.Manifest.DefaultConfig);
         Assert.Empty(result.Manifest.DefaultConfig!);
+    }
+
+    [Fact]
+    public void CompanionManifest_ShouldDeserializeAndValidate()
+    {
+        var json = """
+                   {
+                     "id": "automation",
+                     "name": "Automation",
+                     "version": "1.0.0",
+                     "main": "main.js",
+                     "permissions": ["companion"],
+                     "companion": {
+                       "executable": "worker/win-x64/AkashaAutomation.Worker.exe",
+                       "protocolVersion": 1,
+                       "lifetime": "plugin",
+                       "singleInstance": true
+                     }
+                   }
+                   """;
+
+        var result = PluginManifest.LoadFromJson(json);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.Equal("worker/win-x64/AkashaAutomation.Worker.exe", result.Manifest!.Companion!.Executable);
+        Assert.True(PluginPermissions.IsHighRiskPermission(PluginPermissions.Companion));
+    }
+
+    [Theory]
+    [InlineData("../outside.exe")]
+    [InlineData("C:/outside.exe")]
+    [InlineData("worker/helper.dll")]
+    public void CompanionManifest_ShouldRejectUnsafeExecutable(string executable)
+    {
+        var manifest = new PluginManifest
+        {
+            Id = "automation",
+            Name = "Automation",
+            Version = "1.0.0",
+            Main = "main.js",
+            Permissions = new List<string> { PluginPermissions.Companion },
+            Companion = new CompanionManifest { Executable = executable }
+        };
+
+        var validation = manifest.Validate();
+
+        Assert.False(validation.IsValid);
+        Assert.Contains("companion.executable", validation.Errors.Keys);
+    }
+
+    [Fact]
+    public void CompanionManifest_ShouldRequireCompanionPermission()
+    {
+        var manifest = new PluginManifest
+        {
+            Id = "automation",
+            Name = "Automation",
+            Version = "1.0.0",
+            Main = "main.js",
+            Companion = new CompanionManifest { Executable = "worker/worker.exe" }
+        };
+
+        var validation = manifest.Validate();
+
+        Assert.False(validation.IsValid);
+        Assert.Contains("permissions", validation.Errors.Keys);
+    }
+
+    [Fact]
+    public void GetHighRiskPermissions_ShouldReturnDistinctCompanionPermissionOnly()
+    {
+        var permissions = new[]
+        {
+            PluginPermissions.Overlay,
+            PluginPermissions.Companion,
+            "COMPANION"
+        };
+
+        var result = PluginPermissions.GetHighRiskPermissions(permissions);
+
+        Assert.Equal(new[] { PluginPermissions.Companion }, result, StringComparer.OrdinalIgnoreCase);
     }
 }
 }

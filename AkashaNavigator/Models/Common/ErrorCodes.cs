@@ -39,6 +39,11 @@ public static class PluginErrorCodes
     /// 文件删除失败
     /// </summary>
     public const string DeleteFailed = "PLUGIN_DELETE_FAILED";
+
+    /// <summary>
+    /// 用户拒绝高风险权限
+    /// </summary>
+    public const string PermissionConsentDeclined = "PLUGIN_PERMISSION_CONSENT_DECLINED";
 }
 
 /// <summary>

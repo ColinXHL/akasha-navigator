@@ -21,6 +21,7 @@ public sealed class PluginHostObjectFactory : IPluginHostObjectFactory
     private readonly HotkeyService _hotkeyService;
     private readonly OsdManager _osdManager;
     private readonly ILogService _logService;
+    private readonly ICompanionProcessManager _companionProcessManager;
 
     public PluginHostObjectFactory(
         IPlayerRuntimeBridge runtimeBridge,
@@ -31,7 +32,8 @@ public sealed class PluginHostObjectFactory : IPluginHostObjectFactory
         ScriptExecutionQueue scriptExecutionQueue,
         HotkeyService hotkeyService,
         OsdManager osdManager,
-        ILogService logService)
+        ILogService logService,
+        ICompanionProcessManager companionProcessManager)
     {
         _runtimeBridge = runtimeBridge ?? throw new ArgumentNullException(nameof(runtimeBridge));
         _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
@@ -42,6 +44,7 @@ public sealed class PluginHostObjectFactory : IPluginHostObjectFactory
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _osdManager = osdManager ?? throw new ArgumentNullException(nameof(osdManager));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _companionProcessManager = companionProcessManager ?? throw new ArgumentNullException(nameof(companionProcessManager));
     }
 
     public PlayerApi CreatePlayerApi(PluginContext context, EventManager eventManager)
@@ -88,5 +91,10 @@ public sealed class PluginHostObjectFactory : IPluginHostObjectFactory
     public OsdApi CreateOsdApi(string pluginId)
     {
         return new OsdApi(pluginId, _osdManager);
+    }
+
+    public CompanionApi CreateCompanionApi(PluginContext context)
+    {
+        return new CompanionApi(context, _companionProcessManager, _logService);
     }
 }

@@ -44,7 +44,7 @@ public static class ServiceCollectionExtensions
         // ProfileRegistry（依赖LogService）
         services.AddSingleton<IProfileRegistry, ProfileRegistry>();
 
-        // PluginLibrary（无依赖）
+        // PluginLibrary（依赖 CompanionProcessManager + 高风险权限确认服务）
         // 只注册接口，避免重复注册导致多个实例
         services.AddSingleton<IPluginLibrary, PluginLibrary>();
 
@@ -106,6 +106,12 @@ public static class ServiceCollectionExtensions
 
         // MonitorLayoutService（依赖 LogService + EventBus，用于多显示器布局管理）
         services.AddSingleton<IMonitorLayoutService, MonitorLayoutService>();
+
+        // CompanionProcessManager（固定清单伴生进程、命名管道和 Job Object）
+        services.AddSingleton<ICompanionProcessManager, CompanionProcessManager>();
+
+        // 高风险插件权限确认（安装和权限升级时显示）
+        services.AddSingleton<IPluginPermissionConsentService, PluginPermissionConsentService>();
 
         // ============================================================
         // Level 2: 依赖 LogService + ProfileManager（复杂依赖）

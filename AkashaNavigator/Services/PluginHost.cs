@@ -31,6 +31,8 @@ public class PluginHost : IPluginHost, IDisposable
     private readonly HotkeyService _hotkeyService;
     private readonly Core.OsdManager _osdManager;
     private readonly IPluginHostObjectFactory _hostObjectFactory;
+    private readonly ICompanionProcessManager _companionProcessManager;
+    private readonly IPluginPermissionConsentService _permissionConsentService;
 
 #endregion
 
@@ -85,7 +87,9 @@ public class PluginHost : IPluginHost, IDisposable
                       IOverlayManager overlayManager, IPanelManager panelManager,
                       ICursorDetectionService cursorDetectionService, ISubtitleService subtitleService,
                       ScriptExecutionQueue scriptExecutionQueue, HotkeyService hotkeyService,
-                      Core.OsdManager osdManager, IPluginHostObjectFactory hostObjectFactory)
+                      Core.OsdManager osdManager, IPluginHostObjectFactory hostObjectFactory,
+                      ICompanionProcessManager companionProcessManager,
+                      IPluginPermissionConsentService permissionConsentService)
     {
         _logService = logService;
         _pluginAssociationManager = pluginAssociationManager;
@@ -99,6 +103,8 @@ public class PluginHost : IPluginHost, IDisposable
         _hotkeyService = hotkeyService;
         _osdManager = osdManager;
         _hostObjectFactory = hostObjectFactory;
+        _companionProcessManager = companionProcessManager;
+        _permissionConsentService = permissionConsentService;
 
         // 订阅插件启用状态变化事件
         _pluginAssociationManager.PluginEnabledChanged += OnPluginEnabledChanged;
@@ -118,7 +124,9 @@ public class PluginHost : IPluginHost, IDisposable
                         IOverlayManager overlayManager, IPanelManager panelManager,
                         ICursorDetectionService cursorDetectionService, ISubtitleService subtitleService,
                         ScriptExecutionQueue scriptExecutionQueue, HotkeyService hotkeyService,
-                        Core.OsdManager osdManager, IPluginHostObjectFactory hostObjectFactory)
+                        Core.OsdManager osdManager, IPluginHostObjectFactory hostObjectFactory,
+                        ICompanionProcessManager? companionProcessManager = null,
+                        IPluginPermissionConsentService? permissionConsentService = null)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _pluginAssociationManager =
@@ -133,6 +141,8 @@ public class PluginHost : IPluginHost, IDisposable
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _osdManager = osdManager ?? throw new ArgumentNullException(nameof(osdManager));
         _hostObjectFactory = hostObjectFactory ?? throw new ArgumentNullException(nameof(hostObjectFactory));
+        _companionProcessManager = companionProcessManager ?? new CompanionProcessManager(logService);
+        _permissionConsentService = permissionConsentService ?? new FailClosedPluginPermissionConsentService();
         // 测试用构造函数，不订阅事件
     }
 
@@ -599,6 +609,12 @@ public class PluginHost : IPluginHost, IDisposable
 
         var manifest = loadResult.Manifest!;
 
+        if (!string.Equals(manifest.Id, pluginId, StringComparison.OrdinalIgnoreCase))
+        {
+            Log("插件清单 ID ({ManifestPluginId}) 与库 ID ({PluginId}) 不匹配，拒绝加载", manifest.Id, pluginId);
+            return;
+        }
+
         // 检查是否已加载同 ID 插件
         if (_loadedPlugins.Any(p => p.PluginId == manifest.Id))
         {
@@ -624,6 +640,14 @@ public class PluginHost : IPluginHost, IDisposable
         if (!config.Enabled)
         {
             Log("插件 {PluginId} 已禁用，跳过加载", manifest.Id);
+            return;
+        }
+
+        if (!_permissionConsentService.EnsureHighRiskPermissionsApproved(
+                manifest,
+                PluginPermissionConsentOperation.FirstEnable))
+        {
+            Log("插件 {PluginId} 的高风险权限未获授权，拒绝首次启用", manifest.Id);
             return;
         }
 
@@ -686,6 +710,15 @@ public class PluginHost : IPluginHost, IDisposable
             Log("插件 {PluginId} onUnload 调用失败: {ErrorMessage}", pluginId, ex.Message);
         }
 
+        try
+        {
+            _companionProcessManager.StopAsync(pluginId).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Log("停止插件 Companion 失败 ({PluginId}): {ErrorMessage}", pluginId, ex.Message);
+        }
+
         // 清理 PluginApi
         if (_pluginApis.TryGetValue(pluginId, out var pluginApi))
         {
@@ -739,6 +772,18 @@ public class PluginHost : IPluginHost, IDisposable
     private void Log(string messageTemplate, params object?[] args)
     {
         _logService.Info(nameof(PluginHost), messageTemplate, args);
+    }
+
+    private sealed class FailClosedPluginPermissionConsentService : IPluginPermissionConsentService
+    {
+        public bool EnsureHighRiskPermissionsApproved(
+            PluginManifest manifest,
+            PluginPermissionConsentOperation operation)
+        {
+            return PluginPermissions.GetHighRiskPermissions(manifest.Permissions).Count == 0;
+        }
+
+        public bool RevokeHighRiskPermissionConsent(string pluginId) => true;
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Models.Plugin;
 
 namespace AkashaNavigator.Services
 {
@@ -332,7 +333,7 @@ public class SubscriptionManager : ISubscriptionManager
     /// <returns>是否已订阅</returns>
     public bool IsPluginSubscribed(string pluginId, string profileId)
     {
-        if (string.IsNullOrWhiteSpace(pluginId) || string.IsNullOrWhiteSpace(profileId))
+        if (!PluginIdValidator.IsValid(pluginId) || string.IsNullOrWhiteSpace(profileId))
             return false;
 
         EnsureLoaded();
@@ -347,7 +348,7 @@ public class SubscriptionManager : ISubscriptionManager
     /// <returns>是否成功</returns>
     public bool SubscribePlugin(string pluginId, string profileId)
     {
-        if (string.IsNullOrWhiteSpace(pluginId) || string.IsNullOrWhiteSpace(profileId))
+        if (!PluginIdValidator.IsValid(pluginId) || string.IsNullOrWhiteSpace(profileId))
         {
             _logService.Warn(nameof(SubscriptionManager), "订阅插件失败: pluginId 或 profileId 为空");
             return false;
@@ -406,7 +407,7 @@ public class SubscriptionManager : ISubscriptionManager
     /// <returns>是否成功</returns>
     public bool UnsubscribePlugin(string pluginId, string profileId)
     {
-        if (string.IsNullOrWhiteSpace(pluginId) || string.IsNullOrWhiteSpace(profileId))
+        if (!PluginIdValidator.IsValid(pluginId) || string.IsNullOrWhiteSpace(profileId))
         {
             _logService.Warn(nameof(SubscriptionManager), "取消订阅插件失败: pluginId 或 profileId 为空");
             return false;
@@ -464,6 +465,9 @@ public class SubscriptionManager : ISubscriptionManager
     /// <returns>配置目录路径</returns>
     public string GetPluginConfigDirectory(string profileId, string pluginId)
     {
+        if (!PluginIdValidator.IsValid(pluginId))
+            throw new ArgumentException("Plugin ID format is invalid.", nameof(pluginId));
+
         return Path.Combine(UserProfilesDirectory, profileId, "plugins", pluginId);
     }
 

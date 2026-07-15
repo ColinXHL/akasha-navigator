@@ -75,7 +75,8 @@ public sealed class PluginHostUnsubscribeTests
                                                             scriptExecutionQueue,
                                                             hotkeyService,
                                                             osdManager,
-                                                            logService);
+                                                            logService,
+                                                            new CompanionProcessManager(logService));
 
         return new PluginHost(true,
                               logService,

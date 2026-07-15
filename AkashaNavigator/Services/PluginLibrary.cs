@@ -52,12 +52,12 @@ public class PluginLibrary : IPluginLibrary
     /// <summary>
     /// 全局插件库目录
     /// </summary>
-    public string LibraryDirectory => AppPaths.InstalledPluginsDirectory;
+    public string LibraryDirectory => _libraryDirectory;
 
     /// <summary>
     /// 插件库索引文件路径
     /// </summary>
-    public string LibraryIndexPath => AppPaths.LibraryIndexPath;
+    public string LibraryIndexPath => _libraryIndexPath;
 
 #endregion
 
@@ -65,6 +65,11 @@ public class PluginLibrary : IPluginLibrary
 
     private PluginLibraryIndex _index;
     private readonly object _indexLock = new();
+    private readonly ICompanionProcessManager _companionProcessManager;
+    private readonly IPluginPermissionConsentService _permissionConsentService;
+    private readonly string _libraryDirectory;
+    private readonly string _libraryIndexPath;
+    private readonly string _builtInPluginsDirectory;
 
 #endregion
 
@@ -73,18 +78,39 @@ public class PluginLibrary : IPluginLibrary
     /// <summary>
     /// DI容器使用的构造函数
     /// </summary>
-    public PluginLibrary()
+    public PluginLibrary(
+        ICompanionProcessManager companionProcessManager,
+        IPluginPermissionConsentService permissionConsentService)
     {
+        _companionProcessManager = companionProcessManager ??
+                                   throw new ArgumentNullException(nameof(companionProcessManager));
+        _permissionConsentService = permissionConsentService ??
+                                    throw new ArgumentNullException(nameof(permissionConsentService));
+        _libraryDirectory = AppPaths.InstalledPluginsDirectory;
+        _libraryIndexPath = AppPaths.LibraryIndexPath;
+        _builtInPluginsDirectory = AppPaths.BuiltInPluginsDirectory;
         _index = LoadIndex();
     }
 
     /// <summary>
     /// 用于测试的构造函数
     /// </summary>
-    internal PluginLibrary(string libraryDirectory, string indexPath)
+    internal PluginLibrary(
+        string libraryDirectory,
+        string indexPath,
+        string builtInPluginsDirectory,
+        ICompanionProcessManager companionProcessManager,
+        IPluginPermissionConsentService permissionConsentService)
     {
+        _companionProcessManager = companionProcessManager ??
+                                   throw new ArgumentNullException(nameof(companionProcessManager));
+        _permissionConsentService = permissionConsentService ??
+                                    throw new ArgumentNullException(nameof(permissionConsentService));
+        _libraryDirectory = Path.GetFullPath(libraryDirectory);
+        _libraryIndexPath = Path.GetFullPath(indexPath);
+        _builtInPluginsDirectory = Path.GetFullPath(builtInPluginsDirectory);
         // 此构造函数用于测试，允许自定义路径
-        _index = PluginLibraryIndex.LoadFromFile(indexPath);
+        _index = PluginLibraryIndex.LoadFromFile(_libraryIndexPath);
     }
 
 #endregion
@@ -154,7 +180,7 @@ public class PluginLibrary : IPluginLibrary
     /// </summary>
     public bool IsInstalled(string pluginId)
     {
-        if (string.IsNullOrEmpty(pluginId))
+        if (!PluginIdValidator.IsValid(pluginId))
             return false;
 
         lock (_indexLock)
@@ -168,8 +194,8 @@ public class PluginLibrary : IPluginLibrary
     /// </summary>
     public string GetPluginDirectory(string pluginId)
     {
-        var installedPath = Path.Combine(LibraryDirectory, pluginId);
-        var builtInPath = Path.Combine(AppPaths.BuiltInPluginsDirectory, pluginId);
+        var installedPath = GetContainedPluginDirectory(LibraryDirectory, pluginId);
+        var builtInPath = GetContainedPluginDirectory(_builtInPluginsDirectory, pluginId);
 
         if (!Directory.Exists(installedPath))
             return builtInPath;
@@ -197,11 +223,17 @@ public class PluginLibrary : IPluginLibrary
     /// </summary>
     public PluginManifest? GetPluginManifest(string pluginId)
     {
+        if (!PluginIdValidator.IsValid(pluginId))
+            return null;
+
         var pluginDir = GetPluginDirectory(pluginId);
         var manifestPath = Path.Combine(pluginDir, "plugin.json");
 
         var result = PluginManifest.LoadFromFile(manifestPath);
-        return result.IsSuccess ? result.Manifest : null;
+        return result.IsSuccess &&
+               string.Equals(result.Manifest?.Id, pluginId, StringComparison.OrdinalIgnoreCase)
+            ? result.Manifest
+            : null;
     }
 
     /// <summary>
@@ -239,6 +271,12 @@ public class PluginLibrary : IPluginLibrary
     /// <returns>安装结果</returns>
     public Result<InstalledPluginInfo> InstallPlugin(string pluginId, string? sourceDirectory = null)
     {
+        if (!PluginIdValidator.IsValid(pluginId))
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(PluginErrorCodes.InvalidManifest, "插件 ID 格式无效", pluginId: pluginId));
+        }
+
         // 检查是否已安装
         if (IsInstalled(pluginId))
         {
@@ -247,7 +285,7 @@ public class PluginLibrary : IPluginLibrary
         }
 
         // 确定源目录
-        var sourcePath = sourceDirectory ?? Path.Combine(AppPaths.BuiltInPluginsDirectory, pluginId);
+        var sourcePath = sourceDirectory ?? GetContainedPluginDirectory(_builtInPluginsDirectory, pluginId);
 
         // 检查源目录是否存在
         if (!Directory.Exists(sourcePath))
@@ -276,8 +314,19 @@ public class PluginLibrary : IPluginLibrary
                              $"清单中的ID ({manifest.Id}) 与请求的ID ({pluginId}) 不匹配", pluginId: pluginId));
         }
 
+        if (!_permissionConsentService.EnsureHighRiskPermissionsApproved(
+                manifest,
+                PluginPermissionConsentOperation.Install))
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(
+                    PluginErrorCodes.PermissionConsentDeclined,
+                    "未获得或无法保存插件请求的高风险权限授权",
+                    pluginId: pluginId));
+        }
+
         // 复制插件文件到用户插件库（不要写入内置 Repos 目录）
-        var targetDir = Path.Combine(LibraryDirectory, pluginId);
+        var targetDir = GetContainedPluginDirectory(LibraryDirectory, pluginId);
         try
         {
             CopyDirectory(sourcePath, targetDir);
@@ -348,6 +397,12 @@ public class PluginLibrary : IPluginLibrary
     public Result UninstallPlugin(string pluginId, bool force = false,
                                   Func<string, List<string>>? getReferencingProfiles = null)
     {
+        if (!PluginIdValidator.IsValid(pluginId))
+        {
+            return Result.Failure(
+                Error.Plugin(PluginErrorCodes.InvalidManifest, "插件 ID 格式无效", pluginId: pluginId));
+        }
+
         // 检查是否已安装
         if (!IsInstalled(pluginId))
         {
@@ -369,9 +424,19 @@ public class PluginLibrary : IPluginLibrary
         }
 
         // 仅删除用户插件库目录（内置 Repos 目录不应被删除）
-        var pluginDir = Path.Combine(LibraryDirectory, pluginId);
+        var pluginDir = GetContainedPluginDirectory(LibraryDirectory, pluginId);
         try
         {
+            StopCompanionBeforeFileMutation(pluginId);
+            if (!_permissionConsentService.RevokeHighRiskPermissionConsent(pluginId))
+            {
+                return Result.Failure(
+                    Error.Plugin(
+                        PluginErrorCodes.PermissionConsentDeclined,
+                        "无法撤销插件的高风险权限授权，已取消卸载",
+                        pluginId: pluginId));
+            }
+
             if (Directory.Exists(pluginDir))
             {
                 Directory.Delete(pluginDir, true);
@@ -424,17 +489,25 @@ public class PluginLibrary : IPluginLibrary
     /// <returns>更新检查结果</returns>
     public UpdateCheckResult CheckForUpdate(string pluginId)
     {
-        // 获取已安装版本
-        var installedInfo = GetInstalledPluginInfo(pluginId);
-        if (installedInfo == null)
+        if (!PluginIdValidator.IsValid(pluginId))
+        {
+            return UpdateCheckResult.Invalid(pluginId, string.Empty, "插件 ID 格式无效");
+        }
+
+        string? currentVersion;
+        lock (_indexLock)
+        {
+            currentVersion = _index.Plugins.FirstOrDefault(
+                entry => string.Equals(entry.Id, pluginId, StringComparison.OrdinalIgnoreCase))?.Version;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentVersion))
         {
             return UpdateCheckResult.NoUpdate(pluginId, "未安装");
         }
 
-        var currentVersion = installedInfo.Version ?? "1.0.0";
-
         // 检查内置插件目录是否有该插件
-        var builtInPath = Path.Combine(AppPaths.BuiltInPluginsDirectory, pluginId);
+        var builtInPath = GetContainedPluginDirectory(_builtInPluginsDirectory, pluginId);
         if (!Directory.Exists(builtInPath))
         {
             return UpdateCheckResult.NoUpdate(pluginId, currentVersion);
@@ -446,6 +519,14 @@ public class PluginLibrary : IPluginLibrary
         if (!manifestResult.IsSuccess || manifestResult.Manifest == null)
         {
             return UpdateCheckResult.NoUpdate(pluginId, currentVersion);
+        }
+
+        if (!string.Equals(manifestResult.Manifest.Id, pluginId, StringComparison.OrdinalIgnoreCase))
+        {
+            return UpdateCheckResult.Invalid(
+                pluginId,
+                currentVersion,
+                $"更新清单中的 ID ({manifestResult.Manifest.Id}) 与插件 ID ({pluginId}) 不匹配");
         }
 
         var availableVersion = manifestResult.Manifest.Version ?? "1.0.0";
@@ -491,18 +572,41 @@ public class PluginLibrary : IPluginLibrary
         var checkResult = CheckForUpdate(pluginId);
         if (!checkResult.HasUpdate)
         {
-            return UpdateResult.NoUpdateAvailable();
+            return string.IsNullOrWhiteSpace(checkResult.ErrorMessage)
+                ? UpdateResult.NoUpdateAvailable()
+                : UpdateResult.Failed(checkResult.ErrorMessage);
         }
 
         var oldVersion = checkResult.CurrentVersion;
         var newVersion = checkResult.AvailableVersion!;
         var sourcePath = checkResult.SourcePath!;
 
+        var incomingManifestResult = PluginManifest.LoadFromFile(Path.Combine(sourcePath, "plugin.json"));
+        if (!incomingManifestResult.IsSuccess || incomingManifestResult.Manifest == null)
+        {
+            return UpdateResult.Failed($"更新清单无效: {incomingManifestResult.ErrorMessage}");
+        }
+
+        if (!string.Equals(incomingManifestResult.Manifest.Id, pluginId, StringComparison.OrdinalIgnoreCase))
+        {
+            return UpdateResult.Failed(
+                $"更新清单中的 ID ({incomingManifestResult.Manifest.Id}) 与插件 ID ({pluginId}) 不匹配");
+        }
+
+        if (!_permissionConsentService.EnsureHighRiskPermissionsApproved(
+                incomingManifestResult.Manifest,
+                PluginPermissionConsentOperation.Update))
+        {
+            return UpdateResult.Failed("未获得或无法保存更新所需的高风险权限授权");
+        }
+
         // 获取目标目录（仅更新用户插件库目录）
-        var targetDir = Path.Combine(LibraryDirectory, pluginId);
+        var targetDir = GetContainedPluginDirectory(LibraryDirectory, pluginId);
 
         try
         {
+            StopCompanionBeforeFileMutation(pluginId);
+
             // 删除旧文件（保留配置目录 - 配置在 Profile 目录中，不在这里）
             if (Directory.Exists(targetDir))
             {
@@ -607,6 +711,30 @@ public class PluginLibrary : IPluginLibrary
         return CompareVersions(availableVersion, currentVersion) > 0;
     }
 
+    private void StopCompanionBeforeFileMutation(string pluginId)
+    {
+        _companionProcessManager.StopAsync(pluginId).GetAwaiter().GetResult();
+    }
+
+    private static string GetContainedPluginDirectory(string rootDirectory, string pluginId)
+    {
+        if (!PluginIdValidator.IsValid(pluginId))
+        {
+            throw new ArgumentException("Plugin ID format is invalid.", nameof(pluginId));
+        }
+
+        var root = Path.GetFullPath(rootDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var candidate = Path.GetFullPath(Path.Combine(root, pluginId));
+        var rootPrefix = root + Path.DirectorySeparatorChar;
+        if (!candidate.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Plugin directory escapes its allowed root.");
+        }
+
+        return candidate;
+    }
+
 #endregion
 
 #region Utility Methods
@@ -618,10 +746,10 @@ public class PluginLibrary : IPluginLibrary
     {
         var result = new List<PluginManifest>();
 
-        if (!Directory.Exists(AppPaths.BuiltInPluginsDirectory))
+        if (!Directory.Exists(_builtInPluginsDirectory))
             return result;
 
-        foreach (var dir in Directory.GetDirectories(AppPaths.BuiltInPluginsDirectory))
+        foreach (var dir in Directory.GetDirectories(_builtInPluginsDirectory))
         {
             var pluginId = Path.GetFileName(dir);
 

@@ -29,7 +29,8 @@ public class PluginHostObjectFactoryTests
                                                   new ScriptExecutionQueue(new FakeLogService()),
                                                   new HotkeyService(),
                                                   new OsdManager(),
-                                                  new FakeLogService());
+                                                  new FakeLogService(),
+                                                  new CompanionProcessManager(new FakeLogService()));
 
         var context = new PluginContext("plugin.alpha", @"C:\\plugin", @"C:\\config",
                                         new PluginManifest
@@ -61,14 +62,16 @@ public class PluginHostObjectFactoryTests
                                                   new ScriptExecutionQueue(new FakeLogService()),
                                                   new HotkeyService(),
                                                   new OsdManager(),
-                                                  new FakeLogService());
+                                                  new FakeLogService(),
+                                                  new CompanionProcessManager(new FakeLogService()));
 
         PluginEngine.InitializeEngine(engine,
                                       tempDir.Path,
                                       tempDir.Path,
                                       null,
                                       new PluginConfig("plugin.alpha"),
-                                      CreateManifest(PluginPermissions.Overlay, PluginPermissions.Player),
+                                      CreateManifest(PluginPermissions.Overlay, PluginPermissions.Player,
+                                                     PluginPermissions.Companion),
                                       new PluginEngineOptions
                                       {
                                           HostObjectFactory = factory
@@ -78,6 +81,7 @@ public class PluginHostObjectFactoryTests
         Assert.True(IsGlobalDefined(engine, "player"));
         Assert.True(IsGlobalDefined(engine, "webview"));
         Assert.True(IsGlobalDefined(engine, "osd"));
+        Assert.True(IsGlobalDefined(engine, "companion"));
     }
 
     [Fact]

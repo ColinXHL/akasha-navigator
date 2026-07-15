@@ -68,4 +68,19 @@ public class ServiceRegistrationTests
         var manager = provider.GetRequiredService<HotkeyManager>();
         Assert.NotNull(manager);
     }
+
+    [Fact]
+    public void ConfigureAppServices_RegistersCompanionSecurityServicesAsSingletons()
+    {
+        var services = new ServiceCollection();
+        services.ConfigureAppServices();
+
+        var manager = services.Single(d => d.ServiceType == typeof(ICompanionProcessManager));
+        var consent = services.Single(d => d.ServiceType == typeof(IPluginPermissionConsentService));
+
+        Assert.Equal(ServiceLifetime.Singleton, manager.Lifetime);
+        Assert.Equal(typeof(CompanionProcessManager), manager.ImplementationType);
+        Assert.Equal(ServiceLifetime.Singleton, consent.Lifetime);
+        Assert.Equal(typeof(PluginPermissionConsentService), consent.ImplementationType);
+    }
 }

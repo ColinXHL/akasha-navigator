@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Models.Plugin;
 
 namespace AkashaNavigator.Services
 {
@@ -193,7 +194,7 @@ public class PluginRegistry : IPluginRegistry
     /// <returns>插件信息，不存在时返回 null</returns>
     public BuiltInPluginInfo? GetPlugin(string pluginId)
     {
-        if (string.IsNullOrWhiteSpace(pluginId))
+        if (!PluginIdValidator.IsValid(pluginId))
             return null;
 
         EnsureLoaded();
@@ -207,6 +208,9 @@ public class PluginRegistry : IPluginRegistry
     /// <returns>源码目录路径</returns>
     public string GetPluginSourceDirectory(string pluginId)
     {
+        if (!PluginIdValidator.IsValid(pluginId))
+            throw new ArgumentException("Plugin ID format is invalid.", nameof(pluginId));
+
         return Path.Combine(BuiltInPluginsDirectory, pluginId);
     }
 
