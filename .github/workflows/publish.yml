@@ -67,6 +67,20 @@ jobs:
           fi
           echo "✅ 版本号匹配"
 
+      - name: Verify release notes match version
+        if: github.event.inputs.create_release == 'true'
+        run: |
+          VERSION="${{ steps.set-version.outputs.version }}"
+          if [[ ! -s release_badges.md ]]; then
+            echo "❌ 错误：release_badges.md 不存在或内容为空"
+            exit 1
+          fi
+          if ! grep -Fq "## v${VERSION}" release_badges.md; then
+            echo "❌ 错误：release_badges.md 与发布版本 v${VERSION} 不匹配"
+            exit 1
+          fi
+          echo "✅ Release Notes 版本匹配"
+
   build_dist:
     runs-on: windows-latest
     needs: [validate]
@@ -309,6 +323,8 @@ jobs:
     if: github.event.inputs.create_release == 'true'
 
     steps:
+      - uses: actions/checkout@v5
+
       - uses: actions/download-artifact@v7
         with:
           name: AkashaNavigator_Installer
@@ -326,6 +342,7 @@ jobs:
           name: AkashaNavigator v${{ needs.validate.outputs.version }}
           draft: true
           prerelease: ${{ github.event.inputs.channel == 'dev' }}
+          body_path: release_badges.md
           fail_on_unmatched_files: true
           files: |
             release/AkashaNavigator.Install.*.exe
