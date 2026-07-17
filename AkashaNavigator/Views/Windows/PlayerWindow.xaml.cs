@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -54,6 +56,7 @@ public partial class PlayerWindow : Window
     private readonly ScriptExecutionQueue _scriptQueue;
     private readonly IPioneerNoteService _pioneerNoteService;
     private readonly IMonitorLayoutService _monitorLayoutService;
+    private readonly ShutdownCoordinator _shutdownCoordinator;
 
     /// <summary>
     /// 是否最大化
@@ -135,6 +138,9 @@ public partial class PlayerWindow : Window
     /// 本次进入可缩放边缘后是否已显示提示
     /// </summary>
     private bool _hasShownResizeHintInCurrentHover;
+    private CoreWebView2Environment? _webViewEnvironment;
+    private Stopwatch? _webViewDisposeStopwatch;
+    private int _webViewDisposed;
 
 #endregion
 
@@ -147,7 +153,7 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
                         IDialogFactory dialogFactory, OsdManager osdManager,
                         Func<PioneerNoteWindow> pioneerNoteWindowFactory,
                         ScriptExecutionQueue scriptQueue, IPioneerNoteService pioneerNoteService,
-                        IMonitorLayoutService monitorLayoutService)
+                        IMonitorLayoutService monitorLayoutService, ShutdownCoordinator shutdownCoordinator)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
@@ -167,6 +173,7 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
         _scriptQueue = scriptQueue ?? throw new ArgumentNullException(nameof(scriptQueue));
         _pioneerNoteService = pioneerNoteService ?? throw new ArgumentNullException(nameof(pioneerNoteService));
         _monitorLayoutService = monitorLayoutService ?? throw new ArgumentNullException(nameof(monitorLayoutService));
+        _shutdownCoordinator = shutdownCoordinator ?? throw new ArgumentNullException(nameof(shutdownCoordinator));
 
         _resizeHintHoverTimer = new DispatcherTimer
                                 {
@@ -178,6 +185,8 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
         _config = _configService.Config;
         InitializeWindowPosition();
         InitializeWindowBehavior();
+        _shutdownCoordinator.RegisterStage(
+            nameof(DisposeWebViewForShutdown), 600, DisposeWebViewForShutdown);
         InitializeWebView();
 
         // 设置 DataContext（用于数据绑定）
@@ -459,9 +468,22 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
 
             // 创建 WebView2 环境，指定 UserDataFolder 以实现 Cookie 持久化
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder, options: options);
+            _webViewEnvironment = env;
+            env.BrowserProcessExited += CoreWebView2Environment_BrowserProcessExited;
+
+            if (Volatile.Read(ref _webViewDisposed) != 0)
+            {
+                return;
+            }
 
             // 初始化 WebView2
             await WebView.EnsureCoreWebView2Async(env);
+
+            if (Volatile.Read(ref _webViewDisposed) != 0)
+            {
+                WebView.Dispose();
+                return;
+            }
 
             // 注入所有脚本（滚动条样式、控制按钮、拖动区域）
             await ScriptInjector.InjectAllAsync(WebView);
@@ -502,6 +524,11 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
         }
         catch (Exception ex)
         {
+            if (Volatile.Read(ref _webViewDisposed) != 0)
+            {
+                return;
+            }
+
             // async void 方法必须在内部处理所有异常
             MessageBox.Show($"WebView2 初始化失败：{ex.Message}\n\n请确保已安装 WebView2 Runtime。", "错误",
                             MessageBoxButton.OK, MessageBoxImage.Error);
@@ -600,6 +627,23 @@ public PlayerWindow(PlayerViewModel viewModel, IConfigService configService, IPr
                                    { Win32Helper.StartMove(this); });
             break;
         }
+    }
+
+    private void CoreWebView2Environment_BrowserProcessExited(
+        object? sender,
+        CoreWebView2BrowserProcessExitedEventArgs e)
+    {
+        if (sender is CoreWebView2Environment environment)
+        {
+            environment.BrowserProcessExited -= CoreWebView2Environment_BrowserProcessExited;
+        }
+
+        _logService.Info(
+            nameof(PlayerWindow),
+            "WebView2 浏览器进程组已退出: ProcessId={ProcessId}, ExitKind={ExitKind}, Dispose后耗时={ElapsedMilliseconds}ms",
+            e.BrowserProcessId,
+            e.BrowserProcessExitKind,
+            _webViewDisposeStopwatch?.ElapsedMilliseconds ?? 0);
     }
 
     private static bool IsBilibiliVideoUrl(string? url)
@@ -1726,27 +1770,44 @@ if (_config.EnableOsd)
         // 保存窗口状态
         SaveWindowState();
 
-        // 停止缩放提示计时器
+        _shutdownCoordinator.Shutdown();
+    }
+
+    private void DisposeWebViewForShutdown()
+    {
+        if (Interlocked.Exchange(ref _webViewDisposed, 1) != 0)
+        {
+            return;
+        }
+
+        _webViewDisposeStopwatch = Stopwatch.StartNew();
+
         StopResizeHintHover();
         _resizeHintHoverTimer.Tick -= ResizeHintHoverTimer_Tick;
-
-        // 停止穿透模式定时器
         _windowBehavior.StopClickThroughTimer();
-
-        // 停止视频时间同步
         StopVideoTimeSync();
 
-        // 取消事件订阅
-        if (WebView.CoreWebView2 != null)
-        {
-            // 分离字幕服务
-            _subtitleService.DetachFromWebView(WebView.CoreWebView2);
+        _viewModel.NavigationRequested -= OnViewModelNavigationRequested;
+        _eventBus.Unsubscribe<NavigationControlEvent>(OnNavigationControl);
+        _eventBus.Unsubscribe<OpacityQueryEvent>(OnOpacityQuery);
+        _eventBus.Unsubscribe<OpacityChangedEvent>(OnOpacityChangedFromSettings);
 
-            WebView.CoreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
-            WebView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
-            WebView.CoreWebView2.SourceChanged -= CoreWebView2_SourceChanged;
-            WebView.CoreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
+        var coreWebView2 = WebView.CoreWebView2;
+        if (coreWebView2 != null)
+        {
+            _subtitleService.DetachFromWebView(coreWebView2);
+            coreWebView2.WebMessageReceived -= CoreWebView2_WebMessageReceived;
+            coreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
+            coreWebView2.SourceChanged -= CoreWebView2_SourceChanged;
+            coreWebView2.DocumentTitleChanged -= CoreWebView2_DocumentTitleChanged;
+            coreWebView2.NewWindowRequested -= CoreWebView2_NewWindowRequested;
         }
+
+        WebView.Dispose();
+        _webViewDisposeStopwatch.Stop();
+        _logService.Info(
+            nameof(PlayerWindow), "WebView2 已显式释放，耗时 {ElapsedMilliseconds}ms",
+            _webViewDisposeStopwatch.ElapsedMilliseconds);
     }
 
 #endregion

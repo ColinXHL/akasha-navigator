@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -32,6 +33,9 @@ public partial class App : System.Windows.Application
 
     private HotkeyManager? _hotkeyManager;
     private OsdManager? _osdManager;
+    private ShutdownCoordinator? _shutdownCoordinator;
+    private Views.Windows.PlayerWindow? _playerWindow;
+    private Views.Windows.ControlBarWindow? _controlBarWindow;
 
     #endregion
 
@@ -177,6 +181,7 @@ public partial class App : System.Windows.Application
         _configService = serviceProvider.GetRequiredService<IConfigService>();
         _dataMigration = serviceProvider.GetRequiredService<DataMigration>();
         _ = serviceProvider.GetRequiredService<PluginStateCoordinator>();
+        _shutdownCoordinator = serviceProvider.GetRequiredService<ShutdownCoordinator>();
 
         _config = _configService.Config;
     }
@@ -368,6 +373,9 @@ public partial class App : System.Windows.Application
     /// </summary>
     private void InitializeManagers(Views.Windows.PlayerWindow playerWindow)
     {
+        _playerWindow = playerWindow;
+        _controlBarWindow = Services.GetRequiredService<Views.Windows.ControlBarWindow>();
+
         // 从 DI 容器获取 OsdManager
         _osdManager = Services.GetRequiredService<OsdManager>();
 
@@ -380,6 +388,63 @@ _hotkeyManager = Services.GetRequiredService<HotkeyManager>();
                     _osdManager.ShowMessage(message, icon);
                 }
             });
+
+        ConfigureShutdownStages();
+    }
+
+    private void ConfigureShutdownStages()
+    {
+        var shutdownCoordinator = _shutdownCoordinator!;
+        var pluginHost = Services.GetRequiredService<IPluginHost>();
+        var companionProcessManager = Services.GetRequiredService<ICompanionProcessManager>();
+        var overlayManager = Services.GetRequiredService<IOverlayManager>();
+        var eventBus = Services.GetRequiredService<Core.Events.IEventBus>();
+        var crashRecoveryService = Services.GetRequiredService<ICrashRecoveryService>();
+
+        shutdownCoordinator.RegisterStage(
+            nameof(HotkeyManager), 100, () => _hotkeyManager?.Dispose());
+        shutdownCoordinator.RegisterStage(
+            nameof(Views.Windows.ControlBarWindow), 200,
+            () =>
+            {
+                _controlBarWindow?.StopAutoShowHide();
+                if (_controlBarWindow?.IsLoaded == true)
+                {
+                    _controlBarWindow.Close();
+                }
+            });
+        shutdownCoordinator.RegisterStage(
+            nameof(IPluginHost.UnloadAllPlugins), 300, pluginHost.UnloadAllPlugins);
+        shutdownCoordinator.RegisterStage(
+            nameof(ICompanionProcessManager.StopAllAsync), 350,
+            () => companionProcessManager.StopAllAsync().GetAwaiter().GetResult());
+        shutdownCoordinator.RegisterStage(
+            nameof(IOverlayManager.DestroyAllOverlays), 400, overlayManager.DestroyAllOverlays);
+        shutdownCoordinator.RegisterStage(
+            nameof(CloseAuxiliaryWindows), 500, CloseAuxiliaryWindows);
+        shutdownCoordinator.RegisterStage(
+            nameof(Core.Events.IEventBus.Clear), 700, eventBus.Clear);
+        shutdownCoordinator.RegisterStage(
+            nameof(ICrashRecoveryService.MarkShutdown), 800, crashRecoveryService.MarkShutdown);
+    }
+
+    private void CloseAuxiliaryWindows()
+    {
+        var windows = new List<Window>();
+        foreach (Window window in Windows)
+        {
+            windows.Add(window);
+        }
+
+        foreach (var window in windows)
+        {
+            if (ReferenceEquals(window, _playerWindow) || ReferenceEquals(window, _controlBarWindow))
+            {
+                continue;
+            }
+
+            window.Close();
+        }
     }
 
     /// <summary>
@@ -417,24 +482,21 @@ _hotkeyManager = Services.GetRequiredService<HotkeyManager>();
     {
         try
         {
-            // 标记程序正常关闭
-            var crashRecoveryService = Services?.GetService<ICrashRecoveryService>();
-            crashRecoveryService?.MarkShutdown();
+            _shutdownCoordinator?.Shutdown();
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "标记程序关闭时发生异常");
+            Log.Error(ex, "统一关停时发生异常");
         }
 
-        _hotkeyManager?.Dispose();
-
-        if (Services is { } services)
+        try
         {
-            var controlBarWindow = services.GetRequiredService<Views.Windows.ControlBarWindow>();
-            controlBarWindow.StopAutoShowHide();
-
-            var pluginHost = services.GetRequiredService<IPluginHost>();
-            pluginHost.UnloadAllPlugins();
+            _bootstrapper?.Dispose();
+            Services = null!;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "释放根 ServiceProvider 时发生异常");
         }
 
         Log.CloseAndFlush();

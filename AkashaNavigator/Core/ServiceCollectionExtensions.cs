@@ -73,6 +73,9 @@ public static class ServiceCollectionExtensions
         // ConfigService（依赖LogService）
         services.AddSingleton<IConfigService, ConfigService>();
 
+        // ShutdownCoordinator（依赖 LogService，统一编排幂等关停阶段）
+        services.AddSingleton<ShutdownCoordinator>();
+
         // AppUpdateService（依赖LogService）
         services.AddSingleton<IAppUpdateService, AppUpdateService>();
 

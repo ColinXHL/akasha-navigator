@@ -7,6 +7,7 @@ using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Events.Events;
 using AkashaNavigator.ViewModels.Windows;
 using AkashaNavigator.Services;
+using System.Threading;
 
 namespace AkashaNavigator.Core
 {
@@ -14,12 +15,13 @@ namespace AkashaNavigator.Core
 /// 应用程序启动引导器
 /// 负责初始化 DI 容器和应用程序核心组件
 /// </summary>
-public class Bootstrapper
+public class Bootstrapper : IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly ServiceProvider _serviceProvider;
     private readonly IEventBus _eventBus;
     private PlayerWindow? _playerWindow;
     private ControlBarWindow? _controlBarWindow;
+    private int _disposed;
 
     public Bootstrapper()
     {
@@ -74,7 +76,12 @@ public class Bootstrapper
 
         // 播放器窗口关闭时，关闭控制栏
         _playerWindow.Closed += (s, e) =>
-        { _controlBarWindow.Close(); };
+        {
+            if (_controlBarWindow.IsLoaded)
+            {
+                _controlBarWindow.Close();
+            }
+        };
 
         // 订阅 URL 变化事件，同步标题到 ControlBarWindow
         _eventBus.Subscribe<UrlChangedEvent>(e =>
@@ -204,6 +211,17 @@ public class Bootstrapper
     public IServiceProvider GetServiceProvider()
     {
         return _serviceProvider;
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _eventBus.Clear();
+        _serviceProvider.Dispose();
     }
 }
 }

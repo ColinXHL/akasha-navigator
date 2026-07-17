@@ -7,6 +7,7 @@ using AkashaNavigator.Models.Config;
 using AkashaNavigator.Views.Windows;
 using AkashaNavigator.Services;
 using Serilog;
+using System.Threading;
 using System.Windows.Threading;
 
 namespace AkashaNavigator.Core
@@ -15,7 +16,7 @@ namespace AkashaNavigator.Core
 /// 全局快捷键管理器
 /// 负责初始化和管理全局快捷键服务
 /// </summary>
-public class HotkeyManager
+public class HotkeyManager : IDisposable
 {
     private static readonly ILogger Logger = Log.ForContext("SourceContext", nameof(HotkeyManager));
 
@@ -31,6 +32,7 @@ private readonly HotkeyService _hotkeyService;
     private const int SeekThrottleMs = 200;
     private readonly Dictionary<string, DateTime> _lastActionTime = new(StringComparer.OrdinalIgnoreCase);
     private const int ToggleActionDebounceMs = 180;
+    private int _disposed;
 
     public HotkeyManager(HotkeyService hotkeyService, IEventBus eventBus)
     {
@@ -95,7 +97,12 @@ public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<strin
     public void UpdateConfig(AppConfig config)
     {
         _config = config;
-        _hotkeyService?.UpdateConfig(_config.ToHotkeyConfig());
+        if (_hotkeyService == null)
+        {
+            return;
+        }
+
+        _hotkeyService.UpdateConfig(_config.ToHotkeyConfig());
 
         // 同步隐藏态热键策略到 HotkeyService
         _hotkeyService.EnableHotkeysWhenHidden = _config.EnableHotkeysWhenHidden;
@@ -337,6 +344,11 @@ public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<strin
     /// </summary>
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         _seekFlushTimer.Stop();
         _seekFlushTimer.Tick -= OnSeekFlushTimerTick;
         _hotkeyService.Dispose();
