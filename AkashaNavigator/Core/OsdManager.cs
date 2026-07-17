@@ -17,6 +17,13 @@ namespace AkashaNavigator.Core
         /// <param name="icon">图标（可选）</param>
         public void ShowMessage(string message, string? icon = null)
         {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                dispatcher.BeginInvoke(() => ShowMessage(message, icon));
+                return;
+            }
+
             // 延迟初始化 OSD 窗口
             _osdWindow ??= new OsdWindow();
             _osdWindow.ShowMessage(message, icon);

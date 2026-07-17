@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AkashaNavigator.Core.Interfaces;
@@ -16,6 +15,9 @@ namespace AkashaNavigator.Tests.Services;
 
 public sealed class DownloadSourceSelectorTests
 {
+    private const int ProbeByteCount = 8 * 1024 * 1024;
+    private static readonly byte[] ProbePayload = new byte[ProbeByteCount];
+
     [Theory]
     [InlineData(PluginDownloadSourcePreference.GitHub, "github")]
     [InlineData(PluginDownloadSourcePreference.Cnb, "cnb")]
@@ -83,6 +85,44 @@ public sealed class DownloadSourceSelectorTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("cnb", result.Value?.First().Id);
+    }
+
+    [Fact]
+    public async Task MeasureSourcesAsync_ReadsUpToEightMibPerSource()
+    {
+        using var httpClient = CreateClient((_, _) => Task.FromResult(CreateResponse()));
+        var selector = CreateSelector(httpClient, PluginDownloadSourcePreference.Auto);
+
+        var result = await selector.MeasureSourcesAsync(CreatePackage(), forceRefresh: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.All(
+            result.Value!,
+            measurement => Assert.Equal(ProbeByteCount, measurement.BytesRead));
+    }
+
+    [Fact]
+    public async Task GetOrderedSourcesAsync_UsesSharedMeasurementAcrossPackages()
+    {
+        var requestCount = 0;
+        using var httpClient = CreateClient(
+            (request, _) =>
+            {
+                Interlocked.Increment(ref requestCount);
+                return Task.FromResult(CreateResponse());
+            });
+        var selector = CreateSelector(httpClient, PluginDownloadSourcePreference.Auto);
+        var measuredPackage = CreatePackage();
+        var anotherPackage = CreatePackage();
+        anotherPackage.FileName = "another-plugin.zip";
+        anotherPackage.Sources[0].Url = "https://github.example.test/another-plugin.zip";
+        anotherPackage.Sources[1].Url = "https://cnb.example.test/another-plugin.zip";
+
+        await selector.MeasureSourcesAsync(measuredPackage, forceRefresh: true);
+        var result = await selector.GetOrderedSourcesAsync(anotherPackage);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, requestCount);
     }
 
     [Fact]
@@ -155,7 +195,7 @@ public sealed class DownloadSourceSelectorTests
     private static HttpResponseMessage CreateResponse()
     {
         return new HttpResponseMessage(HttpStatusCode.PartialContent) {
-            Content = new ByteArrayContent(Encoding.UTF8.GetBytes(new string('x', 512 * 1024)))
+            Content = new ByteArrayContent(ProbePayload)
         };
     }
 
@@ -183,7 +223,7 @@ public sealed class DownloadSourceSelectorTests
         {
             Assert.NotNull(request.Headers.Range);
             Assert.Equal(0, request.Headers.Range!.Ranges.Single().From);
-            Assert.Equal(512 * 1024 - 1, request.Headers.Range.Ranges.Single().To);
+            Assert.Equal(ProbeByteCount - 1, request.Headers.Range.Ranges.Single().To);
             return _handler(request, cancellationToken);
         }
     }

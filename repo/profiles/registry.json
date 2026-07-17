@@ -15,11 +15,16 @@
     {
       "id": "genshin",
       "name": "原神",
-      "description": "原神游戏配置，包含方向标记、智能鼠标检测和 B 站分 P 列表插件，帮助玩家在观看攻略视频时快速定位方向并更方便地跟随攻略进度",
+      "description": "原神游戏配置，包含方向标记、智能鼠标检测、B 站分 P 列表和原神自动化插件，帮助玩家在观看攻略视频时快速定位方向、跟随攻略进度并按需启用自动拾取与自动剧情",
       "author": "AkashaNavigator",
       "targetGame": "原神",
-      "version": "2.0.0",
-      "pluginIds": ["genshin-direction-marker", "smart-cursor-detection", "bilibili-page-list"]
+      "version": "3.0.0",
+      "pluginIds": [
+        "genshin-direction-marker",
+        "smart-cursor-detection",
+        "bilibili-page-list",
+        "akasha-genshin-automation"
+      ]
     }
   ]
 }

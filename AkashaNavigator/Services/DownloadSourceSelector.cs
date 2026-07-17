@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -15,18 +14,23 @@ using AkashaNavigator.Models.Update;
 namespace AkashaNavigator.Services;
 
 /// <summary>
-/// 使用插件包前 512 KiB 测量下载源，并按预计完整下载时间排序。
+/// 通过实际安装包的限时分段读取测量下载源，并在应用更新与插件下载之间共享排序结果。
 /// </summary>
 public sealed class DownloadSourceSelector : IDownloadSourceSelector
 {
-    private const int ProbeByteCount = 512 * 1024;
-    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
+    private const int ProbeByteCount = 8 * 1024 * 1024;
+    private const int ProbeWarmupByteCount = 1024 * 1024;
+    private const int MinimumPartialProbeByteCount = 256 * 1024;
+    private const int MinimumSteadyStateByteCount = 512 * 1024;
+    private static readonly TimeSpan ProbeTransferDuration = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(6);
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(6);
 
     private readonly HttpClient _httpClient;
     private readonly IConfigService _configService;
-    private readonly ConcurrentDictionary<string, CachedSelection> _cache = new();
+    private readonly ConcurrentDictionary<string, CachedMeasurement> _cache = new();
     private readonly ConcurrentDictionary<string, string> _lastSelectedSource = new();
+    private CachedSelection? _sharedSelection;
 
     public DownloadSourceSelector(HttpClient httpClient, IConfigService configService)
     {
@@ -40,11 +44,7 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
     {
         ArgumentNullException.ThrowIfNull(package);
 
-        var sources = package.Sources
-            .Where(source => !string.IsNullOrWhiteSpace(source.Id) &&
-                             Uri.TryCreate(source.Url, UriKind.Absolute, out var uri) &&
-                             uri.Scheme == Uri.UriSchemeHttps)
-            .ToList();
+        var sources = GetValidSources(package);
         if (sources.Count == 0)
         {
             return Result<IReadOnlyList<DownloadSourceInfo>>.Failure(
@@ -63,12 +63,46 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
                     .ToList());
         }
 
-        var cacheKey = CreateCacheKey(package, sources);
-        if (_cache.TryGetValue(cacheKey, out var cached) &&
-            DateTimeOffset.UtcNow - cached.CreatedAt < CacheLifetime)
+        var sharedSelection = Volatile.Read(ref _sharedSelection);
+        if (sharedSelection != null &&
+            DateTimeOffset.UtcNow - sharedSelection.CreatedAt < CacheLifetime)
         {
             return Result<IReadOnlyList<DownloadSourceInfo>>.Success(
-                OrderByIds(sources, cached.SourceIds));
+                OrderByIds(sources, sharedSelection.SourceIds));
+        }
+
+        var measurementResult = await MeasureSourcesAsync(
+            package,
+            cancellationToken: cancellationToken);
+        if (measurementResult.IsFailure)
+        {
+            return Result<IReadOnlyList<DownloadSourceInfo>>.Failure(measurementResult.Error!);
+        }
+
+        return Result<IReadOnlyList<DownloadSourceInfo>>.Success(
+            measurementResult.Value!.Select(result => result.Source).ToList());
+    }
+
+    public async Task<Result<IReadOnlyList<DownloadSourceMeasurement>>> MeasureSourcesAsync(
+        PluginPackageInfo package,
+        bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+
+        var sources = GetValidSources(package);
+        if (sources.Count == 0)
+        {
+            return Result<IReadOnlyList<DownloadSourceMeasurement>>.Failure(
+                Error.Validation("DOWNLOAD_SOURCES_EMPTY", "没有可用于测速的 HTTPS 下载源"));
+        }
+
+        var cacheKey = CreateCacheKey(package, sources);
+        if (!forceRefresh &&
+            _cache.TryGetValue(cacheKey, out var cached) &&
+            DateTimeOffset.UtcNow - cached.CreatedAt < CacheLifetime)
+        {
+            return Result<IReadOnlyList<DownloadSourceMeasurement>>.Success(cached.Measurements);
         }
 
         var probeTasks = sources
@@ -76,6 +110,7 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
             .ToArray();
         var probeResults = await Task.WhenAll(probeTasks);
         cancellationToken.ThrowIfCancellationRequested();
+
         var successful = probeResults
             .Where(result => result.IsSuccess)
             .OrderBy(result => result.EstimatedDownloadTime)
@@ -85,29 +120,40 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
             var errors = string.Join(
                 "；",
                 probeResults.Select(result => $"{result.Source.Id}: {result.ErrorMessage}"));
-            return Result<IReadOnlyList<DownloadSourceInfo>>.Failure(
+            return Result<IReadOnlyList<DownloadSourceMeasurement>>.Failure(
                 Error.Network(
-                    "PLUGIN_SOURCE_PROBE_FAILED",
-                    $"所有插件下载源测速失败：{errors}"));
+                    "DOWNLOAD_SOURCE_PROBE_FAILED",
+                    $"所有下载源测速失败：{errors}"));
         }
 
         ApplyHysteresis(cacheKey, successful);
 
-        var successfulIds = successful.Select(result => result.Source.Id).ToList();
-        var failedIds = probeResults
-            .Where(result => !result.IsSuccess)
-            .Select(result => result.Source.Id);
-        var orderedIds = successfulIds.Concat(failedIds).ToList();
-        _cache[cacheKey] = new CachedSelection(DateTimeOffset.UtcNow, orderedIds);
+        var orderedResults = successful
+            .Concat(probeResults.Where(result => !result.IsSuccess))
+            .ToList();
+        var orderedIds = orderedResults
+            .Select(result => result.Source.Id)
+            .ToList();
+        var measurements = orderedResults
+            .Select(result => result.ToMeasurement())
+            .ToList();
+        var cachedMeasurement = new CachedMeasurement(
+            DateTimeOffset.UtcNow,
+            measurements);
+
+        _cache[cacheKey] = cachedMeasurement;
+        Volatile.Write(
+            ref _sharedSelection,
+            new CachedSelection(cachedMeasurement.CreatedAt, orderedIds));
         _lastSelectedSource[cacheKey] = orderedIds[0];
 
-        return Result<IReadOnlyList<DownloadSourceInfo>>.Success(
-            OrderByIds(sources, orderedIds));
+        return Result<IReadOnlyList<DownloadSourceMeasurement>>.Success(measurements);
     }
 
     public void ClearCache()
     {
         _cache.Clear();
+        Volatile.Write(ref _sharedSelection, null);
     }
 
     private async Task<ProbeResult> ProbeAsync(
@@ -118,6 +164,11 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(ProbeTimeout);
         var stopwatch = Stopwatch.StartNew();
+        var bytesRead = 0;
+        var steadyStateStartBytes = 0;
+        TimeSpan? firstByteTime = null;
+        TimeSpan? steadyStateStartTime = null;
+        long? contentLength = null;
 
         try
         {
@@ -131,10 +182,15 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
 
             await using var stream = await response.Content.ReadAsStreamAsync(timeoutSource.Token);
             var buffer = new byte[64 * 1024];
-            var bytesRead = 0;
-            TimeSpan? firstByteTime = null;
+            contentLength = response.Content.Headers.ContentRange?.Length;
             while (bytesRead < ProbeByteCount)
             {
+                if (firstByteTime.HasValue &&
+                    stopwatch.Elapsed - firstByteTime.Value >= ProbeTransferDuration)
+                {
+                    break;
+                }
+
                 var count = await stream.ReadAsync(
                     buffer.AsMemory(0, Math.Min(buffer.Length, ProbeByteCount - bytesRead)),
                     timeoutSource.Token);
@@ -145,26 +201,42 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
 
                 firstByteTime ??= stopwatch.Elapsed;
                 bytesRead += count;
+                if (!steadyStateStartTime.HasValue && bytesRead >= ProbeWarmupByteCount)
+                {
+                    steadyStateStartBytes = bytesRead;
+                    steadyStateStartTime = stopwatch.Elapsed;
+                }
             }
 
             stopwatch.Stop();
-            if (bytesRead == 0 || firstByteTime == null)
-            {
-                return ProbeResult.Failure(source, "未读取到数据");
-            }
-
-            var transferDuration = stopwatch.Elapsed - firstByteTime.Value;
-            var transferSeconds = Math.Max(transferDuration.TotalSeconds, 0.001);
-            var bytesPerSecond = bytesRead / transferSeconds;
-            var estimatedSeconds =
-                firstByteTime.Value.TotalSeconds +
-                Math.Max(packageSize, bytesRead) / bytesPerSecond;
-            return ProbeResult.Success(
+            return CreateProbeResult(
                 source,
-                TimeSpan.FromSeconds(estimatedSeconds));
+                packageSize,
+                contentLength,
+                bytesRead,
+                firstByteTime,
+                steadyStateStartBytes,
+                steadyStateStartTime,
+                stopwatch.Elapsed);
         }
         catch (OperationCanceledException)
         {
+            stopwatch.Stop();
+            if (!cancellationToken.IsCancellationRequested &&
+                bytesRead >= MinimumPartialProbeByteCount &&
+                firstByteTime.HasValue)
+            {
+                return CreateProbeResult(
+                    source,
+                    packageSize,
+                    contentLength,
+                    bytesRead,
+                    firstByteTime,
+                    steadyStateStartBytes,
+                    steadyStateStartTime,
+                    stopwatch.Elapsed);
+            }
+
             return ProbeResult.Failure(
                 source,
                 cancellationToken.IsCancellationRequested ? "已取消" : "测速超时");
@@ -173,6 +245,47 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
         {
             return ProbeResult.Failure(source, ex.Message);
         }
+    }
+
+    private static ProbeResult CreateProbeResult(
+        DownloadSourceInfo source,
+        long packageSize,
+        long? contentLength,
+        int bytesRead,
+        TimeSpan? firstByteTime,
+        int steadyStateStartBytes,
+        TimeSpan? steadyStateStartTime,
+        TimeSpan elapsed)
+    {
+        if (bytesRead == 0 || !firstByteTime.HasValue)
+        {
+            return ProbeResult.Failure(source, "未读取到数据");
+        }
+
+        var measuredBytes = bytesRead;
+        var transferDuration = elapsed - firstByteTime.Value;
+        if (steadyStateStartTime.HasValue &&
+            bytesRead - steadyStateStartBytes >= MinimumSteadyStateByteCount)
+        {
+            measuredBytes = bytesRead - steadyStateStartBytes;
+            transferDuration = elapsed - steadyStateStartTime.Value;
+        }
+
+        var transferSeconds = Math.Max(transferDuration.TotalSeconds, 0.001);
+        var bytesPerSecond = measuredBytes / transferSeconds;
+        var totalBytes = contentLength is > 0
+            ? contentLength.GetValueOrDefault()
+            : Math.Max(packageSize, bytesRead);
+        var estimatedSeconds =
+            firstByteTime.Value.TotalSeconds +
+            totalBytes / bytesPerSecond;
+
+        return ProbeResult.Success(
+            source,
+            bytesRead,
+            bytesPerSecond,
+            firstByteTime.Value,
+            TimeSpan.FromSeconds(estimatedSeconds));
     }
 
     private void ApplyHysteresis(string cacheKey, List<ProbeResult> successful)
@@ -206,6 +319,15 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
         successful.Insert(0, previous);
     }
 
+    private static List<DownloadSourceInfo> GetValidSources(PluginPackageInfo package)
+    {
+        return package.Sources
+            .Where(source => !string.IsNullOrWhiteSpace(source.Id) &&
+                             Uri.TryCreate(source.Url, UriKind.Absolute, out var uri) &&
+                             uri.Scheme == Uri.UriSchemeHttps)
+            .ToList();
+    }
+
     private static string CreateCacheKey(
         PluginPackageInfo package,
         IEnumerable<DownloadSourceInfo> sources)
@@ -230,22 +352,58 @@ public sealed class DownloadSourceSelector : IDownloadSourceSelector
 
     private sealed record CachedSelection(DateTimeOffset CreatedAt, IReadOnlyList<string> SourceIds);
 
+    private sealed record CachedMeasurement(
+        DateTimeOffset CreatedAt,
+        IReadOnlyList<DownloadSourceMeasurement> Measurements);
+
     private sealed record ProbeResult(
         DownloadSourceInfo Source,
         bool IsSuccess,
+        long BytesRead,
+        double BytesPerSecond,
+        TimeSpan TimeToFirstByte,
         TimeSpan EstimatedDownloadTime,
         string ErrorMessage)
     {
         public static ProbeResult Success(
             DownloadSourceInfo source,
+            long bytesRead,
+            double bytesPerSecond,
+            TimeSpan timeToFirstByte,
             TimeSpan estimatedDownloadTime)
         {
-            return new ProbeResult(source, true, estimatedDownloadTime, string.Empty);
+            return new ProbeResult(
+                source,
+                true,
+                bytesRead,
+                bytesPerSecond,
+                timeToFirstByte,
+                estimatedDownloadTime,
+                string.Empty);
         }
 
         public static ProbeResult Failure(DownloadSourceInfo source, string errorMessage)
         {
-            return new ProbeResult(source, false, TimeSpan.MaxValue, errorMessage);
+            return new ProbeResult(
+                source,
+                false,
+                0,
+                0,
+                TimeSpan.Zero,
+                TimeSpan.MaxValue,
+                errorMessage);
+        }
+
+        public DownloadSourceMeasurement ToMeasurement()
+        {
+            return new DownloadSourceMeasurement(
+                Source,
+                IsSuccess,
+                BytesRead,
+                BytesPerSecond,
+                TimeToFirstByte,
+                EstimatedDownloadTime,
+                ErrorMessage);
         }
     }
 }

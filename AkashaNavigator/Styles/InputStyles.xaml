@@ -355,6 +355,7 @@
                         <ContentPresenter x:Name="ContentSite"
                                           Content="{TemplateBinding SelectionBoxItem}"
                                           ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                           Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="Left" VerticalAlignment="Center"
                                           IsHitTestVisible="False"/>

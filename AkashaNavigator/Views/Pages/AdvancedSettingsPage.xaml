@@ -9,6 +9,55 @@
         <TextBlock Text="高级设置" FontSize="18" FontWeight="SemiBold"
                    Foreground="White" Margin="0,0,0,16"/>
 
+        <!-- 共享下载源测速 -->
+        <TextBlock Text="下载源测速" Style="{StaticResource SettingsGroupHeaderStyle}"/>
+        <Grid Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="测试 GitHub 与 CNB 的实际下载速度"
+                           Foreground="#DDD" FontSize="12"/>
+                <TextBlock Text="结果同时用于版本更新源推荐和插件下载自动选源"
+                           Foreground="#666" FontSize="11" Margin="0,3,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1"
+                    Content="测速"
+                    Margin="12,0,0,0"
+                    Style="{StaticResource ActionButtonStyle}"
+                    Command="{Binding MeasureDownloadSourcesCommand}"/>
+        </Grid>
+        <Border Background="#242A30"
+                BorderBrush="#354A5C"
+                BorderThickness="1"
+                CornerRadius="5"
+                Padding="10,8"
+                Margin="0,2,0,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0"
+                        Background="#168FE5"
+                        CornerRadius="2"
+                        Margin="0,0,0,0"/>
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                    <TextBlock Text="测速结果"
+                               Foreground="#4EB4FF"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding DownloadSourceMeasurementStatus}"
+                               Foreground="#E6E6E6"
+                               FontSize="12"
+                               LineHeight="20"
+                               TextWrapping="Wrap"
+                               Margin="0,3,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- 版本更新 -->
         <TextBlock Text="版本更新" Style="{StaticResource SettingsGroupHeaderStyle}"/>
         <Grid Margin="0,0,0,8">
@@ -24,6 +73,22 @@
                     Margin="12,0,0,0"
                     Style="{StaticResource PrimaryActionButtonStyle}"
                     Command="{Binding CheckAppUpdateCommand}"/>
+        </Grid>
+        <Grid Margin="0,0,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="180"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="应用更新源" Foreground="#DDD" FontSize="12"
+                       VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="1"
+                      Style="{StaticResource DarkComboBoxStyle}"
+                      ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                      ItemsSource="{Binding AppUpdateSourceOptions}"
+                      DisplayMemberPath="DisplayName"
+                      SelectedValuePath="Value"
+                      SelectedValue="{Binding AppUpdateSourcePreference, Mode=TwoWay}"
+                      Margin="12,0,0,0"/>
         </Grid>
         <CheckBox Content="测试版"
                   Style="{StaticResource DarkCheckBoxStyle}"
@@ -44,7 +109,6 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="180"/>
-                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="插件下载源" Foreground="#DDD" FontSize="12"
                        VerticalAlignment="Center"/>
@@ -56,12 +120,8 @@
                       SelectedValuePath="Value"
                       SelectedValue="{Binding PluginDownloadSourcePreference, Mode=TwoWay}"
                       Margin="12,0,0,0"/>
-            <Button Grid.Column="2" Content="重新测速"
-                    Style="{StaticResource ActionButtonStyle}"
-                    Command="{Binding RemeasurePluginSourcesCommand}"
-                    Margin="8,0,0,0"/>
         </Grid>
-        <TextBlock Text="自动模式会并行读取各下载源前 512 KiB，并缓存测速结果 6 小时"
+        <TextBlock Text="自动模式使用共享测速结果；没有缓存时会用实际插件包自动测速"
                    Foreground="#666" FontSize="11" Margin="0,0,0,16"/>
 
         <!-- 调试日志 -->

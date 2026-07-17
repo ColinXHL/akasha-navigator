@@ -1383,12 +1383,32 @@ public class SettingsUiRenderer
 
     private FrameworkElement RenderHotkeyBox(SettingsItem item)
     {
-        var container = CreateItemContainer(item.Label, item.Description);
+        var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
 
-        var hotkeyTextBox = new Controls.HotkeyTextBox { MinWidth = 200 };
+        if (!string.IsNullOrWhiteSpace(item.Label))
+        {
+            var label = new TextBlock {
+                Text = item.Label,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            if (!ApplyStyleIfExists(label, "SettingsLabelStyle"))
+            {
+                label.Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+                label.FontSize = 13;
+            }
+            Grid.SetColumn(label, 0);
+            row.Children.Add(label);
+        }
+
+        var hotkeyTextBox = new Controls.HotkeyTextBox();
+        Grid.SetColumn(hotkeyTextBox, 2);
 
         // 尝试应用共享样式
-        if (!ApplyStyleIfExists(hotkeyTextBox, "DarkTextBoxStyle"))
+        if (!ApplyStyleIfExists(hotkeyTextBox, "HotkeyTextBoxStyle"))
         {
             hotkeyTextBox.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
             hotkeyTextBox.Foreground = Brushes.White;
@@ -1429,8 +1449,8 @@ public class SettingsUiRenderer
             _itemMap[item.Key] = item;
         }
 
-        container.Children.Add(hotkeyTextBox);
-        return container;
+        row.Children.Add(hotkeyTextBox);
+        return row;
     }
 
     private FrameworkElement RenderTextArea(SettingsItem item)
@@ -1678,6 +1698,24 @@ public class SettingsUiRenderer
     {
         switch (control)
         {
+        case Controls.HotkeyTextBox hotkeyTextBox:
+            var hotkeyValue = _config.Get<string?>(
+                key,
+                item?.GetDefaultValue<string>() ?? string.Empty);
+            var parseResult = Plugins.Apis.HotkeyParser.Parse(hotkeyValue ?? string.Empty);
+            if (parseResult.IsValid)
+            {
+                hotkeyTextBox.HotkeyValue = parseResult.VkCode;
+                hotkeyTextBox.Modifiers = parseResult.Modifiers;
+                hotkeyTextBox.InputType = Models.Config.InputType.Keyboard;
+            }
+            else
+            {
+                hotkeyTextBox.HotkeyValue = 0;
+                hotkeyTextBox.Modifiers = Models.Config.ModifierKeys.None;
+                hotkeyTextBox.InputType = Models.Config.InputType.Keyboard;
+            }
+            break;
         case TextBox textBox:
             // 尝试作为数字读取，如果失败则作为字符串读取
             var numValue = _config.Get<double?>(key, null);

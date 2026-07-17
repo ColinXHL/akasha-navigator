@@ -71,6 +71,9 @@ public class ConfigServiceTests : IDisposable
         Assert.False(config.EnableDebugLog);
         Assert.True(config.EnablePluginUpdateNotification);
         Assert.Equal(
+            AkashaNavigator.Models.Update.AppUpdateSourcePreference.Cnb,
+            config.AppUpdateSourcePreference);
+        Assert.Equal(
             AkashaNavigator.Models.Update.PluginDownloadSourcePreference.Auto,
             config.PluginDownloadSourcePreference);
         Assert.True(config.EnableEdgeSnap);

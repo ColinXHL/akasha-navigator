@@ -178,8 +178,9 @@ public partial class SettingsViewModel : ObservableObject
         _searchableSettings.AddRange(new[] {
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "插件更新", "高级设置"),
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "更新提示", "高级设置"),
+            new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "应用更新源 CNB GitHub", "高级设置"),
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "插件下载源", "高级设置"),
-            new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "GitHub CNB 自动测速", "高级设置"),
+            new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "下载源测速 共享 GitHub CNB", "高级设置"),
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "调试日志", "高级设置"),
             new SearchableSetting(SettingsPageType.Advanced, "🔧 高级", "日志", "高级设置"),
         });
