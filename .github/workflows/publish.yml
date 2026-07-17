@@ -303,7 +303,7 @@ jobs:
   create_release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: build_installer
+    needs: [validate, build_installer]
     permissions:
       contents: write
     if: github.event.inputs.create_release == 'true'
