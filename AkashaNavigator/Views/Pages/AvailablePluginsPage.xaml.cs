@@ -33,10 +33,10 @@ public partial class AvailablePluginsPage : UserControl, IDisposable
         Loaded += AvailablePluginsPage_Loaded;
     }
 
-    private void AvailablePluginsPage_Loaded(object sender, RoutedEventArgs e)
+    private async void AvailablePluginsPage_Loaded(object sender, RoutedEventArgs e)
     {
         // 委托给 ViewModel 的 OnLoaded 方法
-        _viewModel.OnLoaded();
+        await _viewModel.OnLoadedAsync();
     }
 
     /// <summary>

@@ -38,7 +38,12 @@ on:
       plugin_min_host_version:
         description: "插件要求的最低 AkashaNavigator 版本"
         required: false
-        default: "1.3.0-alpha.4"
+        default: "1.4.0-alpha.1"
+        type: string
+      plugin_resource_min_version:
+        description: "插件资源要求的最低插件版本（留空则不更新）"
+        required: false
+        default: ""
         type: string
       plugin_package_size:
         description: "插件 ZIP 字节数"
@@ -85,6 +90,7 @@ jobs:
           SOURCE="${{ github.event.inputs.source }}"
           PLUGIN_VERSION="${{ github.event.inputs.plugin_version }}"
           PLUGIN_MIN_HOST_VERSION="${{ github.event.inputs.plugin_min_host_version }}"
+          PLUGIN_RESOURCE_MIN_VERSION="${{ github.event.inputs.plugin_resource_min_version }}"
           PLUGIN_PACKAGE_SIZE="${{ github.event.inputs.plugin_package_size }}"
           PLUGIN_PACKAGE_SHA256="${{ github.event.inputs.plugin_package_sha256 }}"
           PLUGIN_GITHUB_URL="${{ github.event.inputs.plugin_github_url }}"
@@ -123,6 +129,10 @@ jobs:
             fi
             if ! [[ "$PLUGIN_MIN_HOST_VERSION" =~ $SEMVER_REGEX ]]; then
               echo "❌ plugin_min_host_version 不符合语义化版本"
+              exit 1
+            fi
+            if [[ -n "$PLUGIN_RESOURCE_MIN_VERSION" ]] && ! [[ "$PLUGIN_RESOURCE_MIN_VERSION" =~ $SEMVER_REGEX ]]; then
+              echo "❌ plugin_resource_min_version 不符合语义化版本"
               exit 1
             fi
             if ! [[ "$PLUGIN_PACKAGE_SIZE" =~ ^[1-9][0-9]*$ ]]; then
@@ -205,6 +215,7 @@ jobs:
           SOURCE: ${{ needs.validate.outputs.source }}
           PLUGIN_VERSION: ${{ github.event.inputs.plugin_version }}
           PLUGIN_MIN_HOST_VERSION: ${{ github.event.inputs.plugin_min_host_version }}
+          PLUGIN_RESOURCE_MIN_VERSION: ${{ github.event.inputs.plugin_resource_min_version }}
           PLUGIN_PACKAGE_SIZE: ${{ github.event.inputs.plugin_package_size }}
           PLUGIN_PACKAGE_SHA256: ${{ github.event.inputs.plugin_package_sha256 }}
           PLUGIN_GITHUB_URL: ${{ github.event.inputs.plugin_github_url }}
@@ -278,6 +289,26 @@ jobs:
                       ]
                   }
               })
+              resource_min_version = os.environ.get(
+                  "PLUGIN_RESOURCE_MIN_VERSION", ""
+              ).strip()
+              if resource_min_version:
+                  resources = plugin.get("resources")
+                  pick_blacklist = (
+                      resources.get("pickBlacklist")
+                      if isinstance(resources, dict)
+                      else None
+                  )
+                  if not isinstance(pick_blacklist, dict):
+                      raise ValueError(
+                          "Existing notice must contain pickBlacklist before "
+                          "updating plugin_resource_min_version"
+                      )
+                  pick_blacklist["minPluginVersion"] = resource_min_version
+                  print(
+                      "✅ 更新远程插件资源最低版本: "
+                      f"pickBlacklist >= {resource_min_version}"
+                  )
               data["schemaVersion"] = 2
               print(f"✅ 更新远程插件目录: {plugin_id} v{plugin_version}")
 

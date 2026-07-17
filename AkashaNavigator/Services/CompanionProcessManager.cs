@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Services.Companion;
 
@@ -216,6 +217,7 @@ public sealed class CompanionProcessManager : ICompanionProcessManager
             startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
             startInfo.ArgumentList.Add("--protocol-version");
             startInfo.ArgumentList.Add(protocolVersion.ToString());
+            ConfigurePluginEnvironment(startInfo, pluginId);
 
             process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
             if (!process.Start())
@@ -298,6 +300,13 @@ public sealed class CompanionProcessManager : ICompanionProcessManager
         var actualBytes = Encoding.UTF8.GetBytes(hello.Token);
         return expectedBytes.Length == actualBytes.Length &&
                CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+    }
+
+    internal static void ConfigurePluginEnvironment(ProcessStartInfo startInfo, string pluginId)
+    {
+        ArgumentNullException.ThrowIfNull(startInfo);
+        startInfo.Environment[AppConstants.PluginDataDirectoryEnvironmentVariable] =
+            AppPaths.GetPluginResourceDirectory(pluginId);
     }
 
     private static string CreateSessionToken()

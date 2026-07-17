@@ -83,4 +83,38 @@ public class ServiceRegistrationTests
         Assert.Equal(ServiceLifetime.Singleton, consent.Lifetime);
         Assert.Equal(typeof(PluginPermissionConsentService), consent.ImplementationType);
     }
+
+    [Fact]
+    public void ConfigureAppServices_RegistersUpdateManifestServiceAsSingleton()
+    {
+        var services = new ServiceCollection();
+        services.ConfigureAppServices();
+
+        var descriptor = services.Single(
+            service => service.ServiceType == typeof(IUpdateManifestService));
+
+        Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
+        Assert.Equal(typeof(UpdateManifestService), descriptor.ImplementationType);
+    }
+
+    [Fact]
+    public void ConfigureAppServices_RegistersRemotePluginServicesAsSingletons()
+    {
+        var services = new ServiceCollection();
+        services.ConfigureAppServices();
+
+        var selector = services.Single(
+            service => service.ServiceType == typeof(IDownloadSourceSelector));
+        var packages = services.Single(
+            service => service.ServiceType == typeof(IPluginPackageService));
+        var resources = services.Single(
+            service => service.ServiceType == typeof(IPluginResourceUpdateService));
+
+        Assert.Equal(ServiceLifetime.Singleton, selector.Lifetime);
+        Assert.Equal(typeof(DownloadSourceSelector), selector.ImplementationType);
+        Assert.Equal(ServiceLifetime.Singleton, packages.Lifetime);
+        Assert.Equal(typeof(PluginPackageService), packages.ImplementationType);
+        Assert.Equal(ServiceLifetime.Singleton, resources.Lifetime);
+        Assert.Equal(typeof(PluginResourceUpdateService), resources.ImplementationType);
+    }
 }

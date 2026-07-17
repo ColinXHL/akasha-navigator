@@ -54,6 +54,40 @@ public static class PluginErrorCodes
     /// 插件压缩包版本不高于已安装版本
     /// </summary>
     public const string VersionNotNewer = "PLUGIN_VERSION_NOT_NEWER";
+
+    /// <summary>
+    /// 远程目录中没有可下载的插件包。
+    /// </summary>
+    public const string RemotePackageNotFound = "PLUGIN_REMOTE_PACKAGE_NOT_FOUND";
+
+    /// <summary>
+    /// 当前宿主版本低于插件要求。
+    /// </summary>
+    public const string HostVersionTooLow = "PLUGIN_HOST_VERSION_TOO_LOW";
+
+    /// <summary>
+    /// 所有远程下载源均失败。
+    /// </summary>
+    public const string RemoteDownloadFailed = "PLUGIN_REMOTE_DOWNLOAD_FAILED";
+
+    /// <summary>
+    /// 用户取消远程插件下载。
+    /// </summary>
+    public const string RemoteDownloadCanceled = "PLUGIN_REMOTE_DOWNLOAD_CANCELED";
+}
+
+/// <summary>
+/// 插件独立资源更新错误码。
+/// </summary>
+public static class PluginResourceErrorCodes
+{
+    public const string MetadataInvalid = "PLUGIN_RESOURCE_METADATA_INVALID";
+    public const string DownloadFailed = "PLUGIN_RESOURCE_DOWNLOAD_FAILED";
+    public const string SizeMismatch = "PLUGIN_RESOURCE_SIZE_MISMATCH";
+    public const string HashMismatch = "PLUGIN_RESOURCE_HASH_MISMATCH";
+    public const string ContentInvalid = "PLUGIN_RESOURCE_CONTENT_INVALID";
+    public const string SaveFailed = "PLUGIN_RESOURCE_SAVE_FAILED";
+    public const string DownloadCanceled = "PLUGIN_RESOURCE_DOWNLOAD_CANCELED";
 }
 
 /// <summary>

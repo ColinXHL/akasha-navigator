@@ -11,7 +11,7 @@ public static class AppConstants
     /// <summary>
     /// 应用程序版本
     /// </summary>
-    public const string Version = "0.1.0";
+    public const string Version = "1.4.0-alpha.1";
 
 #endregion
 
@@ -197,11 +197,6 @@ public static class AppConstants
     /// </summary>
     public const string DefaultHomeUrl = "https://www.bilibili.com";
 
-    /// <summary>
-    /// 应用更新公告 URL
-    /// </summary>
-    public const string NoticeJsonUrl = "http://update.fisheepx.cn/notice.json";
-
 #endregion
 
 #region Updater
@@ -258,6 +253,21 @@ public static class AppConstants
 #endregion
 
 #region IDs and Names
+
+    /// <summary>
+    /// Akasha Automation 插件 ID。
+    /// </summary>
+    public const string AutomationPluginId = "akasha-genshin-automation";
+
+    /// <summary>
+    /// Notice 中拾取黑名单资源的键。
+    /// </summary>
+    public const string PickBlacklistResourceKey = "pickBlacklist";
+
+    /// <summary>
+    /// 传给插件伴生进程的用户资源目录环境变量。
+    /// </summary>
+    public const string PluginDataDirectoryEnvironmentVariable = "AKASHA_PLUGIN_DATA_DIR";
 
     /// <summary>
     /// 默认 Profile ID

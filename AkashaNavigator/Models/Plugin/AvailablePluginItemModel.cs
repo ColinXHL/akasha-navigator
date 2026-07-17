@@ -40,6 +40,23 @@ namespace AkashaNavigator.Models.Plugin
         public string SourceDirectory { get; set; } = string.Empty;
 
         /// <summary>
+        /// 是否来自远程 Manifest。
+        /// </summary>
+        public bool IsRemote { get; set; }
+
+        /// <summary>
+        /// 已安装版本；未安装时为空。
+        /// </summary>
+        public string InstalledVersion { get; set; } = string.Empty;
+
+        public string InstalledVersionText { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 远程插件包大小显示文本。
+        /// </summary>
+        public string PackageSizeText { get; set; } = string.Empty;
+
+        /// <summary>
         /// 是否有描述
         /// </summary>
         public bool HasDescription { get; set; }
@@ -64,5 +81,89 @@ namespace AkashaNavigator.Models.Plugin
         /// </summary>
         [ObservableProperty]
         private bool _isInstalled;
+
+        /// <summary>
+        /// 是否有远程更新。
+        /// </summary>
+        [ObservableProperty]
+        private bool _hasUpdate;
+
+        /// <summary>
+        /// 是否正在下载远程插件。
+        /// </summary>
+        [ObservableProperty]
+        private bool _isDownloading;
+
+        /// <summary>
+        /// 下载进度百分比。
+        /// </summary>
+        [ObservableProperty]
+        private double _downloadProgress;
+
+        /// <summary>
+        /// 下载状态文本。
+        /// </summary>
+        [ObservableProperty]
+        private string _downloadStatus = string.Empty;
+
+        /// <summary>
+        /// 当前下载源文本。
+        /// </summary>
+        [ObservableProperty]
+        private string _selectedSourceText = string.Empty;
+
+        public Visibility AvailableTagVisibility =>
+            !IsInstalled && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility InstalledTagVisibility =>
+            IsInstalled && !HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility UpdateTagVisibility =>
+            IsInstalled && HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility RemoteInfoVisibility =>
+            IsRemote ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility DownloadVisibility =>
+            IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility InstallButtonVisibility =>
+            !IsInstalled && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility UpdateButtonVisibility =>
+            IsInstalled && HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility UninstallButtonVisibility =>
+            IsInstalled && !HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility CancelButtonVisibility =>
+            IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        partial void OnIsInstalledChanged(bool value)
+        {
+            NotifyStateVisibilities();
+        }
+
+        partial void OnHasUpdateChanged(bool value)
+        {
+            NotifyStateVisibilities();
+        }
+
+        partial void OnIsDownloadingChanged(bool value)
+        {
+            NotifyStateVisibilities();
+        }
+
+        private void NotifyStateVisibilities()
+        {
+            OnPropertyChanged(nameof(AvailableTagVisibility));
+            OnPropertyChanged(nameof(InstalledTagVisibility));
+            OnPropertyChanged(nameof(UpdateTagVisibility));
+            OnPropertyChanged(nameof(DownloadVisibility));
+            OnPropertyChanged(nameof(InstallButtonVisibility));
+            OnPropertyChanged(nameof(UpdateButtonVisibility));
+            OnPropertyChanged(nameof(UninstallButtonVisibility));
+            OnPropertyChanged(nameof(CancelButtonVisibility));
+        }
     }
 }

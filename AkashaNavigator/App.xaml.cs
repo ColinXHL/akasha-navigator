@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
@@ -184,6 +185,48 @@ public partial class App : System.Windows.Application
         _shutdownCoordinator = serviceProvider.GetRequiredService<ShutdownCoordinator>();
 
         _config = _configService.Config;
+
+        var updateManifestService = serviceProvider.GetRequiredService<IUpdateManifestService>();
+        var pluginResourceUpdateService =
+            serviceProvider.GetRequiredService<IPluginResourceUpdateService>();
+        var notificationService = serviceProvider.GetRequiredService<INotificationService>();
+        _ = RefreshUpdateManifestInBackgroundAsync(
+            updateManifestService,
+            pluginResourceUpdateService,
+            notificationService,
+            logService);
+    }
+
+    private static async Task RefreshUpdateManifestInBackgroundAsync(
+        IUpdateManifestService updateManifestService,
+        IPluginResourceUpdateService pluginResourceUpdateService,
+        INotificationService notificationService,
+        ILogService logService)
+    {
+        var result = await updateManifestService.RefreshAsync();
+        if (result.IsFailure)
+        {
+            logService.Warn(
+                nameof(App),
+                "后台刷新更新清单失败，远程更新功能暂不可用: {ErrorMessage}",
+                result.Error?.Message ?? "未知错误");
+            return;
+        }
+
+        var resourceResult = await pluginResourceUpdateService.UpdatePickBlacklistAsync();
+        if (resourceResult.IsFailure)
+        {
+            logService.Warn(
+                nameof(App),
+                "后台更新插件资源失败，将继续使用现有资源: {ErrorMessage}",
+                resourceResult.Error?.Message ?? "未知错误");
+        }
+        else if (resourceResult.Value?.TakesEffectOnNextWorkerStart == true)
+        {
+            notificationService.Info(
+                "拾取黑名单已更新，将在下次启用 Akasha Automation 时生效",
+                "插件资源已更新");
+        }
     }
 
     /// <summary>

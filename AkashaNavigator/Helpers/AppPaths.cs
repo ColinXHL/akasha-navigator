@@ -92,6 +92,26 @@ public static class AppPaths
     /// </summary>
     public static string PluginPermissionConsentsFilePath { get; }
 
+    /// <summary>
+    /// 更新清单缓存目录（User/Data/Update/）。
+    /// </summary>
+    public static string UpdateDirectory { get; }
+
+    /// <summary>
+    /// 最近一次成功解析的更新清单缓存。
+    /// </summary>
+    public static string NoticeCacheFilePath { get; }
+
+    /// <summary>
+    /// 更新清单的 ETag 和 Last-Modified 状态。
+    /// </summary>
+    public static string NoticeStateFilePath { get; }
+
+    /// <summary>
+    /// 插件独立资源根目录（User/Data/PluginResources/）。
+    /// </summary>
+    public static string PluginResourcesDirectory { get; }
+
     static AppPaths()
     {
         // 获取应用程序目录
@@ -136,6 +156,12 @@ public static class AppPaths
         // 高风险插件权限授权记录
         PluginPermissionConsentsFilePath = Path.Combine(DataDirectory, "plugin-permission-consents.json");
 
+        // 更新清单缓存
+        UpdateDirectory = Path.Combine(DataDirectory, "Update");
+        NoticeCacheFilePath = Path.Combine(UpdateDirectory, "notice-cache.json");
+        NoticeStateFilePath = Path.Combine(UpdateDirectory, "notice-state.json");
+        PluginResourcesDirectory = Path.Combine(DataDirectory, "PluginResources");
+
         // 确保目录存在
         EnsureDirectoriesExist();
     }
@@ -155,6 +181,17 @@ public static class AppPaths
     }
 
     /// <summary>
+    /// 获取插件独立资源目录。
+    /// </summary>
+    public static string GetPluginResourceDirectory(string pluginId)
+    {
+        if (!PluginIdValidator.IsValid(pluginId))
+            throw new ArgumentException("Plugin ID format is invalid.", nameof(pluginId));
+
+        return Path.Combine(PluginResourcesDirectory, pluginId);
+    }
+
+    /// <summary>
     /// 确保所有必要目录存在
     /// </summary>
     private static void EnsureDirectoriesExist()
@@ -164,6 +201,8 @@ public static class AppPaths
         Directory.CreateDirectory(DataDirectory);
         Directory.CreateDirectory(ProfilesDirectory);
         Directory.CreateDirectory(InstalledPluginsDirectory);
+        Directory.CreateDirectory(UpdateDirectory);
+        Directory.CreateDirectory(PluginResourcesDirectory);
 
         // 为 WebView2 数据文件夹设置写权限
         EnsureWebView2FolderPermissions();

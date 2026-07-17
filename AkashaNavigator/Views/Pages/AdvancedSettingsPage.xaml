@@ -39,6 +39,29 @@
                   Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,4"
                   IsChecked="{Binding EnablePluginUpdateNotification}"/>
         <TextBlock Text="开启后，启动时如有插件可更新会弹窗提示"
+                   Foreground="#666" FontSize="11" Margin="0,0,0,10"/>
+        <Grid Margin="0,0,0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="180"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="插件下载源" Foreground="#DDD" FontSize="12"
+                       VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="1"
+                      Style="{StaticResource DarkComboBoxStyle}"
+                      ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                      ItemsSource="{Binding PluginDownloadSourceOptions}"
+                      DisplayMemberPath="DisplayName"
+                      SelectedValuePath="Value"
+                      SelectedValue="{Binding PluginDownloadSourcePreference, Mode=TwoWay}"
+                      Margin="12,0,0,0"/>
+            <Button Grid.Column="2" Content="重新测速"
+                    Style="{StaticResource ActionButtonStyle}"
+                    Command="{Binding RemeasurePluginSourcesCommand}"
+                    Margin="8,0,0,0"/>
+        </Grid>
+        <TextBlock Text="自动模式会并行读取各下载源前 512 KiB，并缓存测速结果 6 小时"
                    Foreground="#666" FontSize="11" Margin="0,0,0,16"/>
 
         <!-- 调试日志 -->

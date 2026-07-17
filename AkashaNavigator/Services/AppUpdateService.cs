@@ -2,26 +2,25 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Reflection;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Common;
+using AkashaNavigator.Models.Update;
 
 namespace AkashaNavigator.Services;
 
 public class AppUpdateService : IAppUpdateService
 {
-    private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     private readonly ILogService _logService;
+    private readonly IUpdateManifestService _updateManifestService;
 
-    public AppUpdateService(ILogService logService)
+    public AppUpdateService(ILogService logService, IUpdateManifestService updateManifestService)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _updateManifestService =
+            updateManifestService ?? throw new ArgumentNullException(nameof(updateManifestService));
     }
 
     public async Task<Result<AppUpdateCheckResult>> CheckForUpdateAsync(bool includePrerelease)
@@ -30,25 +29,15 @@ public class AppUpdateService : IAppUpdateService
 
         try
         {
-            using var response = await HttpClient.GetAsync(AppConstants.NoticeJsonUrl);
-            if (!response.IsSuccessStatusCode)
+            var manifestResult = await _updateManifestService.RefreshAsync();
+            if (manifestResult.IsFailure)
             {
                 return Result<AppUpdateCheckResult>.Failure(
-                    Error.Network("UPDATE_NOTICE_FETCH_FAILED",
-                                  $"获取更新信息失败，HTTP {(int)response.StatusCode}",
-                                  url: AppConstants.NoticeJsonUrl));
+                    manifestResult.Error ??
+                    Error.Unknown("UPDATE_MANIFEST_RESULT_INVALID", "更新清单服务返回失败但未提供错误"));
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            var notice = JsonSerializer.Deserialize<UpdateNotice>(json, JsonOptions);
-            if (notice == null)
-            {
-                return Result<AppUpdateCheckResult>.Failure(
-                    Error.Serialization("UPDATE_NOTICE_PARSE_FAILED", "更新信息为空或格式无效",
-                                        filePath: AppConstants.NoticeJsonUrl));
-            }
-
-            var candidate = SelectCandidateVersion(notice, includePrerelease);
+            var candidate = SelectCandidateVersion(manifestResult.Value!, includePrerelease);
             if (candidate == null || string.IsNullOrWhiteSpace(candidate.Version))
             {
                 return Result<AppUpdateCheckResult>.Failure(
@@ -66,22 +55,6 @@ public class AppUpdateService : IAppUpdateService
             var updateResult = AppUpdateCheckResult.WithUpdate(currentVersion, candidate.Version, notes,
                                                                 candidate.IsPrerelease, sourceId);
             return Result<AppUpdateCheckResult>.Success(updateResult);
-        }
-        catch (HttpRequestException ex)
-        {
-            return Result<AppUpdateCheckResult>.Failure(
-                Error.Network("UPDATE_NOTICE_HTTP_EXCEPTION", ex.Message, ex, AppConstants.NoticeJsonUrl));
-        }
-        catch (TaskCanceledException ex)
-        {
-            return Result<AppUpdateCheckResult>.Failure(
-                Error.Network("UPDATE_NOTICE_TIMEOUT", "请求更新信息超时", ex, AppConstants.NoticeJsonUrl));
-        }
-        catch (JsonException ex)
-        {
-            return Result<AppUpdateCheckResult>.Failure(
-                Error.Serialization("UPDATE_NOTICE_JSON_EXCEPTION", "更新信息 JSON 解析失败", ex,
-                                    AppConstants.NoticeJsonUrl));
         }
         catch (Exception ex)
         {
@@ -114,28 +87,28 @@ public class AppUpdateService : IAppUpdateService
         }
     }
 
-    private UpdateCandidate? SelectCandidateVersion(UpdateNotice notice, bool includePrerelease)
+    private UpdateCandidate? SelectCandidateVersion(UpdateManifest manifest, bool includePrerelease)
     {
         UpdateCandidate? stableCandidate = null;
-        if (!string.IsNullOrWhiteSpace(notice.Stable?.Version))
+        if (!string.IsNullOrWhiteSpace(manifest.Stable?.Version))
         {
             stableCandidate = new UpdateCandidate {
-                Version = notice.Stable!.Version!,
-                Notes = notice.Stable.Notes,
+                Version = manifest.Stable!.Version!,
+                Notes = manifest.Stable.Notes,
                 IsPrerelease = false
             };
         }
 
-        if (!includePrerelease || string.IsNullOrWhiteSpace(notice.Alpha?.Version))
+        if (!includePrerelease || string.IsNullOrWhiteSpace(manifest.Alpha?.Version))
         {
             return stableCandidate;
         }
 
-var alphaCandidate = new UpdateCandidate {
-                Version = notice.Alpha!.Version!,
-                Notes = notice.Alpha.Notes,
-                IsPrerelease = true
-            };
+        var alphaCandidate = new UpdateCandidate {
+            Version = manifest.Alpha!.Version!,
+            Notes = manifest.Alpha.Notes,
+            IsPrerelease = true
+        };
 
         if (stableCandidate == null)
         {
@@ -283,26 +256,6 @@ var alphaCandidate = new UpdateCandidate {
         return candidate.IsPrerelease
             ? "cnb-alpha"
             : "cnb";
-    }
-
-    private sealed class UpdateNotice
-    {
-        public NoticeVersion? Stable { get; set; }
-
-        public NoticeVersion? Alpha { get; set; }
-    }
-
-    private sealed class NoticeVersion
-    {
-        public string? Version { get; set; }
-
-        /// <summary>
-        /// 下载源标识（如 "qiniu"），不是 kachina 更新频道 ID。
-        /// kachina 更新频道由 IsPrerelease 决定，不使用此字段。
-        /// </summary>
-        public string? Source { get; set; }
-
-        public string? Notes { get; set; }
     }
 
     private sealed class UpdateCandidate

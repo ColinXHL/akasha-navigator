@@ -80,13 +80,17 @@
 
                                         <!-- 可安装标签：未安装时显示 -->
                                         <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
-                                                Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                                Visibility="{Binding AvailableTagVisibility}">
                                             <TextBlock Text="可安装" Foreground="#60A5FA" FontSize="11"/>
                                         </Border>
                                         <!-- 已安装标签：已安装时显示 -->
                                         <Border Grid.Column="1" Style="{StaticResource InstalledTagStyle}"
-                                                Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                Visibility="{Binding InstalledTagVisibility}">
                                             <TextBlock Text="已安装" Foreground="#4ADE80" FontSize="11"/>
+                                        </Border>
+                                        <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
+                                                Visibility="{Binding UpdateTagVisibility}">
+                                            <TextBlock Text="可更新" Foreground="#FBBF24" FontSize="11"/>
                                         </Border>
                                     </Grid>
 
@@ -97,20 +101,44 @@
                                         <TextBlock Text="{Binding Author, StringFormat='作者: {0}'}"
                                                    Foreground="#666" FontSize="11" Margin="0,4,0,0"
                                                    Visibility="{Binding HasAuthorVisibility}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,5,0,0"
+                                                    Visibility="{Binding RemoteInfoVisibility}">
+                                            <TextBlock Text="{Binding PackageSizeText, StringFormat='包大小: {0}'}"
+                                                       Foreground="#777" FontSize="11"/>
+                                            <TextBlock Text="{Binding InstalledVersionText}"
+                                                       Foreground="#777" FontSize="11" Margin="14,0,0,0"/>
+                                            <TextBlock Text="{Binding SelectedSourceText}"
+                                                       Foreground="#60A5FA" FontSize="11" Margin="14,0,0,0"/>
+                                        </StackPanel>
                                     </StackPanel>
 
                                     <!-- 第三行：操作按钮 -->
-                                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
-                                        <!-- 安装按钮：未安装时显示 -->
-                                        <Button Content="📥 安装" Style="{StaticResource PrimaryActionButtonStyle}"
-                                                Command="{Binding DataContext.InstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
-                                        <!-- 卸载按钮：已安装时显示 -->
-                                        <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
-                                                Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                                        <StackPanel Visibility="{Binding DownloadVisibility}">
+                                            <ProgressBar Height="5" Minimum="0" Maximum="100"
+                                                         Value="{Binding DownloadProgress}"
+                                                         Foreground="#3B82F6" Background="#252A34"/>
+                                            <TextBlock Text="{Binding DownloadStatus}" Foreground="#888"
+                                                       FontSize="11" Margin="0,5,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button Content="📥 安装" Style="{StaticResource PrimaryActionButtonStyle}"
+                                                    Command="{Binding DataContext.InstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding InstallButtonVisibility}"/>
+                                            <Button Content="⬆ 更新" Style="{StaticResource PrimaryActionButtonStyle}"
+                                                    Command="{Binding DataContext.InstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding UpdateButtonVisibility}"/>
+                                            <Button Content="取消下载" Style="{StaticResource ActionButtonStyle}"
+                                                    Command="{Binding DataContext.CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding CancelButtonVisibility}"/>
+                                            <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
+                                                    Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding UninstallButtonVisibility}"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Grid>
                             </Border>

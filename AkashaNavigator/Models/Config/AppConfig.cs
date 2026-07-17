@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AkashaNavigator.Models.Update;
 
 namespace AkashaNavigator.Models.Config
 {
@@ -143,6 +144,12 @@ public class AppConfig
     /// 是否包含测试版更新（默认关闭）
     /// </summary>
     public bool EnablePrereleaseUpdate { get; set; } = false;
+
+    /// <summary>
+    /// 插件包下载源偏好。
+    /// </summary>
+    public PluginDownloadSourcePreference PluginDownloadSourcePreference { get; set; } =
+        PluginDownloadSourcePreference.Auto;
 
 #endregion
 

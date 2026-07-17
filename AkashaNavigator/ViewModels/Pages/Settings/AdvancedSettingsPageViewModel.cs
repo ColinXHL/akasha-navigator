@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Config;
+using AkashaNavigator.Models.Update;
 
 namespace AkashaNavigator.ViewModels.Pages.Settings;
 
@@ -16,6 +17,14 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     private readonly IAppUpdateService _appUpdateService;
     private readonly INotificationService _notificationService;
     private readonly ILogService _logService;
+    private readonly IDownloadSourceSelector _downloadSourceSelector;
+
+    public IReadOnlyList<PluginDownloadSourceOption> PluginDownloadSourceOptions { get; } =
+        new[] {
+            new PluginDownloadSourceOption(PluginDownloadSourcePreference.Auto, "自动选择"),
+            new PluginDownloadSourceOption(PluginDownloadSourcePreference.GitHub, "GitHub"),
+            new PluginDownloadSourceOption(PluginDownloadSourcePreference.Cnb, "CNB")
+        };
 
     [ObservableProperty]
     private bool _isCheckingAppUpdate;
@@ -35,18 +44,26 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     [ObservableProperty]
     private bool _enablePrereleaseUpdate;
 
+    [ObservableProperty]
+    private PluginDownloadSourcePreference _pluginDownloadSourcePreference;
+
     /// <summary>
     /// 是否启用调试日志（自动生成属性和通知）
     /// </summary>
     [ObservableProperty]
     private bool _enableDebugLog;
 
-    public AdvancedSettingsPageViewModel(IAppUpdateService appUpdateService, INotificationService notificationService,
-                                         ILogService logService)
+    public AdvancedSettingsPageViewModel(
+        IAppUpdateService appUpdateService,
+        INotificationService notificationService,
+        ILogService logService,
+        IDownloadSourceSelector downloadSourceSelector)
     {
         _appUpdateService = appUpdateService ?? throw new ArgumentNullException(nameof(appUpdateService));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
+        _downloadSourceSelector =
+            downloadSourceSelector ?? throw new ArgumentNullException(nameof(downloadSourceSelector));
 
         IsPrereleaseToggleEnabled = true;
     }
@@ -58,6 +75,7 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     {
         EnablePluginUpdateNotification = config.EnablePluginUpdateNotification;
         EnablePrereleaseUpdate = config.EnablePrereleaseUpdate;
+        PluginDownloadSourcePreference = config.PluginDownloadSourcePreference;
         EnableDebugLog = config.EnableDebugLog;
     }
 
@@ -68,6 +86,7 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     {
         config.EnablePluginUpdateNotification = EnablePluginUpdateNotification;
         config.EnablePrereleaseUpdate = EnablePrereleaseUpdate;
+        config.PluginDownloadSourcePreference = PluginDownloadSourcePreference;
         config.EnableDebugLog = EnableDebugLog;
     }
 
@@ -78,7 +97,15 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
     {
         EnablePluginUpdateNotification = config.EnablePluginUpdateNotification;
         EnablePrereleaseUpdate = config.EnablePrereleaseUpdate;
+        PluginDownloadSourcePreference = config.PluginDownloadSourcePreference;
         EnableDebugLog = config.EnableDebugLog;
+    }
+
+    [RelayCommand]
+    private void RemeasurePluginSources()
+    {
+        _downloadSourceSelector.ClearCache();
+        _notificationService.Info("插件下载源测速缓存已清除，下次下载时会重新测速", "插件更新");
     }
 
     [RelayCommand]
@@ -135,3 +162,7 @@ public partial class AdvancedSettingsPageViewModel : ObservableObject
         }
     }
 }
+
+public sealed record PluginDownloadSourceOption(
+    PluginDownloadSourcePreference Value,
+    string DisplayName);

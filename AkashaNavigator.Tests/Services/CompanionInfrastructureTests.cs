@@ -262,6 +262,21 @@ public class CompanionInfrastructureTests
     }
 
     [Fact]
+    public void ConfigurePluginEnvironment_ShouldPassPluginResourceDirectory()
+    {
+        var startInfo = new ProcessStartInfo();
+
+        CompanionProcessManager.ConfigurePluginEnvironment(
+            startInfo,
+            AppConstants.AutomationPluginId);
+
+        Assert.Equal(
+            AkashaNavigator.Helpers.AppPaths.GetPluginResourceDirectory(
+                AppConstants.AutomationPluginId),
+            startInfo.Environment[AppConstants.PluginDataDirectoryEnvironmentVariable]);
+    }
+
+    [Fact]
     public async Task Dispose_ShouldWaitForInFlightStartBeforeCompleting()
     {
         using var directory = new TemporaryDirectory();

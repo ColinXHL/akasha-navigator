@@ -70,6 +70,9 @@ public class ConfigServiceTests : IDisposable
         Assert.True(config.IsFirstLaunch);
         Assert.False(config.EnableDebugLog);
         Assert.True(config.EnablePluginUpdateNotification);
+        Assert.Equal(
+            AkashaNavigator.Models.Update.PluginDownloadSourcePreference.Auto,
+            config.PluginDownloadSourcePreference);
         Assert.True(config.EnableEdgeSnap);
         Assert.Equal(AppConstants.SnapThreshold, config.SnapThreshold);
         Assert.Equal(AppConstants.CenterSnapThreshold, config.CenterSnapThreshold);

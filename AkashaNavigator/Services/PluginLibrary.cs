@@ -1065,46 +1065,119 @@ public class PluginLibrary : IPluginLibrary
     /// </returns>
     public static int CompareVersions(string? version1, string? version2)
     {
-        // 处理空值情况
-        if (string.IsNullOrEmpty(version1) && string.IsNullOrEmpty(version2))
+        if (string.IsNullOrWhiteSpace(version1) && string.IsNullOrWhiteSpace(version2))
             return 0;
-        if (string.IsNullOrEmpty(version1))
+        if (string.IsNullOrWhiteSpace(version1))
             return -1;
-        if (string.IsNullOrEmpty(version2))
+        if (string.IsNullOrWhiteSpace(version2))
             return 1;
 
-        // 移除可能的 'v' 前缀
-        version1 = version1.TrimStart('v', 'V');
-        version2 = version2.TrimStart('v', 'V');
-
-        // 分割版本号
-        var parts1 = version1.Split('.', '-', '+');
-        var parts2 = version2.Split('.', '-', '+');
-
-        // 比较主要版本部分 (major.minor.patch)
-        var maxParts = Math.Max(parts1.Length, parts2.Length);
-        for (int i = 0; i < maxParts; i++)
+        if (!TryParseSemanticVersion(version1, out var parsed1) ||
+            !TryParseSemanticVersion(version2, out var parsed2))
         {
-            var part1 = i < parts1.Length ? parts1[i] : "0";
-            var part2 = i < parts2.Length ? parts2[i] : "0";
-
-            // 尝试作为数字比较
-            if (int.TryParse(part1, out int num1) && int.TryParse(part2, out int num2))
-            {
-                if (num1 != num2)
-                    return num1.CompareTo(num2);
-            }
-            else
-            {
-                // 作为字符串比较（用于预发布标签等）
-                var strCompare = string.Compare(part1, part2, StringComparison.OrdinalIgnoreCase);
-                if (strCompare != 0)
-                    return strCompare;
-            }
+            return string.Compare(version1, version2, StringComparison.OrdinalIgnoreCase);
         }
 
-        return 0;
+        var coreComparison = parsed1.Major.CompareTo(parsed2.Major);
+        if (coreComparison != 0)
+            return coreComparison;
+
+        coreComparison = parsed1.Minor.CompareTo(parsed2.Minor);
+        if (coreComparison != 0)
+            return coreComparison;
+
+        coreComparison = parsed1.Patch.CompareTo(parsed2.Patch);
+        if (coreComparison != 0)
+            return coreComparison;
+
+        if (parsed1.PreRelease.Length == 0)
+            return parsed2.PreRelease.Length == 0 ? 0 : 1;
+        if (parsed2.PreRelease.Length == 0)
+            return -1;
+
+        var identifierCount = Math.Min(parsed1.PreRelease.Length, parsed2.PreRelease.Length);
+        for (var index = 0; index < identifierCount; index++)
+        {
+            var identifierComparison = ComparePreReleaseIdentifiers(
+                parsed1.PreRelease[index],
+                parsed2.PreRelease[index]);
+            if (identifierComparison != 0)
+                return identifierComparison;
+        }
+
+        return parsed1.PreRelease.Length.CompareTo(parsed2.PreRelease.Length);
     }
+
+    private static bool TryParseSemanticVersion(string value, out SemanticPluginVersion version)
+    {
+        var normalized = value.Trim();
+        if (normalized.StartsWith('v') || normalized.StartsWith('V'))
+        {
+            normalized = normalized[1..];
+        }
+
+        var buildMetadataIndex = normalized.IndexOf('+');
+        if (buildMetadataIndex >= 0)
+        {
+            normalized = normalized[..buildMetadataIndex];
+        }
+
+        var preReleaseIndex = normalized.IndexOf('-');
+        var core = preReleaseIndex >= 0 ? normalized[..preReleaseIndex] : normalized;
+        var preRelease = preReleaseIndex >= 0
+            ? normalized[(preReleaseIndex + 1)..].Split('.')
+            : [];
+        var coreParts = core.Split('.');
+        var minor = 0L;
+        var patch = 0L;
+
+        if (coreParts.Length is < 1 or > 3 ||
+            preRelease.Any(string.IsNullOrEmpty) ||
+            !long.TryParse(coreParts[0], out var major) ||
+            (coreParts.Length > 1 && !long.TryParse(coreParts[1], out minor)) ||
+            (coreParts.Length > 2 && !long.TryParse(coreParts[2], out patch)))
+        {
+            version = default;
+            return false;
+        }
+
+        version = new SemanticPluginVersion(
+            major,
+            minor,
+            patch,
+            preRelease);
+        return true;
+    }
+
+    private static int ComparePreReleaseIdentifiers(string left, string right)
+    {
+        var leftIsNumeric = left.All(char.IsDigit);
+        var rightIsNumeric = right.All(char.IsDigit);
+
+        if (leftIsNumeric && rightIsNumeric)
+        {
+            var normalizedLeft = left.TrimStart('0');
+            var normalizedRight = right.TrimStart('0');
+            normalizedLeft = normalizedLeft.Length == 0 ? "0" : normalizedLeft;
+            normalizedRight = normalizedRight.Length == 0 ? "0" : normalizedRight;
+
+            var lengthComparison = normalizedLeft.Length.CompareTo(normalizedRight.Length);
+            return lengthComparison != 0
+                ? lengthComparison
+                : string.Compare(normalizedLeft, normalizedRight, StringComparison.Ordinal);
+        }
+
+        if (leftIsNumeric != rightIsNumeric)
+            return leftIsNumeric ? -1 : 1;
+
+        return string.Compare(left, right, StringComparison.Ordinal);
+    }
+
+    private readonly record struct SemanticPluginVersion(
+        long Major,
+        long Minor,
+        long Patch,
+        string[] PreRelease);
 
     /// <summary>
     /// 检查 availableVersion 是否比 currentVersion 更新

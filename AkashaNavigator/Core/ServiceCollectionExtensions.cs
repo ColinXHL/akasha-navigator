@@ -1,3 +1,5 @@
+using System;
+using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Services;
 using AkashaNavigator.Core.Interfaces;
@@ -11,6 +13,7 @@ using AkashaNavigator.ViewModels.Pages;
 using AkashaNavigator.ViewModels.Pages.Settings;
 using AkashaNavigator.ViewModels.Windows;
 using AkashaNavigator.Plugins.Core;
+using AkashaNavigator.Models.Update;
 
 namespace AkashaNavigator.Core
 {
@@ -66,6 +69,11 @@ public static class ServiceCollectionExtensions
         // PlayerRuntimeBridge（运行时 PlayerWindow 桥接）
         services.AddSingleton<IPlayerRuntimeBridge, PlayerRuntimeBridge>();
 
+        // 更新清单配置和专用 HTTP 客户端
+        services.AddSingleton(new UpdateOptions());
+        services.AddSingleton(
+            _ => new HttpClient { Timeout = Timeout.InfiniteTimeSpan });
+
         // ============================================================
         // Level 1: 依赖 LogService
         // ============================================================
@@ -76,7 +84,19 @@ public static class ServiceCollectionExtensions
         // ShutdownCoordinator（依赖 LogService，统一编排幂等关停阶段）
         services.AddSingleton<ShutdownCoordinator>();
 
-        // AppUpdateService（依赖LogService）
+        // UpdateManifestService（依赖 LogService + UpdateOptions + HttpClient）
+        services.AddSingleton<IUpdateManifestService, UpdateManifestService>();
+
+        // DownloadSourceSelector（依赖 HttpClient + ConfigService）
+        services.AddSingleton<IDownloadSourceSelector, DownloadSourceSelector>();
+
+        // PluginPackageService（依赖 Manifest、下载源选择器和 PluginLibrary）
+        services.AddSingleton<IPluginPackageService, PluginPackageService>();
+
+        // PluginResourceUpdateService（仅在对应插件已安装时更新独立资源）
+        services.AddSingleton<IPluginResourceUpdateService, PluginResourceUpdateService>();
+
+        // AppUpdateService（依赖 LogService + UpdateManifestService）
         services.AddSingleton<IAppUpdateService, AppUpdateService>();
 
         // NotificationService（依赖LogService + Func<IDialogFactory>延迟解析）
