@@ -241,11 +241,19 @@ public class HotkeyService : IDisposable
     }
 
     /// <summary>
-    /// 更新快捷键配置
+    /// 更新内置快捷键配置，同时保留运行中插件注册的快捷键。
     /// </summary>
-    /// <param name="config">新配置</param>
+    /// <remarks>
+    /// 插件绑定是运行时注册的，未存储在 <see cref="AppConfig"/> 转换出的配置中。
+    /// 因此，不能在更新内置配置时直接丢弃 <c>Plugin:</c> 动作，否则保存应用设置会使
+    /// 已加载插件的快捷键失效。
+    /// </remarks>
+    /// <param name="config">新的内置快捷键配置</param>
     public void UpdateConfig(HotkeyConfig config)
     {
+        ArgumentNullException.ThrowIfNull(config);
+
+        PreservePluginBindings(_config, config);
         _config = config;
     }
 
@@ -282,33 +290,44 @@ public class HotkeyService : IDisposable
     }
 
     /// <summary>
-    /// 注册插件快捷键（添加到当前激活的 Profile）
+    /// 注册插件快捷键（添加到当前激活的 Profile）。
     /// </summary>
     /// <param name="vkCode">虚拟键码</param>
     /// <param name="modifiers">修饰键</param>
     /// <param name="actionName">动作名称</param>
-    public void RegisterPluginHotkey(uint vkCode, Models.Config.ModifierKeys modifiers, string actionName)
+    /// <returns>成功注册或已存在相同动作时为 <see langword="true"/>；发生冲突时为 <see langword="false"/>。</returns>
+    public bool RegisterPluginHotkey(uint vkCode, Models.Config.ModifierKeys modifiers, string actionName)
     {
         var activeProfile = _config.GetActiveProfile();
         if (activeProfile == null)
         {
             Serilog.Log.Warning("RegisterPluginHotkey: No active profile found");
-            return;
+            return false;
         }
 
-        // 检查是否已存在相同的绑定
-        var existingBinding = activeProfile.FindMatchingBinding(vkCode, modifiers, null);
+        var inputType = HotkeyBinding.InferInputType(vkCode);
+        var existingBinding = activeProfile.Bindings.FirstOrDefault(binding =>
+            binding.IsEnabled &&
+            binding.InputType == inputType &&
+            binding.Key == vkCode &&
+            binding.Modifiers == modifiers);
         if (existingBinding != null)
         {
-            // 已存在，更新动作名称
-            existingBinding.Action = actionName;
-            Serilog.Log.Debug("RegisterPluginHotkey: Updated existing binding for VK={VkCode}, Modifiers={Modifiers}, Action={Action}", vkCode, modifiers, actionName);
-            return;
+            if (string.Equals(existingBinding.Action, actionName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            Serilog.Log.Warning(
+                "RegisterPluginHotkey: Rejected conflicting binding for VK={VkCode}, Modifiers={Modifiers}. Existing action={ExistingAction}, requested action={RequestedAction}",
+                vkCode, modifiers, existingBinding.Action, actionName);
+            return false;
         }
 
         // 添加新绑定
         var binding = new HotkeyBinding
         {
+            InputType = inputType,
             Key = vkCode,
             Modifiers = modifiers,
             Action = actionName,
@@ -317,6 +336,7 @@ public class HotkeyService : IDisposable
         activeProfile.Bindings.Add(binding);
         Serilog.Log.Information("RegisterPluginHotkey: Added new binding - VK={VkCode}, Modifiers={Modifiers}, Action={Action}, Total bindings={Count}", 
             vkCode, modifiers, actionName, activeProfile.Bindings.Count);
+        return true;
     }
 
     /// <summary>
@@ -331,6 +351,61 @@ public class HotkeyService : IDisposable
 
         // 移除匹配的绑定
         activeProfile.Bindings.RemoveAll(b => b.Action == actionName);
+    }
+
+    private static void PreservePluginBindings(HotkeyConfig currentConfig, HotkeyConfig updatedConfig)
+    {
+        foreach (var currentProfile in currentConfig.Profiles)
+        {
+            var pluginBindings = currentProfile.Bindings
+                                               .Where(binding => IsPluginAction(binding.Action))
+                                               .Select(CloneBinding)
+                                               .ToList();
+            if (pluginBindings.Count == 0)
+            {
+                continue;
+            }
+
+            var updatedProfile = updatedConfig.Profiles.FirstOrDefault(profile =>
+                string.Equals(profile.Name, currentProfile.Name, StringComparison.OrdinalIgnoreCase));
+            if (updatedProfile == null)
+            {
+                updatedProfile = new HotkeyProfile
+                {
+                    Name = currentProfile.Name,
+                    ActivationProcesses = currentProfile.ActivationProcesses?.ToList()
+                };
+                updatedConfig.Profiles.Add(updatedProfile);
+            }
+
+            foreach (var pluginBinding in pluginBindings)
+            {
+                var alreadyPresent = updatedProfile.Bindings.Any(binding =>
+                    string.Equals(binding.Action, pluginBinding.Action, StringComparison.OrdinalIgnoreCase));
+                if (!alreadyPresent)
+                {
+                    updatedProfile.Bindings.Add(pluginBinding);
+                }
+            }
+        }
+    }
+
+    private static bool IsPluginAction(string actionName)
+    {
+        return actionName.StartsWith("Plugin:", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static HotkeyBinding CloneBinding(HotkeyBinding binding)
+    {
+        return new HotkeyBinding
+        {
+            InputType = binding.InputType,
+            Key = binding.Key,
+            Modifiers = binding.Modifiers,
+            Action = binding.Action,
+            ProcessFilters = binding.ProcessFilters?.ToList(),
+            IsEnabled = binding.IsEnabled
+        };
     }
 
     /// <summary>

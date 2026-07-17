@@ -14,6 +14,12 @@ public sealed class CompanionApi
         "worker.echo",
         "worker.getStatus",
         "worker.shutdown",
+        "features.autoPick.getOptions",
+        "features.autoPick.setOptions",
+        "features.autoPick.setEnabled",
+        "features.autoDialogue.getOptions",
+        "features.autoDialogue.setOptions",
+        "features.autoDialogue.setEnabled",
         "automation.emergencyStop"
     };
 

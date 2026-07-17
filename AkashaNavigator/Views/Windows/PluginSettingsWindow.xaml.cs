@@ -72,10 +72,10 @@ public partial class PluginSettingsWindow : AnimatedWindow
 
     private void OnButtonAction(object? sender, SettingsButtonActionEventArgs e)
     {
-        HandleButtonAction(e.Action);
+        HandleButtonAction(e.Action, e.RelativePath);
     }
 
-    private void HandleButtonAction(string action)
+    private void HandleButtonAction(string action, string? relativePath)
     {
         if (string.IsNullOrEmpty(action))
             return;
@@ -91,7 +91,7 @@ public partial class PluginSettingsWindow : AnimatedWindow
                 break;
 
             case SettingsButtonActions.OpenPluginFolder:
-                OpenPluginFolder();
+                OpenPluginFolder(relativePath);
                 break;
 
             default:
@@ -140,18 +140,23 @@ public partial class PluginSettingsWindow : AnimatedWindow
         await _viewModel.SaveAsync(notifyUser: false, reloadPlugin: false);
     }
 
-    private void OpenPluginFolder()
+    private void OpenPluginFolder(string? relativePath)
     {
         try
         {
-            if (Directory.Exists(_viewModel.PluginDirectory))
+            var directory = PluginSettingsPathResolver.ResolveDirectory(_viewModel.PluginDirectory, relativePath);
+            if (directory != null && Directory.Exists(directory))
             {
-                Process.Start(new ProcessStartInfo { FileName = _viewModel.PluginDirectory, UseShellExecute = true });
+                Process.Start(new ProcessStartInfo { FileName = directory, UseShellExecute = true });
+                return;
             }
+
+            _viewModel.ShowWarning("目标目录不存在，请确认插件资源已完整安装");
         }
         catch (Exception ex)
         {
             _logService.Error(nameof(PluginSettingsWindow), ex, "打开插件目录失败");
+            _viewModel.ShowWarning("打开目录失败，请检查插件文件是否完整");
         }
     }
 

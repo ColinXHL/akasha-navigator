@@ -300,6 +300,45 @@ public class SettingsUiDefinitionTests
 
 #endregion
 
+#region Presentation Metadata Tests
+
+    [Fact]
+    public void LoadFromJson_PresentationMetadata_ParsesCorrectly()
+    {
+        var json = """
+                   {
+                     "sections": [
+                       {
+                         "title": "名单",
+                         "items": [
+                           {
+                             "type": "textarea",
+                             "key": "whitelist",
+                             "label": "白名单",
+                             "description": "每行一个完整名称",
+                             "default": ""
+                           },
+                           {
+                             "type": "button",
+                             "label": "打开目录",
+                             "action": "openPluginFolder",
+                             "relativePath": "worker/win-x64/Assets/Config/Pick"
+                           }
+                         ]
+                       }
+                     ]
+                   }
+                   """;
+
+        var definition = SettingsUiDefinition.LoadFromJson(json);
+
+        var items = definition!.Sections![0].Items!;
+        Assert.Equal("每行一个完整名称", items[0].Description);
+        Assert.Equal("worker/win-x64/Assets/Config/Pick", items[1].RelativePath);
+    }
+
+#endregion
+
 #region Multiple Sections Tests
 
     [Fact]

@@ -56,8 +56,8 @@
                         <Button x:Name="BtnCancel" Content="取消" 
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="BtnCancel_Click" Margin="0,0,8,0"/>
-                        <Button x:Name="BtnSave" Content="保存" 
-                                Style="{StaticResource SecondaryButtonStyle}"
+                        <Button x:Name="BtnSave" Content="保存"
+                                Style="{StaticResource PrimaryButtonStyle}"
                                 Click="BtnSave_Click"/>
                     </StackPanel>
                 </Grid>

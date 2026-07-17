@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -416,6 +417,11 @@ public sealed class FakePluginLibrary : IPluginLibrary
 
         InstalledPlugins[pluginId] = plugin;
         return Result<InstalledPluginInfo>.Success(plugin);
+    }
+
+    public Result<InstalledPluginInfo> InstallPluginPackage(string archivePath)
+    {
+        return InstallPlugin(Path.GetFileNameWithoutExtension(archivePath));
     }
 
     public Result UninstallPlugin(string pluginId, bool force = false, Func<string, List<string>>? getReferencingProfiles = null)

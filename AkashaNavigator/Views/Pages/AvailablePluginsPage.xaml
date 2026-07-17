@@ -22,10 +22,15 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="可用插件" FontSize="18" FontWeight="SemiBold"
                        Foreground="White" VerticalAlignment="Center"/>
-            <TextBox x:Name="SearchBox" Grid.Column="1" Width="200"
+            <Button Grid.Column="1" Content="📦 从 ZIP 安装"
+                    Style="{StaticResource ActionButtonStyle}"
+                    Margin="0,0,12,0"
+                    Click="OnInstallPackageClick"/>
+            <TextBox x:Name="SearchBox" Grid.Column="2" Width="200"
                      Style="{StaticResource SearchBoxStyle}" Tag="搜索插件..."
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid>

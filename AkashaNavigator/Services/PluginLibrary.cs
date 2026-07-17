@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text.Json;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Common;
@@ -70,6 +73,8 @@ public class PluginLibrary : IPluginLibrary
     private readonly string _libraryDirectory;
     private readonly string _libraryIndexPath;
     private readonly string _builtInPluginsDirectory;
+    private const int MaxPackageEntries = 20_000;
+    private const long MaxPackageUncompressedBytes = 512L * 1024 * 1024;
 
 #endregion
 
@@ -356,6 +361,407 @@ public class PluginLibrary : IPluginLibrary
         OnPluginChanged(new PluginLibraryChangedEventArgs(PluginLibraryChangeType.Installed, pluginId, pluginInfo));
 
         return Result<InstalledPluginInfo>.Success(pluginInfo);
+    }
+
+    /// <summary>
+    /// 从本地 ZIP 插件包安装或更新插件
+    /// </summary>
+    public Result<InstalledPluginInfo> InstallPluginPackage(string archivePath)
+    {
+        if (string.IsNullOrWhiteSpace(archivePath) ||
+            !File.Exists(archivePath) ||
+            !string.Equals(Path.GetExtension(archivePath), ".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.FileSystem(
+                    PluginErrorCodes.SourceNotFound,
+                    "请选择存在的 ZIP 插件包",
+                    filePath: archivePath));
+        }
+
+        var extractionRoot = Path.Combine(
+            Path.GetTempPath(),
+            $"AkashaNavigator.PluginPackage.{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(extractionRoot);
+            ExtractPluginPackage(archivePath, extractionRoot);
+            var pluginDirectory = FindPluginRoot(extractionRoot);
+            VerifyPackageManifestIfPresent(pluginDirectory);
+
+            var manifestResult = PluginManifest.LoadFromFile(Path.Combine(pluginDirectory, "plugin.json"));
+            if (!manifestResult.IsSuccess || manifestResult.Manifest == null)
+            {
+                return Result<InstalledPluginInfo>.Failure(
+                    Error.Plugin(
+                        PluginErrorCodes.InvalidManifest,
+                        $"插件包清单无效: {manifestResult.ErrorMessage ?? "未知错误"}"));
+            }
+
+            var manifest = manifestResult.Manifest;
+            var pluginId = manifest.Id!;
+            ValidatePackageEntryFiles(pluginDirectory, manifest);
+
+            return IsInstalled(pluginId)
+                ? UpdatePluginFromDirectory(pluginDirectory, manifest)
+                : InstallPlugin(pluginId, pluginDirectory);
+        }
+        catch (InvalidDataException ex)
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(PluginErrorCodes.InvalidPackage, ex.Message));
+        }
+        catch (JsonException ex)
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(PluginErrorCodes.InvalidPackage, $"插件包校验清单不是有效 JSON: {ex.Message}"));
+        }
+        catch (Exception ex)
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.FileSystem(
+                    PluginErrorCodes.CopyFailed,
+                    $"插件包导入失败: {ex.Message}",
+                    ex,
+                    filePath: archivePath));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(extractionRoot))
+                {
+                    Directory.Delete(extractionRoot, recursive: true);
+                }
+            }
+            catch
+            {
+                // 临时目录清理由系统后续回收，不影响安装结果。
+            }
+        }
+    }
+
+    private Result<InstalledPluginInfo> UpdatePluginFromDirectory(
+        string sourceDirectory,
+        PluginManifest manifest)
+    {
+        var pluginId = manifest.Id!;
+        InstalledPluginEntry? entry;
+        lock (_indexLock)
+        {
+            entry = _index.Plugins.FirstOrDefault(
+                item => string.Equals(item.Id, pluginId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (entry == null)
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(PluginErrorCodes.NotInstalled, $"插件 {pluginId} 未安装", pluginId: pluginId));
+        }
+
+        var incomingVersion = manifest.Version ?? "0.0.0";
+        if (CompareVersions(incomingVersion, entry.Version) <= 0)
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(
+                    PluginErrorCodes.VersionNotNewer,
+                    $"插件包版本 {incomingVersion} 不高于已安装版本 {entry.Version}",
+                    pluginId: pluginId));
+        }
+
+        if (!_permissionConsentService.EnsureHighRiskPermissionsApproved(
+                manifest,
+                PluginPermissionConsentOperation.Update))
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(
+                    PluginErrorCodes.PermissionConsentDeclined,
+                    "未获得或无法保存更新所需的高风险权限授权",
+                    pluginId: pluginId));
+        }
+
+        Directory.CreateDirectory(LibraryDirectory);
+        var targetDirectory = GetContainedPluginDirectory(LibraryDirectory, pluginId);
+        var stagingDirectory = Path.Combine(
+            LibraryDirectory,
+            $".package-staging-{pluginId}-{Guid.NewGuid():N}");
+        var backupDirectory = Path.Combine(
+            LibraryDirectory,
+            $".package-backup-{pluginId}-{Guid.NewGuid():N}");
+        InstalledPluginInfo pluginInfo;
+
+        try
+        {
+            CopyDirectory(sourceDirectory, stagingDirectory);
+            StopCompanionBeforeFileMutation(pluginId);
+
+            if (Directory.Exists(targetDirectory))
+            {
+                Directory.Move(targetDirectory, backupDirectory);
+            }
+
+            Directory.Move(stagingDirectory, targetDirectory);
+
+            lock (_indexLock)
+            {
+                entry.Version = incomingVersion;
+                entry.Source = "external";
+                SaveIndex();
+            }
+
+            pluginInfo = InstalledPluginInfo.FromManifest(manifest, entry.Source);
+            pluginInfo.InstalledAt = entry.InstalledAt;
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                if (Directory.Exists(targetDirectory) && Directory.Exists(backupDirectory))
+                {
+                    Directory.Delete(targetDirectory, recursive: true);
+                }
+
+                if (!Directory.Exists(targetDirectory) && Directory.Exists(backupDirectory))
+                {
+                    Directory.Move(backupDirectory, targetDirectory);
+                }
+
+                if (Directory.Exists(stagingDirectory))
+                {
+                    Directory.Delete(stagingDirectory, recursive: true);
+                }
+            }
+            catch
+            {
+                // 保留原始异常；备份目录不会被主动删除，便于人工恢复。
+            }
+
+            return Result<InstalledPluginInfo>.Failure(
+                Error.FileSystem(
+                    PluginErrorCodes.CopyFailed,
+                    $"插件更新失败: {ex.Message}",
+                    ex,
+                    filePath: targetDirectory));
+        }
+
+        try
+        {
+            if (Directory.Exists(backupDirectory))
+            {
+                Directory.Delete(backupDirectory, recursive: true);
+            }
+        }
+        catch
+        {
+            // 新版本已经提交；旧版本备份可在后续维护时清理，不能因此回滚索引。
+        }
+
+        OnPluginChanged(new PluginLibraryChangedEventArgs(
+            PluginLibraryChangeType.Updated,
+            pluginId,
+            pluginInfo));
+        return Result<InstalledPluginInfo>.Success(pluginInfo);
+    }
+
+    private static void ExtractPluginPackage(string archivePath, string extractionRoot)
+    {
+        using var archive = ZipFile.OpenRead(archivePath);
+        if (archive.Entries.Count == 0)
+        {
+            throw new InvalidDataException("插件包为空");
+        }
+
+        if (archive.Entries.Count > MaxPackageEntries)
+        {
+            throw new InvalidDataException($"插件包文件数量超过限制（{MaxPackageEntries}）");
+        }
+
+        long totalLength = 0;
+        var rootPrefix = Path.GetFullPath(extractionRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+                         Path.DirectorySeparatorChar;
+
+        foreach (var entry in archive.Entries)
+        {
+            totalLength = checked(totalLength + entry.Length);
+            if (totalLength > MaxPackageUncompressedBytes)
+            {
+                throw new InvalidDataException("插件包解压后大小超过 512 MiB");
+            }
+
+            var relativePath = entry.FullName.Replace('\\', '/');
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                continue;
+            }
+
+            var pathSegments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (relativePath.StartsWith("/", StringComparison.Ordinal) ||
+                Path.IsPathRooted(relativePath) ||
+                relativePath.Contains(':') ||
+                pathSegments.Any(segment => segment is "." or ".."))
+            {
+                throw new InvalidDataException($"插件包包含不安全路径: {entry.FullName}");
+            }
+
+            var unixFileType = (entry.ExternalAttributes >> 16) & 0xF000;
+            if (unixFileType == 0xA000)
+            {
+                throw new InvalidDataException($"插件包不允许包含符号链接: {entry.FullName}");
+            }
+
+            var destinationPath = Path.GetFullPath(
+                Path.Combine(extractionRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!destinationPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"插件包路径越界: {entry.FullName}");
+            }
+
+            if (relativePath.EndsWith("/", StringComparison.Ordinal))
+            {
+                Directory.CreateDirectory(destinationPath);
+                continue;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            using var source = entry.Open();
+            using var destination = new FileStream(destinationPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            source.CopyTo(destination);
+        }
+    }
+
+    private static string FindPluginRoot(string extractionRoot)
+    {
+        var manifestPaths = Directory
+            .EnumerateFiles(extractionRoot, "plugin.json", SearchOption.AllDirectories)
+            .ToArray();
+        if (manifestPaths.Length != 1)
+        {
+            throw new InvalidDataException(
+                manifestPaths.Length == 0
+                    ? "插件包中没有 plugin.json"
+                    : "插件包中存在多个 plugin.json");
+        }
+
+        var manifestDirectory = Path.GetDirectoryName(manifestPaths[0])!;
+        var relativeDirectory = Path.GetRelativePath(extractionRoot, manifestDirectory);
+        if (relativeDirectory != "." &&
+            relativeDirectory.Split(
+                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries).Length != 1)
+        {
+            throw new InvalidDataException("plugin.json 只能位于 ZIP 根目录或唯一的顶层插件目录中");
+        }
+
+        if (relativeDirectory != ".")
+        {
+            var topLevelEntries = Directory.EnumerateFileSystemEntries(extractionRoot).ToArray();
+            if (topLevelEntries.Length != 1 ||
+                !string.Equals(
+                    Path.GetFullPath(topLevelEntries[0]),
+                    Path.GetFullPath(manifestDirectory),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("顶层插件目录之外包含额外文件");
+            }
+        }
+
+        return manifestDirectory;
+    }
+
+    private static void ValidatePackageEntryFiles(string pluginDirectory, PluginManifest manifest)
+    {
+        EnsurePackageFileExists(pluginDirectory, manifest.Main!, "插件入口文件");
+        if (manifest.Companion != null)
+        {
+            EnsurePackageFileExists(pluginDirectory, manifest.Companion.Executable!, "companion 可执行文件");
+        }
+    }
+
+    private static void EnsurePackageFileExists(string pluginDirectory, string relativePath, string displayName)
+    {
+        var normalized = relativePath.Replace('\\', '/');
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (Path.IsPathRooted(normalized) ||
+            normalized.Contains(':') ||
+            segments.Any(segment => segment is "." or ".."))
+        {
+            throw new InvalidDataException($"{displayName}路径不安全: {relativePath}");
+        }
+
+        var rootPrefix = Path.GetFullPath(pluginDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+                         Path.DirectorySeparatorChar;
+        var fullPath = Path.GetFullPath(
+            Path.Combine(pluginDirectory, normalized.Replace('/', Path.DirectorySeparatorChar)));
+        if (!fullPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) || !File.Exists(fullPath))
+        {
+            throw new InvalidDataException($"{displayName}不存在: {relativePath}");
+        }
+    }
+
+    private static void VerifyPackageManifestIfPresent(string pluginDirectory)
+    {
+        var manifestPath = Path.Combine(pluginDirectory, "package-manifest.json");
+        if (!File.Exists(manifestPath))
+        {
+            return;
+        }
+
+        using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        if (!document.RootElement.TryGetProperty("files", out var filesElement) ||
+            filesElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException("package-manifest.json 缺少 files 数组");
+        }
+
+        var declaredPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var fileElement in filesElement.EnumerateArray())
+        {
+            if (!fileElement.TryGetProperty("path", out var pathElement) ||
+                !fileElement.TryGetProperty("size", out var sizeElement) ||
+                !fileElement.TryGetProperty("sha256", out var hashElement))
+            {
+                throw new InvalidDataException("package-manifest.json 文件条目不完整");
+            }
+
+            var relativePath = pathElement.GetString() ?? string.Empty;
+            EnsurePackageFileExists(pluginDirectory, relativePath, "清单文件");
+            var normalizedPath = relativePath.Replace('\\', '/');
+            if (!declaredPaths.Add(normalizedPath))
+            {
+                throw new InvalidDataException($"package-manifest.json 包含重复路径: {relativePath}");
+            }
+
+            var fullPath = Path.Combine(
+                pluginDirectory,
+                normalizedPath.Replace('/', Path.DirectorySeparatorChar));
+            var expectedSize = sizeElement.GetInt64();
+            var expectedHash = hashElement.GetString() ?? string.Empty;
+            var fileInfo = new FileInfo(fullPath);
+            if (fileInfo.Length != expectedSize)
+            {
+                throw new InvalidDataException($"插件包文件大小校验失败: {relativePath}");
+            }
+
+            using var stream = File.OpenRead(fullPath);
+            var actualHash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+            if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"插件包文件哈希校验失败: {relativePath}");
+            }
+        }
+
+        var actualPaths = Directory
+            .EnumerateFiles(pluginDirectory, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(pluginDirectory, path).Replace('\\', '/'))
+            .Where(path => !string.Equals(path, "package-manifest.json", StringComparison.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!actualPaths.SetEquals(declaredPaths))
+        {
+            throw new InvalidDataException("插件包实际文件与 package-manifest.json 不一致");
+        }
     }
 
     /// <summary>

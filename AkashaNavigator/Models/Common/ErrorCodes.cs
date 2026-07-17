@@ -44,6 +44,16 @@ public static class PluginErrorCodes
     /// 用户拒绝高风险权限
     /// </summary>
     public const string PermissionConsentDeclined = "PLUGIN_PERMISSION_CONSENT_DECLINED";
+
+    /// <summary>
+    /// 插件压缩包无效或不安全
+    /// </summary>
+    public const string InvalidPackage = "PLUGIN_INVALID_PACKAGE";
+
+    /// <summary>
+    /// 插件压缩包版本不高于已安装版本
+    /// </summary>
+    public const string VersionNotNewer = "PLUGIN_VERSION_NOT_NEWER";
 }
 
 /// <summary>

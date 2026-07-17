@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
@@ -140,6 +141,7 @@ public class SettingsUiRenderer
     private FrameworkElement? RenderItem(SettingsItem item)
     {
         return item.Type.ToLowerInvariant() switch { "text" => RenderTextBox(item),
+                                                     "textarea" => RenderTextArea(item),
                                                      "number" => RenderNumberBox(item),
                                                      "checkbox" => RenderCheckBox(item),
                                                      "select" => RenderComboBox(item),
@@ -157,7 +159,7 @@ public class SettingsUiRenderer
 
     private FrameworkElement RenderTextBox(SettingsItem item)
     {
-        var container = CreateItemContainer(item.Label);
+        var container = CreateItemContainer(item.Label, item.Description);
 
         var textBox = new TextBox { MinWidth = 200 };
 
@@ -257,7 +259,7 @@ public class SettingsUiRenderer
 
     private FrameworkElement RenderNumberBox(SettingsItem item)
     {
-        var container = CreateItemContainer(item.Label);
+        var container = CreateItemContainer(item.Label, item.Description);
 
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -544,7 +546,7 @@ public class SettingsUiRenderer
 
     private FrameworkElement RenderComboBox(SettingsItem item)
     {
-        var container = CreateItemContainer(item.Label);
+        var container = CreateItemContainer(item.Label, item.Description);
 
         var comboBox = new ComboBox { MinWidth = 150 };
 
@@ -847,7 +849,7 @@ public class SettingsUiRenderer
     /// </summary>
     private FrameworkElement RenderProcessList(SettingsItem item)
     {
-        var container = CreateItemContainer(item.Label);
+        var container = CreateItemContainer(item.Label, item.Description);
 
         // 输入行容器
         var inputRow = new Grid { Margin = new Thickness(0, 0, 0, 8) };
@@ -1144,7 +1146,7 @@ public class SettingsUiRenderer
 
     private FrameworkElement RenderSlider(SettingsItem item)
     {
-        var container = CreateItemContainer(item.Label);
+        var container = CreateItemContainer(item.Label, item.Description);
 
         var sliderContainer = new Grid();
         sliderContainer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1245,7 +1247,8 @@ public class SettingsUiRenderer
     private FrameworkElement RenderButton(SettingsItem item)
     {
         var button = new Button { Content = item.Label ?? "按钮", Padding = new Thickness(16, 8, 16, 8), FontSize = 12,
-                                  Margin = new Thickness(0, 8, 0, 0), MinWidth = 80 };
+                                  Margin = new Thickness(0, 8, 0, 0), MinWidth = 80,
+                                  HorizontalAlignment = HorizontalAlignment.Left };
 
         // 尝试应用共享样式，如果不存在则使用回退样式
         if (!ApplyStyleIfExists(button, "ActionButtonStyle"))
@@ -1257,7 +1260,7 @@ public class SettingsUiRenderer
         }
 
         button.Click += (s, e) =>
-        { OnButtonAction(item.Action ?? string.Empty); };
+        { OnButtonAction(item.Action ?? string.Empty, item.RelativePath); };
 
         return button;
     }
@@ -1380,7 +1383,7 @@ public class SettingsUiRenderer
 
     private FrameworkElement RenderHotkeyBox(SettingsItem item)
     {
-        var container = CreateItemContainer(item.Label);
+        var container = CreateItemContainer(item.Label, item.Description);
 
         var hotkeyTextBox = new Controls.HotkeyTextBox { MinWidth = 200 };
 
@@ -1416,10 +1419,7 @@ public class SettingsUiRenderer
             {
                 // 构建快捷键字符串
                 var newCombo = BuildHotkeyString(hotkeyTextBox.HotkeyValue, hotkeyTextBox.Modifiers);
-                if (!string.IsNullOrEmpty(newCombo))
-                {
-                    OnValueChanged(item.Key, newCombo);
-                }
+                OnValueChanged(item.Key, newCombo);
             }
         };
 
@@ -1431,6 +1431,124 @@ public class SettingsUiRenderer
 
         container.Children.Add(hotkeyTextBox);
         return container;
+    }
+
+    private FrameworkElement RenderTextArea(SettingsItem item)
+    {
+        var container = CreateItemContainer(item.Label, item.Description);
+        var textBox = new TextBox { MinWidth = 200,
+                                    MinHeight = 88,
+                                    MaxHeight = 160,
+                                    AcceptsReturn = true,
+                                    AcceptsTab = false,
+                                    TextWrapping = TextWrapping.Wrap,
+                                    VerticalContentAlignment = VerticalAlignment.Top,
+                                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+
+        if (!ApplyStyleIfExists(textBox, "DarkMultilineTextBoxStyle"))
+        {
+            textBox.Background = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+            textBox.Foreground = Brushes.White;
+            textBox.BorderBrush = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55));
+            textBox.BorderThickness = new Thickness(1);
+            textBox.Padding = new Thickness(8, 6, 8, 6);
+            textBox.FontSize = 12;
+            ApplyRoundedTextBoxStyle(textBox);
+        }
+
+        if (!string.IsNullOrEmpty(item.Placeholder))
+        {
+            textBox.Tag = item.Placeholder;
+        }
+
+        textBox.Text = GetConfigValue<string>(item.Key, item.GetDefaultValue<string>() ?? string.Empty);
+        textBox.PreviewMouseLeftButtonDown += (s, e) =>
+        {
+            if (!textBox.IsKeyboardFocusWithin)
+            {
+                textBox.Focus();
+            }
+        };
+        textBox.PreviewMouseWheel += (s, e) => HandleTextAreaMouseWheel(textBox, e);
+        textBox.GotKeyboardFocus += (s, e) =>
+        {
+            if (textBox.Text.Length == 0)
+            {
+                textBox.CaretIndex = 0;
+                textBox.ScrollToHome();
+            }
+        };
+        textBox.TextChanged += (s, e) =>
+        {
+            if (!string.IsNullOrEmpty(item.Key))
+            {
+                OnValueChanged(item.Key, textBox.Text);
+            }
+        };
+
+        if (!string.IsNullOrEmpty(item.Key))
+        {
+            _controlMap[item.Key] = textBox;
+            _itemMap[item.Key] = item;
+        }
+
+        container.Children.Add(textBox);
+        return container;
+    }
+
+    private static void HandleTextAreaMouseWheel(TextBox textBox, MouseWheelEventArgs e)
+    {
+        textBox.ApplyTemplate();
+
+        if (textBox.Template.FindName("PART_ContentHost", textBox) is ScrollViewer contentHost &&
+            CanScrollVertically(contentHost, e.Delta))
+        {
+            ScrollOneLine(contentHost, e.Delta);
+            e.Handled = true;
+            return;
+        }
+
+        var parentScrollViewer = FindAncestorScrollViewer(textBox);
+        if (parentScrollViewer == null || !CanScrollVertically(parentScrollViewer, e.Delta))
+            return;
+
+        ScrollOneLine(parentScrollViewer, e.Delta);
+        e.Handled = true;
+    }
+
+    private static bool CanScrollVertically(ScrollViewer scrollViewer, int delta)
+    {
+        const double offsetTolerance = 0.5;
+
+        return delta > 0
+                   ? scrollViewer.VerticalOffset > offsetTolerance
+                   : delta < 0 &&
+                     scrollViewer.VerticalOffset < scrollViewer.ScrollableHeight - offsetTolerance;
+    }
+
+    private static void ScrollOneLine(ScrollViewer scrollViewer, int delta)
+    {
+        if (delta > 0)
+        {
+            scrollViewer.LineUp();
+        }
+        else if (delta < 0)
+        {
+            scrollViewer.LineDown();
+        }
+    }
+
+    private static ScrollViewer? FindAncestorScrollViewer(DependencyObject element)
+    {
+        for (var parent = VisualTreeHelper.GetParent(element);
+             parent != null;
+             parent = VisualTreeHelper.GetParent(parent))
+        {
+            if (parent is ScrollViewer scrollViewer)
+                return scrollViewer;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1513,13 +1631,13 @@ public class SettingsUiRenderer
 
 #region Helper Methods
 
-    private StackPanel CreateItemContainer(string? label)
+    private StackPanel CreateItemContainer(string? label, string? description = null)
     {
         var container = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
 
         if (!string.IsNullOrEmpty(label))
         {
-            var labelBlock = new TextBlock { Text = label };
+            var labelBlock = new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap };
 
             // 尝试应用共享样式，如果不存在则使用回退样式
             if (!ApplyStyleIfExists(labelBlock, "SettingsLabelStyle"))
@@ -1527,9 +1645,22 @@ public class SettingsUiRenderer
                 labelBlock.Foreground = Brushes.White;
                 labelBlock.FontSize = 12;
             }
-            labelBlock.Margin = new Thickness(0, 0, 0, 4);
+            labelBlock.Margin = new Thickness(0, 0, 0, string.IsNullOrWhiteSpace(description) ? 4 : 2);
 
             container.Children.Add(labelBlock);
+        }
+
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            container.Children.Add(
+                new TextBlock
+                {
+                    Text = description,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x8F, 0x8F, 0x8F)),
+                    FontSize = 11,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 6)
+                });
         }
 
         return container;
@@ -1632,9 +1763,9 @@ public class SettingsUiRenderer
         ValueChanged?.Invoke(this, new SettingsValueChangedEventArgs(key, value));
     }
 
-    private void OnButtonAction(string action)
+    private void OnButtonAction(string action, string? relativePath)
     {
-        ButtonAction?.Invoke(this, new SettingsButtonActionEventArgs(action));
+        ButtonAction?.Invoke(this, new SettingsButtonActionEventArgs(action, relativePath));
     }
 
 #endregion
@@ -1663,10 +1794,12 @@ public class SettingsValueChangedEventArgs : EventArgs
 public class SettingsButtonActionEventArgs : EventArgs
 {
     public string Action { get; }
+    public string? RelativePath { get; }
 
-    public SettingsButtonActionEventArgs(string action)
+    public SettingsButtonActionEventArgs(string action, string? relativePath = null)
     {
         Action = action;
+        RelativePath = relativePath;
     }
 }
 

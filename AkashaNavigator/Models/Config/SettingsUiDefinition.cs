@@ -87,7 +87,7 @@ public class SettingsSection
 public class SettingsItem
 {
     /// <summary>
-    /// 控件类型：text, number, checkbox, select, slider, button, group
+    /// 控件类型：text, textarea, number, checkbox, select, slider, button, group
     /// </summary>
     [JsonPropertyName("type")]
     public string Type { get; set; } = string.Empty;
@@ -115,6 +115,12 @@ public class SettingsItem
     /// </summary>
     [JsonPropertyName("placeholder")]
     public string? Placeholder { get; set; }
+
+    /// <summary>
+    /// 设置项的辅助说明文字
+    /// </summary>
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
 
     /// <summary>
     /// 最小值（用于 number, slider 类型）
@@ -145,6 +151,12 @@ public class SettingsItem
     /// </summary>
     [JsonPropertyName("action")]
     public string? Action { get; set; }
+
+    /// <summary>
+    /// 内置文件夹动作使用的插件目录内相对路径
+    /// </summary>
+    [JsonPropertyName("relativePath")]
+    public string? RelativePath { get; set; }
 
     /// <summary>
     /// 子项（用于 group 类型）

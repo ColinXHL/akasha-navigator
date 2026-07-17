@@ -65,6 +65,13 @@ public interface IPluginLibrary
     Result<InstalledPluginInfo> InstallPlugin(string pluginId, string? sourceDirectory = null);
 
     /// <summary>
+    /// 从本地 ZIP 插件包安装或更新插件
+    /// </summary>
+    /// <param name="archivePath">插件 ZIP 文件路径</param>
+    /// <returns>安装结果，成功时返回 InstalledPluginInfo</returns>
+    Result<InstalledPluginInfo> InstallPluginPackage(string archivePath);
+
+    /// <summary>
     /// 卸载插件
     /// </summary>
     /// <param name="pluginId">插件 ID</param>

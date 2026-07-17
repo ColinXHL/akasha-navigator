@@ -12,6 +12,45 @@ namespace AkashaNavigator.Tests
 /// </summary>
 public class HotkeyServicePropertyTests
 {
+    [Fact]
+    public void UpdateConfig_PreservesRegisteredPluginBindings()
+    {
+        var service = new HotkeyService(HotkeyConfig.CreateDefault(), new ActionDispatcher());
+        const string actionName = "Plugin:test-plugin:Hotkey:1";
+
+        Assert.True(service.RegisterPluginHotkey(0x50, ModifierKeys.Alt, actionName));
+
+        service.UpdateConfig(HotkeyConfig.CreateDefault());
+
+        var binding = service.GetConfig().GetActiveProfile()!
+                             .FindMatchingBinding(0x50, ModifierKeys.Alt, null);
+        Assert.NotNull(binding);
+        Assert.Equal(actionName, binding.Action);
+        service.Dispose();
+    }
+
+    [Fact]
+    public void RegisterPluginHotkey_RejectsExistingBindingWithoutReplacingIt()
+    {
+        var service = new HotkeyService(HotkeyConfig.CreateDefault(), new ActionDispatcher());
+        const string coreAction = "CoreAction";
+        const string pluginAction = "Plugin:test-plugin:Hotkey:1";
+        var profile = service.GetConfig().GetActiveProfile()!;
+        profile.Bindings.Add(new HotkeyBinding
+        {
+            Key = 0x50,
+            Modifiers = ModifierKeys.Alt,
+            Action = coreAction
+        });
+
+        Assert.False(service.RegisterPluginHotkey(0x50, ModifierKeys.Alt, pluginAction));
+
+        var binding = profile.FindMatchingBinding(0x50, ModifierKeys.Alt, null);
+        Assert.NotNull(binding);
+        Assert.Equal(coreAction, binding.Action);
+        service.Dispose();
+    }
+
     /// <summary>
     /// **Feature: hotkey-expansion, Property 3: Key events not consumed**
     /// **Validates: Requirements 1.6**

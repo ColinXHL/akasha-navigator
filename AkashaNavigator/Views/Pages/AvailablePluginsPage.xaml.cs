@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using AkashaNavigator.ViewModels.Pages;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Plugin;
+using Microsoft.Win32;
 
 namespace AkashaNavigator.Views.Pages
 {
@@ -80,6 +81,23 @@ public partial class AvailablePluginsPage : UserControl, IDisposable
             {
                 centerWindow.RefreshCurrentPage();
             }
+        }
+    }
+
+    private void OnInstallPackageClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "安装 Akasha 插件包",
+            Filter = "Akasha 插件包 (*.zip)|*.zip",
+            DefaultExt = ".zip",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true)
+        {
+            _viewModel.InstallPackage(dialog.FileName);
         }
     }
 

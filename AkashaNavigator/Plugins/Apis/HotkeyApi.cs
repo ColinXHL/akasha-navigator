@@ -131,8 +131,16 @@ public class HotkeyApi
         // 注册到 ActionDispatcher
         _dispatcher.RegisterAction(actionName, actionHandler);
 
-        // 注册到 HotkeyService（添加到配置绑定列表）
-        _hotkeyService.RegisterPluginHotkey(parseResult.VkCode, parseResult.Modifiers, actionName);
+        // 注册到 HotkeyService（添加到配置绑定列表）。如果与已有绑定冲突，
+        // 撤销分发器注册，避免插件误以为快捷键已生效。
+        if (!_hotkeyService.RegisterPluginHotkey(parseResult.VkCode, parseResult.Modifiers, actionName))
+        {
+            _dispatcher.UnregisterAction(actionName);
+            LogService.Instance.Warn("Plugin:{PluginId}",
+                                     "HotkeyApi.Register: keyCombo '{KeyCombo}' conflicts with an existing binding",
+                                     _pluginId, normalizedCombo);
+            return -1;
+        }
 
         // 保存注册信息
         var registration = new HotkeyRegistration { Id = id, KeyCombo = normalizedCombo, ActionName = actionName,

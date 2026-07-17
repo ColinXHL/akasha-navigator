@@ -177,6 +177,25 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 从用户选择的 ZIP 插件包安装或更新插件
+    /// </summary>
+    public void InstallPackage(string archivePath)
+    {
+        var result = _pluginLibrary.InstallPluginPackage(archivePath);
+        if (result.IsSuccess)
+        {
+            _notificationService.Show(
+                $"插件 \"{result.Value!.Name}\" 导入成功，可在“已安装插件”中管理。",
+                NotificationType.Success);
+            RefreshRequested?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            _notificationService.Show($"插件包导入失败: {result.Error?.Message}", NotificationType.Error);
+        }
+    }
+
+    /// <summary>
     /// 卸载请求命令（自动生成 UninstallCommand）
     /// 注意：此命令需要由 Code-behind 处理对话框显示
     /// </summary>

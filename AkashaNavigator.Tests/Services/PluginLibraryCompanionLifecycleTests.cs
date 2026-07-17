@@ -1,6 +1,8 @@
 using System.IO;
+using System.IO.Compression;
 using System.Text.Json;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Services;
 using Xunit;
@@ -9,6 +11,95 @@ namespace AkashaNavigator.Tests.Services;
 
 public sealed class PluginLibraryCompanionLifecycleTests
 {
+    [Fact]
+    public void InstallPackage_ShouldInstallZipWithSingleTopLevelDirectory()
+    {
+        using var environment = new PluginLibraryTestEnvironment();
+        var archivePath = environment.CreatePackage("1.0.0", "new.txt");
+
+        var result = environment.Library.InstallPluginPackage(archivePath);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        Assert.Equal(environment.PluginId, result.Value?.Id);
+        Assert.True(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "new.txt")));
+        Assert.True(File.Exists(Path.Combine(
+            environment.InstalledPluginDirectory,
+            "worker",
+            "win-x64",
+            "Worker.exe")));
+        Assert.Contains(PluginPermissionConsentOperation.Install, environment.ConsentService.Operations);
+    }
+
+    [Fact]
+    public void InstallPackage_ShouldUpdateOnlyToNewerVersionAndStopCompanion()
+    {
+        using var environment = new PluginLibraryTestEnvironment();
+        environment.InstallVersion("1.0.0", "old.txt");
+        var archivePath = environment.CreatePackage("2.0.0", "new.txt");
+
+        var result = environment.Library.InstallPluginPackage(archivePath);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        Assert.True(environment.ProcessManager.OldMarkerExistedWhenStopped);
+        Assert.False(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "old.txt")));
+        Assert.True(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "new.txt")));
+        Assert.Equal("2.0.0", environment.Library.GetInstalledPluginInfo(environment.PluginId)?.Version);
+        Assert.Contains(PluginPermissionConsentOperation.Update, environment.ConsentService.Operations);
+    }
+
+    [Fact]
+    public void InstallPackage_ShouldRejectSameVersionWithoutMutatingFiles()
+    {
+        using var environment = new PluginLibraryTestEnvironment();
+        environment.InstallVersion("1.0.0", "old.txt");
+        var archivePath = environment.CreatePackage("1.0.0", "new.txt");
+
+        var result = environment.Library.InstallPluginPackage(archivePath);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(PluginErrorCodes.VersionNotNewer, result.Error?.Code);
+        Assert.Equal(0, environment.ProcessManager.StopCallCount);
+        Assert.True(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "old.txt")));
+        Assert.False(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "new.txt")));
+    }
+
+    [Fact]
+    public void InstallPackage_ShouldRejectPathTraversal()
+    {
+        using var environment = new PluginLibraryTestEnvironment();
+        var escapedFileName = $"akasha-package-escape-{Guid.NewGuid():N}.txt";
+        var escapedPath = Path.Combine(Path.GetTempPath(), escapedFileName);
+        var archivePath = Path.Combine(environment.RootDirectory, "unsafe.zip");
+        using (var stream = File.Create(archivePath))
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+        {
+            using var writer = new StreamWriter(archive.CreateEntry($"../{escapedFileName}").Open());
+            writer.Write("unsafe");
+        }
+
+        var result = environment.Library.InstallPluginPackage(archivePath);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(PluginErrorCodes.InvalidPackage, result.Error?.Code);
+        Assert.False(File.Exists(escapedPath));
+    }
+
+    [Fact]
+    public void InstallPackage_ShouldRejectMalformedPackageManifest()
+    {
+        using var environment = new PluginLibraryTestEnvironment();
+        var archivePath = environment.CreatePackage(
+            "1.0.0",
+            "new.txt",
+            packageManifestContent: "{ not-json");
+
+        var result = environment.Library.InstallPluginPackage(archivePath);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(PluginErrorCodes.InvalidPackage, result.Error?.Code);
+        Assert.False(Directory.Exists(environment.InstalledPluginDirectory));
+    }
+
     [Fact]
     public void Uninstall_ShouldStopCompanionAndRevokeConsentBeforeDeletingDirectory()
     {
@@ -142,6 +233,29 @@ public sealed class PluginLibraryCompanionLifecycleTests
             WritePlugin(Path.Combine(_builtInDirectory, PluginId), version, markerFile, manifestId);
         }
 
+        public string CreatePackage(
+            string version,
+            string markerFile,
+            string? packageManifestContent = null)
+        {
+            var sourceDirectory = Path.Combine(_root, $"package-source-{Guid.NewGuid():N}");
+            WritePlugin(sourceDirectory, version, markerFile);
+            if (packageManifestContent != null)
+            {
+                File.WriteAllText(
+                    Path.Combine(sourceDirectory, "package-manifest.json"),
+                    packageManifestContent);
+            }
+
+            var archivePath = Path.Combine(_root, $"plugin-{version}-{Guid.NewGuid():N}.zip");
+            ZipFile.CreateFromDirectory(
+                sourceDirectory,
+                archivePath,
+                CompressionLevel.Fastest,
+                includeBaseDirectory: true);
+            return archivePath;
+        }
+
         public void Dispose()
         {
             try
@@ -158,6 +272,9 @@ public sealed class PluginLibraryCompanionLifecycleTests
             Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, markerFile), markerFile);
             File.WriteAllText(Path.Combine(directory, "main.js"), string.Empty);
+            var workerDirectory = Path.Combine(directory, "worker", "win-x64");
+            Directory.CreateDirectory(workerDirectory);
+            File.WriteAllText(Path.Combine(workerDirectory, "Worker.exe"), string.Empty);
             File.WriteAllText(
                 Path.Combine(directory, "plugin.json"),
                 JsonSerializer.Serialize(new

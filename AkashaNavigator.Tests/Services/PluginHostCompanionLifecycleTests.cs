@@ -60,7 +60,12 @@ public sealed class PluginHostCompanionLifecycleTests
         Directory.CreateDirectory(pluginDirectory);
         File.WriteAllText(
             Path.Combine(pluginDirectory, "main.js"),
-            "function onLoad() { companion.start(); companion.invoke('automation.emergencyStop'); }");
+            "function onLoad() { " +
+            "companion.start(); " +
+            "companion.invoke('features.autoPick.setEnabled', { enabled: true }); " +
+            "companion.invoke('features.autoDialogue.setEnabled', { enabled: true }); " +
+            "companion.invoke('automation.emergencyStop'); " +
+            "}");
         File.WriteAllText(
             Path.Combine(pluginDirectory, "plugin.json"),
             JsonSerializer.Serialize(new
@@ -94,6 +99,8 @@ public sealed class PluginHostCompanionLifecycleTests
                 () => manager.InvokedMethods.Contains("automation.emergencyStop"),
                 TimeSpan.FromSeconds(2)),
             "The companion allowlist rejected automation.emergencyStop.");
+        Assert.Contains("features.autoPick.setEnabled", manager.InvokedMethods);
+        Assert.Contains("features.autoDialogue.setEnabled", manager.InvokedMethods);
         Assert.Single(host.LoadedPlugins);
         Assert.Equal(new[] { PluginPermissionConsentOperation.FirstEnable }, consent.Operations);
     }
