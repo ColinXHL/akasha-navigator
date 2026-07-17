@@ -194,13 +194,24 @@ jobs:
           QINIU_NOTICE_URL: ${{ secrets.QINIU_NOTICE_URL }}
         run: |
           mkdir -p out
-          # 尝试下载现有的 notice.json
-          if curl -f -o out/notice_existing.json "$QINIU_NOTICE_URL" 2>/dev/null; then
+          HTTP_STATUS=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --output out/notice_existing.json \
+            --write-out "%{http_code}" \
+            "$QINIU_NOTICE_URL")
+
+          if [[ "$HTTP_STATUS" == "200" ]]; then
+            python -m json.tool out/notice_existing.json >/dev/null
             echo "✅ 下载现有 notice.json 成功"
             cat out/notice_existing.json
-          else
+          elif [[ "$HTTP_STATUS" == "404" ]]; then
             echo "⚠️ 未找到现有 notice.json，将创建新文件"
             echo '{"stable":{"version":"0.0.0","installer":"","source":"qiniu","notes":""},"alpha":{"version":"0.0.0","installer":"","source":"qiniu","notes":""},"min_required_version":"1.0.0"}' > out/notice_existing.json
+          else
+            echo "❌ 下载现有 notice.json 失败，HTTP $HTTP_STATUS"
+            exit 1
           fi
 
       - name: Generate notice.json
@@ -233,28 +244,9 @@ jobs:
           source = os.environ["SOURCE"]
           plugin_version = os.environ.get("PLUGIN_VERSION", "").strip()
 
-          # 读取现有的 notice.json
-          try:
-              with open("out/notice_existing.json", "r", encoding="utf-8") as f:
-                  data = json.load(f)
-                  print(f"✅ 读取现有配置成功")
-          except Exception as e:
-              print(f"⚠️ 读取现有配置失败，使用默认配置: {e}")
-              data = {
-                  "stable": {
-                      "version": "0.0.0",
-                      "installer": "",
-                      "source": source,
-                      "notes": ""
-                  },
-                  "alpha": {
-                      "version": "0.0.0",
-                      "installer": "",
-                      "source": source,
-                      "notes": ""
-                  },
-                  "min_required_version": min_required_version
-              }
+          with open("out/notice_existing.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+              print("✅ 读取现有配置成功")
 
           # 只更新指定通道
           data[channel] = {
