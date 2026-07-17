@@ -30,6 +30,36 @@ on:
         required: true
         default: qiniu
         type: string
+      plugin_version:
+        description: "Akasha Automation 插件版本（留空则不更新插件目录）"
+        required: false
+        default: ""
+        type: string
+      plugin_min_host_version:
+        description: "插件要求的最低 AkashaNavigator 版本"
+        required: false
+        default: "1.3.0-alpha.4"
+        type: string
+      plugin_package_size:
+        description: "插件 ZIP 字节数"
+        required: false
+        default: ""
+        type: string
+      plugin_package_sha256:
+        description: "插件 ZIP SHA-256"
+        required: false
+        default: ""
+        type: string
+      plugin_github_url:
+        description: "插件 GitHub Release 下载地址"
+        required: false
+        default: ""
+        type: string
+      plugin_cnb_url:
+        description: "插件 CNB Release 下载地址"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   validate:
@@ -53,6 +83,12 @@ jobs:
           MIN_REQUIRED_VERSION="${{ github.event.inputs.min_required_version }}"
           NOTES="${{ github.event.inputs.notes }}"
           SOURCE="${{ github.event.inputs.source }}"
+          PLUGIN_VERSION="${{ github.event.inputs.plugin_version }}"
+          PLUGIN_MIN_HOST_VERSION="${{ github.event.inputs.plugin_min_host_version }}"
+          PLUGIN_PACKAGE_SIZE="${{ github.event.inputs.plugin_package_size }}"
+          PLUGIN_PACKAGE_SHA256="${{ github.event.inputs.plugin_package_sha256 }}"
+          PLUGIN_GITHUB_URL="${{ github.event.inputs.plugin_github_url }}"
+          PLUGIN_CNB_URL="${{ github.event.inputs.plugin_cnb_url }}"
 
           # 自动生成安装包文件名
           INSTALLER_NAME="AkashaNavigator.Install.${VERSION}.exe"
@@ -78,6 +114,29 @@ jobs:
           if [[ "$VERSION" != "$CSPROJ_VERSION" ]]; then
             echo "❌ 输入版本号与 csproj 中 <Version> 不一致"
             exit 1
+          fi
+
+          if [[ -n "$PLUGIN_VERSION" ]]; then
+            if ! [[ "$PLUGIN_VERSION" =~ $SEMVER_REGEX ]]; then
+              echo "❌ plugin_version 不符合语义化版本"
+              exit 1
+            fi
+            if ! [[ "$PLUGIN_MIN_HOST_VERSION" =~ $SEMVER_REGEX ]]; then
+              echo "❌ plugin_min_host_version 不符合语义化版本"
+              exit 1
+            fi
+            if ! [[ "$PLUGIN_PACKAGE_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+              echo "❌ plugin_package_size 必须是正整数"
+              exit 1
+            fi
+            if ! [[ "$PLUGIN_PACKAGE_SHA256" =~ ^[0-9a-fA-F]{64}$ ]]; then
+              echo "❌ plugin_package_sha256 必须是 64 位十六进制字符串"
+              exit 1
+            fi
+            if [[ "$PLUGIN_GITHUB_URL" != https://* || "$PLUGIN_CNB_URL" != https://* ]]; then
+              echo "❌ 插件下载地址必须使用 HTTPS"
+              exit 1
+            fi
           fi
 
           case "$CHANNEL" in
@@ -144,6 +203,12 @@ jobs:
           INSTALLER_NAME: ${{ needs.validate.outputs.installer_name }}
           NOTES: ${{ needs.validate.outputs.notes }}
           SOURCE: ${{ needs.validate.outputs.source }}
+          PLUGIN_VERSION: ${{ github.event.inputs.plugin_version }}
+          PLUGIN_MIN_HOST_VERSION: ${{ github.event.inputs.plugin_min_host_version }}
+          PLUGIN_PACKAGE_SIZE: ${{ github.event.inputs.plugin_package_size }}
+          PLUGIN_PACKAGE_SHA256: ${{ github.event.inputs.plugin_package_sha256 }}
+          PLUGIN_GITHUB_URL: ${{ github.event.inputs.plugin_github_url }}
+          PLUGIN_CNB_URL: ${{ github.event.inputs.plugin_cnb_url }}
         run: |
           python - <<'PY'
           import json
@@ -155,6 +220,7 @@ jobs:
           installer_name = os.environ["INSTALLER_NAME"]
           notes = os.environ["NOTES"]
           source = os.environ["SOURCE"]
+          plugin_version = os.environ.get("PLUGIN_VERSION", "").strip()
 
           # 读取现有的 notice.json
           try:
@@ -187,6 +253,33 @@ jobs:
               "notes": notes
           }
           data["min_required_version"] = min_required_version
+
+          if plugin_version:
+              plugin_id = "akasha-genshin-automation"
+              plugins = data.setdefault("plugins", {})
+              plugin = plugins.setdefault(plugin_id, {})
+              plugin.update({
+                  "name": "Akasha 原神自动化",
+                  "version": plugin_version,
+                  "minHostVersion": os.environ["PLUGIN_MIN_HOST_VERSION"],
+                  "package": {
+                      "fileName": f"{plugin_id}-v{plugin_version}.zip",
+                      "size": int(os.environ["PLUGIN_PACKAGE_SIZE"]),
+                      "sha256": os.environ["PLUGIN_PACKAGE_SHA256"].lower(),
+                      "sources": [
+                          {
+                              "id": "github",
+                              "url": os.environ["PLUGIN_GITHUB_URL"]
+                          },
+                          {
+                              "id": "cnb",
+                              "url": os.environ["PLUGIN_CNB_URL"]
+                          }
+                      ]
+                  }
+              })
+              data["schemaVersion"] = 2
+              print(f"✅ 更新远程插件目录: {plugin_id} v{plugin_version}")
 
           print(f"✅ 更新 {channel} 通道: {version}")
 
