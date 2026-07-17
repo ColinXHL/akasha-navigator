@@ -193,6 +193,7 @@ jobs:
 
           $releases = (gh api "repos/$repo/releases?per_page=30") | ConvertFrom-Json
           $targetAsset = $null
+          $targetTag = $null
 
           foreach ($release in $releases) {
             if ($release.draft) {
@@ -202,6 +203,7 @@ jobs:
             foreach ($asset in $release.assets) {
               if ($asset.name -like "AkashaNavigator_v*.7z" -and $asset.name -ne $currentAssetName) {
                 $targetAsset = $asset
+                $targetTag = $release.tag_name
                 break
               }
             }
@@ -219,6 +221,7 @@ jobs:
 
           New-Item -ItemType Directory -Path ".\dist\previous" -Force | Out-Null
           gh release download `
+            $targetTag `
             --repo $repo `
             --pattern $targetAsset.name `
             --dir ".\dist\previous" `
