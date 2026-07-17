@@ -60,6 +60,12 @@ public class WindowState
     public double ControlBarCenterAnchorRatio { get; set; } = 0.5;
 
     /// <summary>
+    /// 控制栏位置算法版本。
+    /// 低版本配置可能包含旧坐标换算造成的偏移锚点。
+    /// </summary>
+    public int ControlBarPositionVersion { get; set; }
+
+    /// <summary>
     /// 控制栏上次所在显示器的设备名称（如 "\\.\DISPLAY1"）
     /// 用于跨会话优先恢复到同一显示器
     /// </summary>

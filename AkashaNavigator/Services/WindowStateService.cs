@@ -147,6 +147,7 @@ public class WindowStateService : IWindowStateService
                                 IsMuted = false,
                                 MonitorDeviceName = primaryMonitor.DeviceName,
                                 ControlBarCenterAnchorRatio = 0.5,
+                                ControlBarPositionVersion = AppConstants.ControlBarPositionVersion,
                                 ControlBarMonitorDeviceName = primaryMonitor.DeviceName };
     }
 

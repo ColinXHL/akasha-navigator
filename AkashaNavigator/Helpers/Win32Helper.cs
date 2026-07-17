@@ -105,6 +105,9 @@ public static class Win32Helper
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFOEX lpmi);
@@ -700,6 +703,29 @@ public static class Win32Helper
     public static bool SetWindowRectangle(IntPtr hwnd, int x, int y, int width, int height)
     {
         return SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, SWP_NOACTIVATE | SWP_NOZORDER);
+    }
+
+    /// <summary>
+    /// 获取窗口当前 DPI 缩放比例。
+    /// </summary>
+    /// <param name="hwnd">窗口句柄</param>
+    /// <returns>DPI 缩放比例，获取失败时返回 1.0</returns>
+    public static double GetDpiScaleForWindow(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            return 1.0;
+        }
+
+        try
+        {
+            var dpi = GetDpiForWindow(hwnd);
+            return dpi > 0 ? dpi / 96.0 : 1.0;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return 1.0;
+        }
     }
 
     /// <summary>

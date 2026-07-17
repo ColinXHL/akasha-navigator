@@ -26,6 +26,7 @@ public class WindowBehaviorHelper
     // 拖动相关
     private Win32Helper.POINT _dragOffset;
     private bool _isDragging;
+    private EdgeSnapState _edgeSnapState;
 
     // 透明度相关
     private double _windowOpacity = 1.0;
@@ -433,6 +434,7 @@ public class WindowBehaviorHelper
     /// <param name="hwnd">窗口句柄</param>
     public void HandleEnterSizeMove(IntPtr hwnd)
     {
+        _edgeSnapState = default;
         if (Win32Helper.GetCursorPosition(out var cursorPos) &&
             Win32Helper.GetWindowRectangle(hwnd, out var windowRect))
         {
@@ -448,6 +450,7 @@ public class WindowBehaviorHelper
     public void HandleExitSizeMove()
     {
         _isDragging = false;
+        _edgeSnapState = default;
     }
 
 /// <summary>
@@ -469,8 +472,7 @@ public class WindowBehaviorHelper
         double dpiScale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
 
         // 计算物理像素阈值（使用配置值）
-        int snapThreshold = _config.EnableEdgeSnap ? _config.SnapThreshold : 0;
-        int threshold = (int)(snapThreshold * dpiScale);
+        int threshold = _config.EnableEdgeSnap ? (int)(_config.SnapThreshold * dpiScale) : -1;
 
         // 获取当前显示器信息（多显示器感知）
         Win32Helper.RECT workArea;
@@ -501,42 +503,19 @@ public class WindowBehaviorHelper
         int intendedLeft = cursorPos.X - _dragOffset.X;
         int intendedTop = cursorPos.Y - _dragOffset.Y;
 
-        // 对意图位置进行吸附计算
-        int finalLeft = intendedLeft;
-        int finalTop = intendedTop;
-
-        // 左边缘吸附（工作区和屏幕边缘相同）
-        if (Math.Abs(intendedLeft - workArea.Left) <= threshold)
+        var intendedRect = new Win32Helper.RECT
         {
-            finalLeft = workArea.Left;
-        }
-        // 右边缘吸附（工作区和屏幕边缘相同）
-        else if (Math.Abs(intendedLeft + width - workArea.Right) <= threshold)
-        {
-            finalLeft = workArea.Right - width;
-        }
-
-        // 上边缘吸附（工作区）
-        if (Math.Abs(intendedTop - workArea.Top) <= threshold)
-        {
-            finalTop = workArea.Top;
-        }
-        // 下边缘吸附 - 优先工作区（任务栏上方）
-        else if (Math.Abs(intendedTop + height - workArea.Bottom) <= threshold)
-        {
-            finalTop = workArea.Bottom - height;
-        }
-        // 下边缘吸附 - 屏幕真实底部
-        else if (Math.Abs(intendedTop + height - screenRect.Bottom) <= threshold)
-        {
-            finalTop = screenRect.Bottom - height;
-        }
-
-        // 更新窗口位置
-        rect.Left = finalLeft;
-        rect.Top = finalTop;
-        rect.Right = finalLeft + width;
-        rect.Bottom = finalTop + height;
+            Left = intendedLeft,
+            Top = intendedTop,
+            Right = intendedLeft + width,
+            Bottom = intendedTop + height
+        };
+        var centerThreshold = Math.Max(0, (int)(_config.CenterSnapThreshold * dpiScale));
+        var centerHysteresis = (int)(AppConstants.CenterSnapHysteresis * dpiScale);
+        var snapResult = EdgeSnapCalculator.Calculate(
+            intendedRect, workArea, screenRect, threshold, centerThreshold, centerHysteresis, _edgeSnapState);
+        rect = snapResult.Rect;
+        _edgeSnapState = snapResult.State;
 
         Marshal.StructureToPtr(rect, lParam, false);
     }

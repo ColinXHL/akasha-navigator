@@ -159,6 +159,11 @@ public class AppConfig
     public int SnapThreshold { get; set; } = AppConstants.SnapThreshold;
 
     /// <summary>
+    /// 边缘中点吸附阈值（像素）
+    /// </summary>
+    public int CenterSnapThreshold { get; set; } = AppConstants.CenterSnapThreshold;
+
+    /// <summary>
     /// 退出时是否提示记录（默认 false，即不提示）
     /// </summary>
     public bool PromptRecordOnExit { get; set; } = false;

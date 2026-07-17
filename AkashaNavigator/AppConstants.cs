@@ -62,6 +62,16 @@ public static class AppConstants
     /// </summary>
     public const int SnapThreshold = 15;
 
+    /// <summary>
+    /// 边缘中点吸附阈值（像素）
+    /// </summary>
+    public const int CenterSnapThreshold = 30;
+
+    /// <summary>
+    /// 边缘中点吸附释放滞后（像素）
+    /// </summary>
+    public const int CenterSnapHysteresis = 8;
+
 #endregion
 
 #region Opacity
@@ -159,6 +169,11 @@ public static class AppConstants
     public const double ControlBarTriggerLineHeight = 16;
 
     /// <summary>
+    /// 控制栏位置算法版本
+    /// </summary>
+    public const int ControlBarPositionVersion = 2;
+
+    /// <summary>
     /// 屏幕顶部触发区域比例
     /// </summary>
     public const double ControlBarTriggerAreaRatio = 1.0 / 4.0;
@@ -185,7 +200,7 @@ public static class AppConstants
     /// <summary>
     /// 应用更新公告 URL
     /// </summary>
-    public const string NoticeJsonUrl = "http://tcpwurlnx.hn-bkt.clouddn.com/notice.json";
+    public const string NoticeJsonUrl = "http://update.fisheepx.cn/notice.json";
 
 #endregion
 

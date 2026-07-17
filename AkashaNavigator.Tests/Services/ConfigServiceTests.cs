@@ -72,6 +72,7 @@ public class ConfigServiceTests : IDisposable
         Assert.True(config.EnablePluginUpdateNotification);
         Assert.True(config.EnableEdgeSnap);
         Assert.Equal(AppConstants.SnapThreshold, config.SnapThreshold);
+        Assert.Equal(AppConstants.CenterSnapThreshold, config.CenterSnapThreshold);
         Assert.False(config.PromptRecordOnExit);
     }
 
@@ -236,6 +237,7 @@ public class ConfigServiceTests : IDisposable
         // 窗口行为默认值
         Assert.True(config.EnableEdgeSnap);
         Assert.Equal(AppConstants.SnapThreshold, config.SnapThreshold);
+        Assert.Equal(AppConstants.CenterSnapThreshold, config.CenterSnapThreshold);
         Assert.False(config.PromptRecordOnExit);
     }
 

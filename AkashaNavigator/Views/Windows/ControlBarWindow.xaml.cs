@@ -89,6 +89,12 @@ private readonly ControlBarDisplayController _displayController;
     /// </summary>
     private double _centerAnchorRatio = 0.5;
 
+    /// <summary>
+    /// 是否已安排一次显示后的定位校正。
+    /// WPF 在 Show() 后可能会根据自身 Left/Top/Width/Height 再应用一次窗口位置。
+    /// </summary>
+    private bool _isRepositionCorrectionScheduled;
+
 #endregion
 
 #region Constructor
@@ -110,7 +116,7 @@ public ControlBarWindow(ControlBarViewModel viewModel,
         InitializeComponent();
         DataContext = _viewModel;
 
-        InitializeWindowPosition();
+        LoadControlBarPositionState();
         InitializeAutoShowHide();
 
         // 订阅穿透状态变化事件（穿透模式激活时抑制控制栏自动显示）
@@ -201,32 +207,24 @@ public ControlBarWindow(ControlBarViewModel viewModel,
 #region Initialization
 
     /// <summary>
-    /// 初始化窗口位置和大小
-    /// 位置：播放器所在显示器顶部，水平居中
-    /// 宽度：显示器宽度的 1/3
+    /// 加载控制栏的横向锚点。
+    /// 实际窗口定位延迟到 SourceInitialized，此时播放器和控制栏句柄均已创建。
     /// </summary>
-    private void InitializeWindowPosition()
+    private void LoadControlBarPositionState()
     {
         var state = _windowStateService.Load();
+        if (state.ControlBarPositionVersion < AppConstants.ControlBarPositionVersion)
+        {
+            _centerAnchorRatio = 0.5;
+            _windowStateService.Update(current =>
+            {
+                current.ControlBarCenterAnchorRatio = _centerAnchorRatio;
+                current.ControlBarPositionVersion = AppConstants.ControlBarPositionVersion;
+            });
+            return;
+        }
+
         _centerAnchorRatio = Math.Clamp(state.ControlBarCenterAnchorRatio, 0.0, 1.0);
-
-        // 获取播放器窗口所在显示器信息
-        var hwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
-        MonitorInfo? monitor = null;
-
-        if (!string.IsNullOrWhiteSpace(state.ControlBarMonitorDeviceName))
-        {
-            monitor = _monitorLayoutService.FindMonitorByDeviceName(state.ControlBarMonitorDeviceName);
-        }
-
-        if (hwnd != IntPtr.Zero)
-        {
-            monitor ??= _monitorLayoutService.GetMonitorFromWindow(hwnd);
-        }
-
-        monitor ??= _monitorLayoutService.GetPrimaryMonitor();
-        ApplyAnchorToMonitor(monitor);
-        SaveControlBarState(monitor, updateAnchorFromWindowPosition: false);
     }
 
     /// <summary>
@@ -269,7 +267,7 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     /// <summary>
     /// 将控制栏重新定位到播放器所在的显示器
     /// </summary>
-    private void RepositionToPlayerMonitor()
+    private void RepositionToPlayerMonitor(bool saveState = true)
     {
         var hwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
         if (hwnd == IntPtr.Zero)
@@ -277,7 +275,29 @@ public ControlBarWindow(ControlBarViewModel viewModel,
 
         var monitor = _monitorLayoutService.GetMonitorFromWindowOrDefault(hwnd);
         ApplyAnchorToMonitor(monitor);
-        SaveControlBarState(monitor, updateAnchorFromWindowPosition: false);
+        if (saveState)
+        {
+            SaveControlBarState(monitor, updateAnchorFromWindowPosition: false);
+        }
+    }
+
+    /// <summary>
+    /// 在 WPF 完成 Show/Layout 后再次校正位置，防止显示流程恢复旧窗口坐标。
+    /// </summary>
+    private void ScheduleRepositionCorrection()
+    {
+        if (_isRepositionCorrectionScheduled)
+            return;
+
+        _isRepositionCorrectionScheduled = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() =>
+        {
+            _isRepositionCorrectionScheduled = false;
+            if (IsLoaded)
+            {
+                RepositionToPlayerMonitor(saveState: false);
+            }
+        }));
     }
 
     /// <summary>
@@ -286,6 +306,13 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     /// </summary>
     private double GetPlayerDpiScale()
     {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(_playerWindow).Handle;
+        var win32DpiScale = Win32Helper.GetDpiScaleForWindow(hwnd);
+        if (win32DpiScale > 0)
+        {
+            return win32DpiScale;
+        }
+
         var playerSource = PresentationSource.FromVisual(_playerWindow);
         return playerSource?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
     }
@@ -296,46 +323,44 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     private void ApplyAnchorToMonitor(MonitorInfo monitor)
     {
         double dpiScale = GetPlayerDpiScale();
-        double workAreaWidthPx = monitor.WorkAreaRect.Right - monitor.WorkAreaRect.Left;
-        double workAreaHeightPx = monitor.WorkAreaRect.Bottom - monitor.WorkAreaRect.Top;
-        double widthPx = Math.Max(workAreaWidthPx / 3.0, 400.0 * dpiScale);
-        double heightPx = ActualHeight > 0 ? ActualHeight * dpiScale : Height * dpiScale;
-        if (heightPx <= 0)
-        {
-            heightPx = 64.0 * dpiScale;
-        }
+        double heightDip = _displayController.State == ControlBarDisplayState.Expanded
+            ? AppConstants.ControlBarExpandedHeight
+            : AppConstants.ControlBarTriggerLineHeight;
+        var bounds =
+            ControlBarBoundsCalculator.Calculate(monitor, dpiScale, _centerAnchorRatio, heightDip);
 
-        double desiredCenterPx = monitor.WorkAreaRect.Left + (workAreaWidthPx * _centerAnchorRatio);
-        double minCenterPx = monitor.WorkAreaRect.Left + widthPx / 2.0;
-        double maxCenterPx = monitor.WorkAreaRect.Right - widthPx / 2.0;
-        double actualCenterPx = Math.Max(minCenterPx, Math.Min(desiredCenterPx, maxCenterPx));
-        double leftPx = actualCenterPx - widthPx / 2.0;
-        double topPx = monitor.WorkAreaRect.Top + (2.0 * dpiScale);
-
-        ApplyPhysicalBounds(leftPx, topPx, widthPx, Math.Min(heightPx, workAreaHeightPx));
+        ApplyPhysicalBounds(bounds);
     }
 
     /// <summary>
     /// 使用单一物理像素坐标系应用窗口位置和大小
     /// </summary>
-    private void ApplyPhysicalBounds(double leftPx, double topPx, double widthPx, double heightPx)
+    private void ApplyPhysicalBounds(Win32Helper.RECT bounds)
     {
+        SyncWpfBoundsFromPhysicalBounds(bounds);
+
         var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         if (hwnd != IntPtr.Zero)
         {
             Win32Helper.SetWindowRectangle(hwnd,
-                                           (int)Math.Round(leftPx),
-                                           (int)Math.Round(topPx),
-                                           (int)Math.Round(widthPx),
-                                           (int)Math.Round(heightPx));
+                                           bounds.Left,
+                                           bounds.Top,
+                                           bounds.Right - bounds.Left,
+                                           bounds.Bottom - bounds.Top);
             return;
         }
+    }
 
+    /// <summary>
+    /// 同步 WPF 逻辑坐标，避免 Show()/Hide() 使用旧的 Left/Top/Width/Height 重新覆盖 Win32 位置。
+    /// </summary>
+    private void SyncWpfBoundsFromPhysicalBounds(Win32Helper.RECT bounds)
+    {
         double dpiScale = GetPlayerDpiScale();
-        Width = widthPx / dpiScale;
-        Height = heightPx / dpiScale;
-        Left = leftPx / dpiScale;
-        Top = topPx / dpiScale;
+        Left = bounds.Left / dpiScale;
+        Top = bounds.Top / dpiScale;
+        Width = (bounds.Right - bounds.Left) / dpiScale;
+        Height = (bounds.Bottom - bounds.Top) / dpiScale;
     }
 
     /// <summary>
@@ -376,6 +401,7 @@ public ControlBarWindow(ControlBarViewModel viewModel,
         _windowStateService.Update(state =>
         {
             state.ControlBarCenterAnchorRatio = _centerAnchorRatio;
+            state.ControlBarPositionVersion = AppConstants.ControlBarPositionVersion;
             state.ControlBarMonitorDeviceName = monitor.DeviceName;
         });
     }
@@ -426,6 +452,10 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     {
         // 设置 WS_EX_TOOLWINDOW 样式，从 Alt+Tab 中隐藏窗口
         Win32Helper.SetToolWindowStyle(this);
+
+        // 句柄和 DPI 均已可用，使用播放器当前显示器完成首次定位。
+        RepositionToPlayerMonitor();
+        ScheduleRepositionCorrection();
     }
 
     /// <summary>
@@ -648,7 +678,7 @@ public ControlBarWindow(ControlBarViewModel viewModel,
             // 穿透模式激活：抑制控制栏自动显示
             _isClickThroughSuppressed = true;
             _hideDelayTimer?.Stop();
-            SetDisplayState(ControlBarDisplayState.Hidden);
+            SetDisplayState(ControlBarDisplayState.Hidden, force: true);
         }
         else
         {
@@ -678,7 +708,7 @@ public ControlBarWindow(ControlBarViewModel viewModel,
             // 老板键隐藏模式激活：强制隐藏控制栏并停止自动检测
             _isBossKeyHidden = true;
             _hideDelayTimer?.Stop();
-            SetDisplayState(ControlBarDisplayState.Hidden);
+            SetDisplayState(ControlBarDisplayState.Hidden, force: true);
         }
         else
         {
@@ -862,13 +892,13 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     /// <summary>
     /// 设置显示状态
     /// </summary>
-    private void SetDisplayState(ControlBarDisplayState state)
+    private void SetDisplayState(ControlBarDisplayState state, bool force = false)
     {
         // 防止在窗口关闭后操作
         if (!IsLoaded)
             return;
 
-        if (_displayController.State == state)
+        if (_displayController.State == state && !force)
             return;
 
         _displayController.SetState(state, DateTime.UtcNow);
@@ -880,30 +910,27 @@ public ControlBarWindow(ControlBarViewModel viewModel,
             MainBorder.Opacity = 0;
             MainBorder.Visibility = Visibility.Collapsed;
             TriggerLineBorder.Visibility = Visibility.Collapsed;
-            Height = AppConstants.ControlBarTriggerLineHeight;
+            RepositionToPlayerMonitor(saveState: false);
             Hide();
             break;
-
         case ControlBarDisplayState.TriggerLine:
             // 先确保主容器不可见（使用 Opacity 立即生效）
             MainBorder.Opacity = 0;
             MainBorder.Visibility = Visibility.Collapsed;
             TriggerLineBorder.Visibility = Visibility.Collapsed;
-            // 设置高度
-            Height = AppConstants.ControlBarTriggerLineHeight;
             // 显示触发线
             TriggerLineBorder.Visibility = Visibility.Visible;
             if (!IsVisible)
             {
                 Show();
             }
+            RepositionToPlayerMonitor(saveState: false);
+            ScheduleRepositionCorrection();
             break;
 
         case ControlBarDisplayState.Expanded:
             // 先隐藏触发线
             TriggerLineBorder.Visibility = Visibility.Collapsed;
-            // 设置高度
-            Height = AppConstants.ControlBarExpandedHeight;
             // 显示主容器（先设置 Opacity 为 0，再设置 Visibility，最后恢复 Opacity）
             MainBorder.Opacity = 0;
             MainBorder.Visibility = Visibility.Visible;
@@ -912,6 +939,8 @@ public ControlBarWindow(ControlBarViewModel viewModel,
             {
                 Show();
             }
+            RepositionToPlayerMonitor(saveState: false);
+            ScheduleRepositionCorrection();
             break;
         }
     }
@@ -935,7 +964,8 @@ public ControlBarWindow(ControlBarViewModel viewModel,
     {
         // 先显示窗口以创建 hwnd，然后再隐藏
         Show();
-        SetDisplayState(ControlBarDisplayState.Hidden);
+        SetDisplayState(ControlBarDisplayState.Hidden, force: true);
+        ScheduleRepositionCorrection();
         _mouseCheckTimer?.Start();
     }
 

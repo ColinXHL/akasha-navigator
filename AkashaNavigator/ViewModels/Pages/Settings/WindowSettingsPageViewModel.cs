@@ -22,6 +22,12 @@ public partial class WindowSettingsPageViewModel : ObservableObject
     private int _snapThreshold;
 
     /// <summary>
+    /// 边缘中点吸附阈值（自动生成属性和通知）
+    /// </summary>
+    [ObservableProperty]
+    private int _centerSnapThreshold;
+
+    /// <summary>
     /// 是否在退出时提示记录笔记（自动生成属性和通知）
     /// </summary>
     [ObservableProperty]
@@ -57,6 +63,7 @@ public partial class WindowSettingsPageViewModel : ObservableObject
     {
         EnableEdgeSnap = config.EnableEdgeSnap;
         SnapThreshold = config.SnapThreshold;
+        CenterSnapThreshold = config.CenterSnapThreshold;
         PromptRecordOnExit = config.PromptRecordOnExit;
         EnableOsd = config.EnableOsd;
         EnableHoldToPeek = config.EnableHoldToPeek;
@@ -70,6 +77,7 @@ public partial class WindowSettingsPageViewModel : ObservableObject
     {
         config.EnableEdgeSnap = EnableEdgeSnap;
         config.SnapThreshold = SnapThreshold;
+        config.CenterSnapThreshold = CenterSnapThreshold;
         config.PromptRecordOnExit = PromptRecordOnExit;
         config.EnableOsd = EnableOsd;
         config.EnableHoldToPeek = EnableHoldToPeek;

@@ -15,7 +15,10 @@ public class WindowSettingsPageViewModelTests
     {
         // Arrange
         var viewModel = new WindowSettingsPageViewModel();
-        var config = new AppConfig { EnableEdgeSnap = true, SnapThreshold = 15, PromptRecordOnExit = false };
+        var config = new AppConfig
+        {
+            EnableEdgeSnap = true, SnapThreshold = 15, CenterSnapThreshold = 35, PromptRecordOnExit = false
+        };
 
         // Act
         viewModel.LoadSettings(config);
@@ -23,6 +26,7 @@ public class WindowSettingsPageViewModelTests
         // Assert
         Assert.True(viewModel.EnableEdgeSnap);
         Assert.Equal(15, viewModel.SnapThreshold);
+        Assert.Equal(35, viewModel.CenterSnapThreshold);
         Assert.False(viewModel.PromptRecordOnExit);
     }
 
@@ -49,6 +53,7 @@ public class WindowSettingsPageViewModelTests
         var viewModel = new WindowSettingsPageViewModel();
         viewModel.EnableEdgeSnap = false;
         viewModel.SnapThreshold = 20;
+        viewModel.CenterSnapThreshold = 40;
         viewModel.PromptRecordOnExit = true;
 
         var config = new AppConfig();
@@ -59,6 +64,7 @@ public class WindowSettingsPageViewModelTests
         // Assert
         Assert.False(config.EnableEdgeSnap);
         Assert.Equal(20, config.SnapThreshold);
+        Assert.Equal(40, config.CenterSnapThreshold);
         Assert.True(config.PromptRecordOnExit);
     }
 
@@ -67,7 +73,10 @@ public class WindowSettingsPageViewModelTests
     {
         // Arrange
         var viewModel = new WindowSettingsPageViewModel();
-        var originalConfig = new AppConfig { EnableEdgeSnap = false, SnapThreshold = 18, PromptRecordOnExit = true };
+        var originalConfig = new AppConfig
+        {
+            EnableEdgeSnap = false, SnapThreshold = 18, CenterSnapThreshold = 42, PromptRecordOnExit = true
+        };
 
         // Act - 加载
         viewModel.LoadSettings(originalConfig);
@@ -79,6 +88,7 @@ public class WindowSettingsPageViewModelTests
         // Assert - 验证值被正确保存
         Assert.Equal(originalConfig.EnableEdgeSnap, savedConfig.EnableEdgeSnap);
         Assert.Equal(originalConfig.SnapThreshold, savedConfig.SnapThreshold);
+        Assert.Equal(originalConfig.CenterSnapThreshold, savedConfig.CenterSnapThreshold);
         Assert.Equal(originalConfig.PromptRecordOnExit, savedConfig.PromptRecordOnExit);
     }
 
@@ -115,6 +125,7 @@ public class WindowSettingsPageViewModelTests
         // Assert - 默认值应该是 false/0
         Assert.False(viewModel.EnableEdgeSnap);
         Assert.Equal(0, viewModel.SnapThreshold);
+        Assert.Equal(0, viewModel.CenterSnapThreshold);
         Assert.False(viewModel.PromptRecordOnExit);
     }
 }

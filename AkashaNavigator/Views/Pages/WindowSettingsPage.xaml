@@ -30,6 +30,20 @@
                 <TextBlock Grid.Column="2" Text="{Binding SnapThreshold, StringFormat={}{0}px}"
                            Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
             </Grid>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="45"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="中点吸附阈值" Style="{StaticResource SettingsLabelStyle}"/>
+                <Slider Grid.Column="1"
+                        Style="{StaticResource DarkSliderStyle}"
+                        Minimum="10" Maximum="60" TickFrequency="5" IsSnapToTickEnabled="True"
+                        Value="{Binding CenterSnapThreshold, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Grid.Column="2" Text="{Binding CenterSnapThreshold, StringFormat={}{0}px}"
+                           Style="{StaticResource SettingsLabelStyle}" HorizontalAlignment="Right"/>
+            </Grid>
 <CheckBox x:Name="PromptRecordOnExitCheckBox" Content="退出时提示记录"
                        Style="{StaticResource DarkCheckBoxStyle}" Margin="0,0,0,12"
                        IsChecked="{Binding PromptRecordOnExit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
