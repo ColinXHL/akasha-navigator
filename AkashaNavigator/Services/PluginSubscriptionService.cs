@@ -302,7 +302,7 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
                 {
                     _logService.Info(
                         nameof(PluginSubscriptionService),
-                        "已将旧内置插件 {PluginId} 认领为官方仓库订阅，自动更新保持关闭",
+                        "已将旧版插件 {PluginId} 认领为官方仓库订阅，自动更新保持关闭",
                         pluginId);
                 }
             }
@@ -337,7 +337,15 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
                 string.Equals(
                     installedPlugin.Source,
                     AppConstants.PluginInstallSourceMigrated,
-                    StringComparison.OrdinalIgnoreCase);
+                    StringComparison.OrdinalIgnoreCase) ||
+                (string.Equals(
+                     installedPlugin.Id,
+                     AppConstants.AutomationPluginId,
+                     StringComparison.OrdinalIgnoreCase) &&
+                 string.Equals(
+                     installedPlugin.Source,
+                     AppConstants.PluginInstallSourceExternal,
+                     StringComparison.OrdinalIgnoreCase));
             if (!isLegacySource ||
                 Find(installedPlugin.Id) != null)
             {
@@ -349,7 +357,7 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
             {
                 _logService.Warn(
                     nameof(PluginSubscriptionService),
-                    "旧内置插件 {PluginId} 无法在官方 catalog 中唯一识别，保留原安装且不建立订阅",
+                    "旧版插件 {PluginId} 无法在官方 catalog 中唯一识别，保留原安装且不建立订阅",
                     installedPlugin.Id);
                 continue;
             }

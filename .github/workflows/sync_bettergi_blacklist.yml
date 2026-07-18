@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   sync:
-    uses: ColinXHL/akasha-automation/.github/workflows/sync_bettergi_blacklist.yml@main
+    uses: ColinXHL/akasha-plugins/.github/workflows/sync-bettergi-blacklist.yml@main
     secrets:
       QINIU_ACCESS_KEY: ${{ secrets.QINIU_ACCESS_KEY }}
       QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}

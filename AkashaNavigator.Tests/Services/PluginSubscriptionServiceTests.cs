@@ -181,6 +181,45 @@ public sealed class PluginSubscriptionServiceTests : IDisposable
     }
 
     [Fact]
+    public void Reconcile_AdoptsLegacyNoticeAutomationInstallation()
+    {
+        var installedPlugin = new InstalledPluginInfo {
+            Id = AppConstants.AutomationPluginId,
+            Name = "Akasha Genshin Automation",
+            Version = "0.4.2",
+            Source = AppConstants.PluginInstallSourceExternal
+        };
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        pluginLibrary
+            .Setup(library => library.GetInstalledPlugins())
+            .Returns(new List<InstalledPluginInfo> { installedPlugin });
+        var service = new PluginSubscriptionService(
+            _logService.Object,
+            GetStatePath(),
+            pluginLibrary.Object);
+        var entry = CreateEntry();
+        entry.Id = AppConstants.AutomationPluginId;
+        entry.Path = $"plugins/{AppConstants.AutomationPluginId}";
+        entry.Name = installedPlugin.Name;
+        entry.Version = "0.4.3";
+        entry.DistributionType = AppConstants.PluginDistributionRelease;
+        entry.HasBackend = true;
+        var snapshot = CreateSnapshot(entry);
+
+        var result = service.Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            snapshot);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        var record = Assert.Single(service.GetSubscriptions());
+        Assert.Equal(AppConstants.AutomationPluginId, record.PluginId);
+        Assert.Equal(installedPlugin.Version, record.InstalledVersion);
+        Assert.Equal(snapshot.CatalogCommit, record.InstalledCommit);
+        Assert.False(record.AutoUpdate);
+        Assert.True(record.IsAvailable);
+    }
+
+    [Fact]
     public void Reconcile_DoesNotAdoptExternalOrUnknownLegacyInstallation()
     {
         var pluginLibrary = new Mock<IPluginLibrary>();
