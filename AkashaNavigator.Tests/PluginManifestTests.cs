@@ -385,6 +385,9 @@ public class PluginManifestTests
 
         Assert.True(result.IsSuccess, result.ErrorMessage);
         Assert.Equal("worker/win-x64/AkashaAutomation.Worker.exe", result.Manifest!.Companion!.Executable);
+        Assert.Equal(
+            AppConstants.DefaultCompanionShutdownTimeoutMs,
+            result.Manifest.Companion.ShutdownTimeoutMs);
         Assert.True(PluginPermissions.IsHighRiskPermission(PluginPermissions.Companion));
     }
 
@@ -426,6 +429,35 @@ public class PluginManifestTests
 
         Assert.False(validation.IsValid);
         Assert.Contains("permissions", validation.Errors.Keys);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(AppConstants.MaxCompanionShutdownTimeoutMs + 1)]
+    public void CompanionManifest_ShouldRejectUnsafeShutdownTimeout(
+        int shutdownTimeoutMs)
+    {
+        var manifest = new PluginManifest
+        {
+            Id = "automation",
+            Name = "Automation",
+            Version = "1.0.0",
+            Main = "main.js",
+            Permissions = new List<string> {
+                PluginPermissions.Companion
+            },
+            Companion = new CompanionManifest {
+                Executable = "worker/worker.exe",
+                ShutdownTimeoutMs = shutdownTimeoutMs
+            }
+        };
+
+        var validation = manifest.Validate();
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(
+            "companion.shutdownTimeoutMs",
+            validation.Errors.Keys);
     }
 
     [Fact]

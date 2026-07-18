@@ -63,6 +63,7 @@ public sealed class CompanionProcessManager : ICompanionProcessManager
                     pluginId,
                     executable,
                     manifest.ProtocolVersion,
+                    manifest.ShutdownTimeoutMs,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -185,6 +186,7 @@ public sealed class CompanionProcessManager : ICompanionProcessManager
         string pluginId,
         string executable,
         int protocolVersion,
+        int shutdownTimeoutMs,
         CancellationToken cancellationToken)
     {
         var pipeName = $"akasha-{Environment.ProcessId}-{Guid.NewGuid():N}";
@@ -256,7 +258,13 @@ public sealed class CompanionProcessManager : ICompanionProcessManager
                 }
             }
 
-            var session = new CompanionSession(pluginId, process, pipe, jobObject, _framing);
+            var session = new CompanionSession(
+                pluginId,
+                process,
+                pipe,
+                jobObject,
+                _framing,
+                TimeSpan.FromMilliseconds(shutdownTimeoutMs));
             process = null;
             pipe = null;
             jobObject = null;

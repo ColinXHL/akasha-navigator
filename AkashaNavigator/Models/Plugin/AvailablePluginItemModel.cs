@@ -125,8 +125,15 @@ namespace AkashaNavigator.Models.Plugin
                 AppConstants.PluginDistributionRepository,
                 StringComparison.Ordinal);
 
+        public bool IsCatalogDistribution =>
+            IsRepositoryDistribution ||
+            string.Equals(
+                DistributionType,
+                AppConstants.PluginDistributionRelease,
+                StringComparison.Ordinal);
+
         private bool CanUseCatalogEntry =>
-            !IsRepositoryDistribution || IsRepositoryAvailable;
+            !IsCatalogDistribution || IsRepositoryAvailable;
 
         public Visibility AvailableTagVisibility =>
             CanUseCatalogEntry && !IsInstalled && !IsDownloading
@@ -144,7 +151,7 @@ namespace AkashaNavigator.Models.Plugin
                 : Visibility.Collapsed;
 
         public Visibility RemovedTagVisibility =>
-            IsRepositoryDistribution && !IsRepositoryAvailable
+            IsCatalogDistribution && !IsRepositoryAvailable
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
@@ -171,7 +178,7 @@ namespace AkashaNavigator.Models.Plugin
             IsDownloading ? Visibility.Visible : Visibility.Collapsed;
 
         public Visibility SubscribeButtonVisibility =>
-            IsRepositoryDistribution &&
+            IsCatalogDistribution &&
             IsRepositoryAvailable &&
             !IsSubscribed &&
             !IsDownloading
@@ -179,12 +186,12 @@ namespace AkashaNavigator.Models.Plugin
                 : Visibility.Collapsed;
 
         public Visibility UnsubscribeButtonVisibility =>
-            IsRepositoryDistribution && IsSubscribed && !IsDownloading
+            IsCatalogDistribution && IsSubscribed && !IsDownloading
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
         public Visibility SubscriptionStatusVisibility =>
-            IsRepositoryDistribution && IsSubscribed
+            IsCatalogDistribution && IsSubscribed
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 

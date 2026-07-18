@@ -63,7 +63,8 @@ public sealed class CatalogPluginManifest
                     Executable = Backend.Entry,
                     ProtocolVersion = Backend.ProtocolVersion,
                     Lifetime = Backend.Lifetime,
-                    SingleInstance = true
+                    SingleInstance = true,
+                    ShutdownTimeoutMs = Backend.ShutdownTimeoutMs
                 },
             DefaultConfig = DefaultConfig == null
                 ? new Dictionary<string, JsonElement>()

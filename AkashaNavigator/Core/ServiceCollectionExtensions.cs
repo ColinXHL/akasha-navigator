@@ -90,6 +90,9 @@ public static class ServiceCollectionExtensions
         // PluginSubscriptionService（聚合仓库插件订阅）
         services.AddSingleton<IPluginSubscriptionService, PluginSubscriptionService>();
 
+        // PluginDistributionResolver（将仓库目录或 Release 统一准备为 staging）
+        services.AddSingleton<IPluginDistributionResolver, PluginDistributionResolver>();
+
         // PluginInstaller（Manifest v2 适配与原子安装事务）
         services.AddSingleton<IPluginInstaller, PluginInstaller>();
 

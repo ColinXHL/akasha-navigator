@@ -141,15 +141,55 @@ public sealed class PluginPackageService : IPluginPackageService
                     pluginId: pluginId));
         }
 
+        var downloadResult = await DownloadPackageAsync(
+            pluginId,
+            remote.Package,
+            progress,
+            cancellationToken);
+        if (downloadResult.IsFailure)
+        {
+            return Result<InstalledPluginInfo>.Failure(downloadResult.Error!);
+        }
+
+        using var download = downloadResult.Value!;
+        return _pluginLibrary.InstallPluginPackage(download.FilePath);
+    }
+
+    public async Task<Result<DownloadedPluginPackage>> DownloadPackageAsync(
+        string pluginId,
+        PluginPackageInfo package,
+        IProgress<PluginDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!PluginIdValidator.IsValid(pluginId) ||
+            package == null ||
+            string.IsNullOrWhiteSpace(package.FileName) ||
+            !string.Equals(
+                Path.GetFileName(package.FileName),
+                package.FileName,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                Path.GetExtension(package.FileName),
+                ".zip",
+                StringComparison.OrdinalIgnoreCase) ||
+            package.Size <= 0 ||
+            !IsSha256(package.Sha256))
+        {
+            return Result<DownloadedPluginPackage>.Failure(
+                Error.Validation(
+                    PluginErrorCodes.RemotePackageNotFound,
+                    "插件 Release 包元数据无效"));
+        }
+
         Result<IReadOnlyList<DownloadSourceInfo>> sourcesResult;
         try
         {
             sourcesResult =
-                await _downloadSourceSelector.GetOrderedSourcesAsync(remote.Package, cancellationToken);
+                await _downloadSourceSelector.GetOrderedSourcesAsync(package, cancellationToken);
         }
         catch (OperationCanceledException ex)
         {
-            return Result<InstalledPluginInfo>.Failure(
+            return Result<DownloadedPluginPackage>.Failure(
                 Error.Plugin(
                     PluginErrorCodes.RemoteDownloadCanceled,
                     "插件下载已取消",
@@ -159,7 +199,7 @@ public sealed class PluginPackageService : IPluginPackageService
 
         if (sourcesResult.IsFailure)
         {
-            return Result<InstalledPluginInfo>.Failure(sourcesResult.Error!);
+            return Result<DownloadedPluginPackage>.Failure(sourcesResult.Error!);
         }
 
         var attemptErrors = new List<string>();
@@ -172,23 +212,18 @@ public sealed class PluginPackageService : IPluginPackageService
             {
                 await DownloadAsync(
                     source,
-                    remote.Package,
+                    package,
                     temporaryPath,
                     progress,
                     cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-
-                var installResult = _pluginLibrary.InstallPluginPackage(temporaryPath);
-                if (installResult.IsSuccess)
-                {
-                    return installResult;
-                }
-
-                return installResult;
+                return Result<DownloadedPluginPackage>.Success(
+                    new DownloadedPluginPackage(temporaryPath, source.Id));
             }
             catch (OperationCanceledException ex)
             {
-                return Result<InstalledPluginInfo>.Failure(
+                TryDeleteFile(temporaryPath);
+                return Result<DownloadedPluginPackage>.Failure(
                     Error.Plugin(
                         PluginErrorCodes.RemoteDownloadCanceled,
                         "插件下载已取消",
@@ -198,20 +233,7 @@ public sealed class PluginPackageService : IPluginPackageService
             catch (Exception ex)
             {
                 attemptErrors.Add($"{source.Id}: {SimplifyError(ex)}");
-            }
-            finally
-            {
-                try
-                {
-                    if (File.Exists(temporaryPath))
-                    {
-                        File.Delete(temporaryPath);
-                    }
-                }
-                catch
-                {
-                    // 临时下载文件清理是 best effort。
-                }
+                TryDeleteFile(temporaryPath);
             }
         }
 
@@ -220,7 +242,7 @@ public sealed class PluginPackageService : IPluginPackageService
             $"插件下载失败，已尝试：{string.Join("；", attemptErrors)}",
             pluginId: pluginId);
         error.Metadata["AttemptedSources"] = sourcesResult.Value!.Select(source => source.Id).ToArray();
-        return Result<InstalledPluginInfo>.Failure(error);
+        return Result<DownloadedPluginPackage>.Failure(error);
     }
 
     private RemotePluginInfo? GetRemotePlugin(string pluginId)
@@ -333,6 +355,30 @@ public sealed class PluginPackageService : IPluginPackageService
             IOException => "临时文件读写失败",
             _ => exception.Message
         };
+    }
+
+    private static void TryDeleteFile(string filePath)
+    {
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+        catch
+        {
+            // 临时下载文件清理是 best effort。
+        }
+    }
+
+    private static bool IsSha256(string? value)
+    {
+        return value is { Length: 64 } &&
+               value.All(
+                   character =>
+                       character is >= '0' and <= '9' or
+                           >= 'a' and <= 'f');
     }
 
     private static string GetCurrentHostVersion()

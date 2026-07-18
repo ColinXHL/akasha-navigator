@@ -277,7 +277,7 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void UpdateAllSubscribed()
+    private async Task UpdateAllSubscribedAsync()
     {
         var updates = _pluginSubscriptionService.GetAvailableUpdates();
         if (updates.Count == 0)
@@ -293,7 +293,8 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         foreach (var update in updates)
         {
             var result =
-                _pluginInstaller.InstallOrUpdateRepositoryPlugin(update.PluginId);
+                await _pluginInstaller.InstallOrUpdateRepositoryPluginAsync(
+                    update.PluginId);
             if (result.IsSuccess)
             {
                 succeeded++;
@@ -329,9 +330,9 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         if (plugin == null)
             return;
 
-        if (plugin.IsRepositoryDistribution)
+        if (FindRepositoryEntry(plugin.Id) != null)
         {
-            InstallRepositoryPlugin(plugin);
+            await InstallCatalogPluginAsync(plugin);
             return;
         }
 
@@ -389,7 +390,7 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     [RelayCommand]
     private void Subscribe(AvailablePluginItemModel? plugin)
     {
-        if (plugin == null || !plugin.IsRepositoryDistribution)
+        if (plugin == null)
         {
             return;
         }
@@ -638,27 +639,85 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         };
     }
 
-    private void InstallRepositoryPlugin(AvailablePluginItemModel plugin)
+    private async Task InstallCatalogPluginAsync(
+        AvailablePluginItemModel plugin)
     {
-        var wasInstalled = plugin.IsInstalled;
-        var result = _pluginInstaller.InstallOrUpdateRepositoryPlugin(plugin.Id);
-        if (result.IsFailure)
+        if (_downloads.ContainsKey(plugin.Id))
         {
-            _notificationService.Show(
-                $"仓库插件安装失败: {result.Error?.Message}",
-                NotificationType.Error);
             return;
         }
 
-        plugin.IsInstalled = true;
-        plugin.IsSubscribed = true;
-        plugin.InstalledVersion = result.Value!.Version;
-        plugin.InstalledVersionText = $"已安装: v{result.Value.Version}";
-        plugin.HasUpdate = false;
-        _notificationService.Show(
-            $"插件 \"{plugin.Name}\" {(wasInstalled ? "更新" : "安装")}成功！",
-            NotificationType.Success);
-        RefreshRequested?.Invoke(this, EventArgs.Empty);
+        var cancellation = new CancellationTokenSource();
+        _downloads[plugin.Id] = cancellation;
+        _downloadItems[plugin.Id] = plugin;
+        var wasInstalled = plugin.IsInstalled;
+        var isRelease =
+            plugin.DistributionType == AppConstants.PluginDistributionRelease;
+        plugin.IsDownloading = isRelease;
+        plugin.DownloadProgress = 0;
+        plugin.DownloadStatus = isRelease ? "正在选择下载源…" : string.Empty;
+        var progress = new Progress<PluginDownloadProgress>(
+            value =>
+            {
+                plugin.SelectedSourceText =
+                    $"下载源：{GetSourceDisplayName(value.SourceId)}";
+                plugin.DownloadProgress =
+                    Math.Clamp(value.Percentage, 0, 100);
+                plugin.DownloadStatus =
+                    $"{FormatBytes(value.BytesReceived)} / {FormatBytes(value.TotalBytes)}";
+            });
+
+        try
+        {
+            var result =
+                await _pluginInstaller.InstallOrUpdateRepositoryPluginAsync(
+                    plugin.Id,
+                    isRelease ? progress : null,
+                    cancellation.Token);
+            if (result.IsFailure)
+            {
+                if (result.Error?.Code ==
+                    PluginErrorCodes.RemoteDownloadCanceled)
+                {
+                    _notificationService.Show(
+                        "插件下载已取消",
+                        NotificationType.Info);
+                }
+                else
+                {
+                    _notificationService.Show(
+                        $"仓库插件安装失败: {result.Error?.Message}",
+                        NotificationType.Error);
+                }
+
+                return;
+            }
+
+            plugin.IsInstalled = true;
+            plugin.IsSubscribed = true;
+            plugin.InstalledVersion = result.Value!.Version;
+            plugin.InstalledVersionText =
+                $"已安装: v{result.Value.Version}";
+            plugin.HasUpdate = false;
+            _notificationService.Show(
+                $"插件 \"{plugin.Name}\" {(wasInstalled ? "更新" : "安装")}成功！",
+                NotificationType.Success);
+            RefreshRequested?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException)
+        {
+            _notificationService.Show(
+                "插件下载已取消",
+                NotificationType.Info);
+        }
+        finally
+        {
+            plugin.IsDownloading = false;
+            plugin.DownloadStatus = string.Empty;
+            _downloads.Remove(plugin.Id);
+            _downloadItems.Remove(plugin.Id);
+            cancellation.Dispose();
+        }
     }
 
     private PluginRepositoryEntry? FindRepositoryEntry(string pluginId)

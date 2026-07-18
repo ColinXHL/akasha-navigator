@@ -86,7 +86,63 @@ public sealed class PluginInstallationTransactionTests : IDisposable
             "old code",
             File.ReadAllText(
                 Path.Combine(_libraryDirectory, PluginId, "main.js")));
+        Assert.Equal(
+            "old code worker",
+            File.ReadAllText(
+                Path.Combine(
+                    _libraryDirectory,
+                    PluginId,
+                    "runtime",
+                    "worker.exe")));
         Assert.Equal("1.0.0", _library.GetInstalledPluginInfo(PluginId)?.Version);
+    }
+
+    [Fact]
+    public void InstallOrUpdateFromDirectory_WhenCompanionStopFails_PreservesOldPair()
+    {
+        var stopCount = 0;
+        var companionProcessManager = new Mock<ICompanionProcessManager>();
+        companionProcessManager
+            .Setup(manager => manager.StopAsync(
+                PluginId,
+                It.IsAny<CancellationToken>()))
+            .Returns(
+                () => ++stopCount == 1
+                    ? Task.CompletedTask
+                    : Task.FromException(
+                        new TimeoutException("Companion did not stop.")));
+        var library = new PluginLibrary(
+            _libraryDirectory,
+            _indexPath,
+            Path.Combine(_root, "builtin"),
+            companionProcessManager.Object,
+            CreateConsentService());
+        var versionOne = CreateSource("1.0.0", "old code");
+        Assert.True(library.InstallOrUpdateFromDirectory(
+            versionOne,
+            Array.Empty<string>(),
+            AppConstants.PluginInstallSourceRepository).IsSuccess);
+
+        var versionTwo = CreateSource("2.0.0", "new code");
+        var result = library.InstallOrUpdateFromDirectory(
+            versionTwo,
+            Array.Empty<string>(),
+            AppConstants.PluginInstallSourceRepository);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(
+            "old code",
+            File.ReadAllText(
+                Path.Combine(_libraryDirectory, PluginId, "main.js")));
+        Assert.Equal(
+            "old code worker",
+            File.ReadAllText(
+                Path.Combine(
+                    _libraryDirectory,
+                    PluginId,
+                    "runtime",
+                    "worker.exe")));
+        Assert.Equal("1.0.0", library.GetInstalledPluginInfo(PluginId)?.Version);
     }
 
     [Fact]
@@ -131,7 +187,11 @@ public sealed class PluginInstallationTransactionTests : IDisposable
     {
         var source = Path.Combine(_root, $"source-{version}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(source);
+        Directory.CreateDirectory(Path.Combine(source, "runtime"));
         File.WriteAllText(Path.Combine(source, "main.js"), mainContent);
+        File.WriteAllText(
+            Path.Combine(source, "runtime", "worker.exe"),
+            $"{mainContent} worker");
         File.WriteAllText(
             Path.Combine(source, AppConstants.PluginManifestFileName),
             JsonSerializer.Serialize(

@@ -130,6 +130,15 @@ public class ServiceRegistrationTests
             subscriptions.ImplementationType);
         Assert.Equal(ServiceLifetime.Singleton, installer.Lifetime);
         Assert.Equal(typeof(PluginInstaller), installer.ImplementationType);
+
+        var distributionResolver = services.Single(
+            service =>
+                service.ServiceType ==
+                typeof(IPluginDistributionResolver));
+        Assert.Equal(ServiceLifetime.Singleton, distributionResolver.Lifetime);
+        Assert.Equal(
+            typeof(PluginDistributionResolver),
+            distributionResolver.ImplementationType);
         Assert.Equal(ServiceLifetime.Singleton, writeCoordinator.Lifetime);
     }
 

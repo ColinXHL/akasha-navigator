@@ -271,7 +271,8 @@ public partial class App : System.Windows.Application
                      .Where(item => item.AutoUpdate))
         {
             var updateResult =
-                pluginInstaller.InstallOrUpdateRepositoryPlugin(update.PluginId);
+                await pluginInstaller.InstallOrUpdateRepositoryPluginAsync(
+                    update.PluginId);
             if (updateResult.IsFailure)
             {
                 logService.Warn(

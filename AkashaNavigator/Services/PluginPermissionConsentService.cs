@@ -132,7 +132,9 @@ public sealed class PluginPermissionConsentService : IPluginPermissionConsentSer
                     executable = manifest.Companion?.Executable?.Replace('\\', '/'),
                     protocolVersion = manifest.Companion?.ProtocolVersion,
                     lifetime = manifest.Companion?.Lifetime,
-                    singleInstance = manifest.Companion?.SingleInstance
+                    singleInstance = manifest.Companion?.SingleInstance,
+                    shutdownTimeoutMs =
+                        manifest.Companion?.ShutdownTimeoutMs
                 }
                 : null
         };
@@ -168,9 +170,17 @@ public sealed class PluginPermissionConsentService : IPluginPermissionConsentSer
             var permissionLines = string.Join(
                 Environment.NewLine,
                 permissions.Select(permission => $"• {DescribePermission(permission)}"));
+            var companionDetails =
+                permissions.Contains(
+                    PluginPermissions.Companion,
+                    StringComparer.OrdinalIgnoreCase)
+                    ? $"{Environment.NewLine}{Environment.NewLine}" +
+                      $"将启动可执行文件：{manifest.Companion?.Executable ?? "未声明"}{Environment.NewLine}" +
+                      $"协议版本：{manifest.Companion?.ProtocolVersion}"
+                    : string.Empty;
             var message =
                 $"插件“{manifest.Name ?? manifest.Id ?? "未知插件"}”请求以下高风险权限：{Environment.NewLine}{Environment.NewLine}" +
-                $"{permissionLines}{Environment.NewLine}{Environment.NewLine}" +
+                $"{permissionLines}{companionDetails}{Environment.NewLine}{Environment.NewLine}" +
                 "仅在你信任插件来源时允许。Akasha 会限制可执行文件路径和启动参数，但该进程仍能在当前用户权限下运行。";
             var dialog = _dialogFactory.CreateConfirmDialog(
                 message,
