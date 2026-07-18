@@ -35,7 +35,7 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
     {
     }
 
-    private PluginSubscriptionService(
+    internal PluginSubscriptionService(
         ILogService logService,
         string stateFilePath,
         IPluginLibrary? pluginLibrary)
@@ -252,7 +252,11 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
                 entry => entry.Id,
                 StringComparer.OrdinalIgnoreCase);
             var previousState = CloneState(_state);
-            var changed = false;
+            var adoptedPluginIds = AdoptLegacyBuiltInInstallations(
+                repositoryId,
+                snapshot.CatalogCommit,
+                catalog);
+            var changed = adoptedPluginIds.Count > 0;
             for (var index = 0; index < _state.Subscriptions.Count; index++)
             {
                 var record = _state.Subscriptions[index];
@@ -292,9 +296,79 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
             {
                 _state = previousState;
             }
+            else
+            {
+                foreach (var pluginId in adoptedPluginIds)
+                {
+                    _logService.Info(
+                        nameof(PluginSubscriptionService),
+                        "已将旧内置插件 {PluginId} 认领为官方仓库订阅，自动更新保持关闭",
+                        pluginId);
+                }
+            }
 
             return saveResult;
         }
+    }
+
+    private IReadOnlyList<string> AdoptLegacyBuiltInInstallations(
+        string repositoryId,
+        string catalogCommit,
+        IReadOnlyDictionary<string, PluginRepositoryEntry> catalog)
+    {
+        if (_pluginLibrary == null ||
+            !string.Equals(
+                repositoryId,
+                AppConstants.OfficialPluginRepositoryId,
+                StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(catalogCommit))
+        {
+            return Array.Empty<string>();
+        }
+
+        var adoptedPluginIds = new List<string>();
+        foreach (var installedPlugin in _pluginLibrary.GetInstalledPlugins())
+        {
+            var isLegacySource =
+                string.Equals(
+                    installedPlugin.Source,
+                    AppConstants.PluginInstallSourceBuiltIn,
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    installedPlugin.Source,
+                    AppConstants.PluginInstallSourceMigrated,
+                    StringComparison.OrdinalIgnoreCase);
+            if (!isLegacySource ||
+                Find(installedPlugin.Id) != null)
+            {
+                continue;
+            }
+
+            if (!catalog.TryGetValue(installedPlugin.Id, out var entry) ||
+                ValidateSubscription(repositoryId, entry) != null)
+            {
+                _logService.Warn(
+                    nameof(PluginSubscriptionService),
+                    "旧内置插件 {PluginId} 无法在官方 catalog 中唯一识别，保留原安装且不建立订阅",
+                    installedPlugin.Id);
+                continue;
+            }
+
+            _state.Subscriptions.Add(
+                new PluginSubscriptionRecord {
+                    PluginId = installedPlugin.Id,
+                    RepositoryId = repositoryId,
+                    RepositoryPath = entry.Path,
+                    LastKnownVersion = entry.Version,
+                    InstalledVersion = installedPlugin.Version,
+                    InstalledCommit = catalogCommit,
+                    AutoUpdate = false,
+                    IsAvailable = true
+                });
+            adoptedPluginIds.Add(installedPlugin.Id);
+        }
+
+        return adoptedPluginIds;
     }
 
     private PluginSubscriptionState LoadState()

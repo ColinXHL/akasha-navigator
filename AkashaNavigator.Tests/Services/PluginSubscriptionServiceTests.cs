@@ -1,5 +1,6 @@
 using System.IO;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.PluginRepository;
 using AkashaNavigator.Services;
 using Moq;
@@ -138,6 +139,143 @@ public sealed class PluginSubscriptionServiceTests : IDisposable
             Assert.Single(reloaded.GetSubscriptions()).AutoUpdate);
     }
 
+    [Theory]
+    [InlineData(AppConstants.PluginInstallSourceBuiltIn)]
+    [InlineData(AppConstants.PluginInstallSourceMigrated)]
+    public void Reconcile_AdoptsLegacyInstallationWithoutEnablingAutoUpdate(
+        string legacySource)
+    {
+        var installedPlugin = new InstalledPluginInfo {
+            Id = "sample-plugin",
+            Name = "Sample",
+            Version = "0.9.0",
+            Source = legacySource
+        };
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        pluginLibrary
+            .Setup(library => library.GetInstalledPlugins())
+            .Returns(new List<InstalledPluginInfo> { installedPlugin });
+        var statePath = GetStatePath();
+        var service = new PluginSubscriptionService(
+            _logService.Object,
+            statePath,
+            pluginLibrary.Object);
+        var snapshot = CreateSnapshot(CreateEntry());
+
+        var result = service.Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            snapshot);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        var record = Assert.Single(service.GetSubscriptions());
+        Assert.Equal("sample-plugin", record.PluginId);
+        Assert.Equal("0.9.0", record.InstalledVersion);
+        Assert.Equal(snapshot.CatalogCommit, record.InstalledCommit);
+        Assert.False(record.AutoUpdate);
+        Assert.True(record.IsAvailable);
+
+        var reloaded = new PluginSubscriptionService(
+            _logService.Object,
+            statePath);
+        Assert.False(Assert.Single(reloaded.GetSubscriptions()).AutoUpdate);
+    }
+
+    [Fact]
+    public void Reconcile_DoesNotAdoptExternalOrUnknownLegacyInstallation()
+    {
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        pluginLibrary
+            .Setup(library => library.GetInstalledPlugins())
+            .Returns(
+                new List<InstalledPluginInfo> {
+                    new() {
+                        Id = "sample-plugin",
+                        Name = "Sample",
+                        Version = "1.0.0",
+                        Source = AppConstants.PluginInstallSourceExternal
+                    },
+                    new() {
+                        Id = "unknown-plugin",
+                        Name = "Unknown",
+                        Version = "1.0.0",
+                        Source = AppConstants.PluginInstallSourceBuiltIn
+                    }
+                });
+        var service = new PluginSubscriptionService(
+            _logService.Object,
+            GetStatePath(),
+            pluginLibrary.Object);
+
+        var result = service.Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            CreateSnapshot(CreateEntry()));
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        Assert.Empty(service.GetSubscriptions());
+    }
+
+    [Fact]
+    public void Reconcile_DoesNotOverwriteExistingSubscriptionPreference()
+    {
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        pluginLibrary
+            .Setup(library => library.GetInstalledPlugins())
+            .Returns(
+                new List<InstalledPluginInfo> {
+                    new() {
+                        Id = "sample-plugin",
+                        Name = "Sample",
+                        Version = "1.0.0",
+                        Source = AppConstants.PluginInstallSourceBuiltIn
+                    }
+                });
+        var service = new PluginSubscriptionService(
+            _logService.Object,
+            GetStatePath(),
+            pluginLibrary.Object);
+        Assert.True(
+            service.Subscribe(
+                AppConstants.OfficialPluginRepositoryId,
+                CreateEntry()).IsSuccess);
+
+        var result = service.Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            CreateSnapshot(CreateEntry()));
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        Assert.True(Assert.Single(service.GetSubscriptions()).AutoUpdate);
+    }
+
+    [Fact]
+    public void Reconcile_RollsBackLegacyAdoptionWhenStateCannotBeSaved()
+    {
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        pluginLibrary
+            .Setup(library => library.GetInstalledPlugins())
+            .Returns(
+                new List<InstalledPluginInfo> {
+                    new() {
+                        Id = "sample-plugin",
+                        Name = "Sample",
+                        Version = "1.0.0",
+                        Source = AppConstants.PluginInstallSourceBuiltIn
+                    }
+                });
+        var statePath = GetStatePath();
+        Directory.CreateDirectory(statePath);
+        var service = new PluginSubscriptionService(
+            _logService.Object,
+            statePath,
+            pluginLibrary.Object);
+
+        var result = service.Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            CreateSnapshot(CreateEntry()));
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(service.GetSubscriptions());
+    }
+
     public void Dispose()
     {
         try
@@ -168,5 +306,18 @@ public sealed class PluginSubscriptionServiceTests : IDisposable
             DistributionType = AppConstants.PluginDistributionRepository,
             MinHostVersion = "1.4.0"
         };
+    }
+
+    private static PluginRepositorySnapshot CreateSnapshot(
+        params PluginRepositoryEntry[] entries)
+    {
+        return new PluginRepositorySnapshot(
+            new PluginRepositoryIndex {
+                SchemaVersion = 1,
+                Commit = new string('a', 40),
+                Plugins = entries.ToList()
+            },
+            new string('b', 40),
+            false);
     }
 }

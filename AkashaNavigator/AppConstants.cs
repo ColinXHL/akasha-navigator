@@ -302,6 +302,12 @@ public static class AppConstants
 
     public const string PluginInstallSourceRepository = "repository";
 
+    public const string PluginInstallSourceBuiltIn = "builtin";
+
+    public const string PluginInstallSourceExternal = "external";
+
+    public const string PluginInstallSourceMigrated = "migrated";
+
     /// <summary>
     /// Notice 中拾取黑名单资源的键。
     /// </summary>

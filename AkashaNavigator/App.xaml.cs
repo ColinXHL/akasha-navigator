@@ -67,6 +67,8 @@ public partial class App : System.Windows.Application
 
         ExecuteDataMigration();
 
+        StartBackgroundUpdates();
+
         InitializeApplication();
     }
 
@@ -179,24 +181,27 @@ public partial class App : System.Windows.Application
 
         Services = serviceProvider;
 
-        var logService = serviceProvider.GetRequiredService<ILogService>();
         _configService = serviceProvider.GetRequiredService<IConfigService>();
         _dataMigration = serviceProvider.GetRequiredService<DataMigration>();
         _ = serviceProvider.GetRequiredService<PluginStateCoordinator>();
         _shutdownCoordinator = serviceProvider.GetRequiredService<ShutdownCoordinator>();
 
         _config = _configService.Config;
+    }
 
-        var updateManifestService = serviceProvider.GetRequiredService<IUpdateManifestService>();
+    private static void StartBackgroundUpdates()
+    {
+        var updateManifestService = Services.GetRequiredService<IUpdateManifestService>();
         var pluginResourceUpdateService =
-            serviceProvider.GetRequiredService<IPluginResourceUpdateService>();
+            Services.GetRequiredService<IPluginResourceUpdateService>();
         var pluginRepositoryService =
-            serviceProvider.GetRequiredService<IPluginRepositoryService>();
+            Services.GetRequiredService<IPluginRepositoryService>();
         var pluginSubscriptionService =
-            serviceProvider.GetRequiredService<IPluginSubscriptionService>();
+            Services.GetRequiredService<IPluginSubscriptionService>();
         var pluginInstaller =
-            serviceProvider.GetRequiredService<IPluginInstaller>();
-        var notificationService = serviceProvider.GetRequiredService<INotificationService>();
+            Services.GetRequiredService<IPluginInstaller>();
+        var notificationService = Services.GetRequiredService<INotificationService>();
+        var logService = Services.GetRequiredService<ILogService>();
         _ = RefreshUpdateManifestInBackgroundAsync(
             updateManifestService,
             pluginResourceUpdateService,
@@ -329,6 +334,11 @@ public partial class App : System.Windows.Application
             logService.Info(nameof(App), "检测到需要数据迁移，开始执行...");
 
             var result = _dataMigration.Migrate();
+            if (result.Status is MigrationResultStatus.Success or
+                MigrationResultStatus.PartialSuccess)
+            {
+                Services.GetRequiredService<IPluginLibrary>().ReloadIndex();
+            }
 
             switch (result.Status)
             {

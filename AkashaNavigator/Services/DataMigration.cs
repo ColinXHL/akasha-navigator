@@ -307,7 +307,8 @@ public class DataMigration
                     // 添加到索引
                     libraryIndex.Plugins.Add(
                         new InstalledPluginEntry { Id = pluginId, Version = pluginInfo.Manifest?.Version ?? "1.0.0",
-                                                   InstalledAt = DateTime.Now, Source = "migrated" });
+                                                   InstalledAt = DateTime.Now,
+                                                   Source = AppConstants.PluginInstallSourceMigrated });
 
                     migratedPluginCount++;
                     _logService.Info(nameof(DataMigration), "已迁移插件: {PluginId}", pluginId);

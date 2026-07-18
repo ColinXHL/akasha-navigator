@@ -315,7 +315,9 @@ public class PluginLibrary : IPluginLibrary
         return InstallOrUpdateFromDirectory(
             sourcePath,
             Array.Empty<string>(),
-            sourceDirectory == null ? "builtin" : "external");
+            sourceDirectory == null
+                ? AppConstants.PluginInstallSourceBuiltIn
+                : AppConstants.PluginInstallSourceExternal);
     }
 
     /// <summary>
@@ -361,7 +363,7 @@ public class PluginLibrary : IPluginLibrary
             return InstallOrUpdateFromDirectory(
                 pluginDirectory,
                 Array.Empty<string>(),
-                "external");
+                AppConstants.PluginInstallSourceExternal);
         }
         catch (InvalidDataException ex)
         {

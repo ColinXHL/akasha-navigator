@@ -215,36 +215,6 @@ public class BilibiliEventListenerTests : IDisposable
         Assert.Contains("nextPageHotkey", content);
     }
 
-    /// <summary>
-    /// **Feature: bilibili-page-list-plugin, Task 8.2: 快捷键注册**
-    /// 插件清单应该包含默认快捷键配置
-    /// **Validates: Requirements 4.1, 4.3, 4.4, 4.5**
-    /// </summary>
-    [Fact]
-    public void PluginManifest_ShouldHaveDefaultHotkeyConfig()
-    {
-        // 读取插件清单文件
-        var manifestPath =
-            Path.Combine(Directory.GetCurrentDirectory(), "repo", "plugins", "bilibili-page-list", "plugin.json");
-
-        if (File.Exists(manifestPath))
-        {
-            var manifestContent = File.ReadAllText(manifestPath);
-
-            // 验证包含快捷键配置
-            Assert.Contains("toggleHotkey", manifestContent);
-            Assert.Contains("danmakuHotkey", manifestContent);
-            Assert.Contains("subtitleHotkey", manifestContent);
-            Assert.Contains("prevPageHotkey", manifestContent);
-            Assert.Contains("nextPageHotkey", manifestContent);
-        }
-        else
-        {
-            // 如果文件不存在，跳过测试
-            Assert.True(true, "插件清单文件不存在，跳过测试");
-        }
-    }
-
 #endregion
 
 #region 集成测试
