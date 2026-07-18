@@ -241,6 +241,16 @@ public static class AppConstants
     public const string PluginManifestFileName = "plugin.json";
 
     /// <summary>
+    /// 插件仓库索引文件名。
+    /// </summary>
+    public const string PluginRepositoryIndexFileName = "repo.json";
+
+    /// <summary>
+    /// 插件仓库配置文件名。
+    /// </summary>
+    public const string PluginRepositoriesConfigFileName = "plugin-repositories.json";
+
+    /// <summary>
     /// 插件配置文件名
     /// </summary>
     public const string PluginConfigFileName = "config.json";
@@ -258,6 +268,32 @@ public static class AppConstants
     /// Akasha Automation 插件 ID。
     /// </summary>
     public const string AutomationPluginId = "akasha-genshin-automation";
+
+    /// <summary>
+    /// 官方插件仓库 ID。
+    /// </summary>
+    public const string OfficialPluginRepositoryId = "official";
+
+    /// <summary>
+    /// 官方插件仓库默认分支。
+    /// </summary>
+    public const string OfficialPluginRepositoryBranch = "catalog";
+
+    /// <summary>
+    /// 官方插件仓库 GitHub 地址。
+    /// </summary>
+    public const string OfficialPluginRepositoryGitHubUrl =
+        "https://github.com/ColinXHL/akasha-plugins.git";
+
+    /// <summary>
+    /// 官方插件仓库 CNB 地址。
+    /// </summary>
+    public const string OfficialPluginRepositoryCnbUrl =
+        "https://cnb.cool/AkashaNavigator/akasha-plugins.git";
+
+    public const string PluginDistributionRepository = "repository";
+
+    public const string PluginDistributionRelease = "release";
 
     /// <summary>
     /// Notice 中拾取黑名单资源的键。
