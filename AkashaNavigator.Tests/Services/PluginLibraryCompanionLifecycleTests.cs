@@ -116,23 +116,6 @@ public sealed class PluginLibraryCompanionLifecycleTests
     }
 
     [Fact]
-    public void Update_ShouldStopCompanionBeforeReplacingPluginFiles()
-    {
-        using var environment = new PluginLibraryTestEnvironment();
-        environment.InstallVersion("1.0.0", "old.txt");
-        environment.PublishBuiltInVersion("2.0.0", "new.txt");
-
-        var result = environment.Library.UpdatePlugin(environment.PluginId);
-
-        Assert.True(result.IsSuccess, result.ErrorMessage);
-        Assert.True(environment.ProcessManager.DirectoryExistedWhenStopped);
-        Assert.True(environment.ProcessManager.OldMarkerExistedWhenStopped);
-        Assert.False(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "old.txt")));
-        Assert.True(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "new.txt")));
-        Assert.Contains(PluginPermissionConsentOperation.Update, environment.ConsentService.Operations);
-    }
-
-    [Fact]
     public void Install_ShouldRejectUnsafePluginIdBeforeResolvingAnyTargetPath()
     {
         using var environment = new PluginLibraryTestEnvironment();
@@ -147,23 +130,6 @@ public sealed class PluginLibraryCompanionLifecycleTests
         }
 
         Assert.False(Directory.Exists(outsidePath));
-    }
-
-    [Fact]
-    public void Update_ShouldRejectMismatchedManifestBeforeConsentStopOrFileMutation()
-    {
-        using var environment = new PluginLibraryTestEnvironment();
-        environment.InstallVersion("1.0.0", "old.txt");
-        environment.PublishBuiltInVersion("2.0.0", "new.txt", manifestId: "different-plugin");
-
-        var result = environment.Library.UpdatePlugin(environment.PluginId);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("ID", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(environment.ConsentService.Operations);
-        Assert.Equal(0, environment.ProcessManager.StopCallCount);
-        Assert.True(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "old.txt")));
-        Assert.False(File.Exists(Path.Combine(environment.InstalledPluginDirectory, "new.txt")));
     }
 
     private sealed class PluginLibraryTestEnvironment : IDisposable
@@ -226,11 +192,6 @@ public sealed class PluginLibraryCompanionLifecycleTests
                 _builtInDirectory,
                 ProcessManager,
                 ConsentService);
-        }
-
-        public void PublishBuiltInVersion(string version, string markerFile, string? manifestId = null)
-        {
-            WritePlugin(Path.Combine(_builtInDirectory, PluginId), version, markerFile, manifestId);
         }
 
         public string CreatePackage(

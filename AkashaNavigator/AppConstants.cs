@@ -327,11 +327,6 @@ public static class AppConstants
     public const int MaxCompanionShutdownTimeoutMs = 60000;
 
     /// <summary>
-    /// Notice 中拾取黑名单资源的键。
-    /// </summary>
-    public const string PickBlacklistResourceKey = "pickBlacklist";
-
-    /// <summary>
     /// 传给插件伴生进程的用户资源目录环境变量。
     /// </summary>
     public const string PluginDataDirectoryEnvironmentVariable = "AKASHA_PLUGIN_DATA_DIR";

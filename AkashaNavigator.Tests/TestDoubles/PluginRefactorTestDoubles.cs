@@ -439,11 +439,6 @@ public sealed class FakePluginLibrary : IPluginLibrary
         return Result.Success();
     }
 
-    public UpdateCheckResult CheckForUpdate(string pluginId) => UpdateCheckResult.NoUpdate(pluginId, "1.0.0");
-
-    public List<UpdateCheckResult> CheckAllUpdates() => new();
-
-    public UpdateResult UpdatePlugin(string pluginId) => UpdateResult.NoUpdateAvailable();
 }
 
 public sealed class RecordingEventBus : IEventBus

@@ -16,9 +16,29 @@
 
 ## 快速开始
 
+官方插件在
+[AkashaPlugins](https://github.com/ColinXHL/akasha-plugins)
+中开发和发布。仓库的 `catalog` 分支、根部 `repo.json` 以及每个插件的
+`manifest.json` 共同组成插件中心的唯一目录；AkashaNavigator 的
+`notice.json` 只负责应用更新，不接受插件版本或下载地址。
+
+开发新插件时：
+
+1. Fork 或克隆 AkashaPlugins
+2. 在 `plugins/<plugin-id>/` 中添加 `manifest.json`、脚本和资源
+3. 运行仓库校验与测试
+4. 提交 PR；合并后由 CI 生成并发布 catalog
+
+普通 JavaScript 插件使用 `repository` 分发。包含伴生进程的插件使用
+`release` 分发，并在同一插件目录维护前端、Worker、协议和打包脚本。
+catalog 中只暴露 `manifest.json` 的插件版本，协议版本不参与用户可见的
+版本比较。
+
 ### 最小插件示例
 
-创建一个新文件夹，包含以下两个文件：
+下面的 `plugin.json` 是安装后运行时清单的最小示例。提交到 AkashaPlugins
+时，应按仓库的 Manifest v2 模板编写 `manifest.json`，由 catalog 构建流程
+校验并转换运行时清单。
 
 **plugin.json**
 ```json
@@ -44,7 +64,8 @@ function onUnload(api) {
 }
 ```
 
-将文件夹放入 `User/Plugins/` 目录，重启应用即可加载。
+本地验证可打包 ZIP 后通过插件中心的「从 ZIP 安装」导入。不要把主程序仓库
+中的 `repo/plugins` 当作开发或发布目录；它不再参与插件版本检查。
 
 ---
 

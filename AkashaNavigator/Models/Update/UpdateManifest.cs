@@ -1,18 +1,12 @@
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace AkashaNavigator.Models.Update;
 
 /// <summary>
-/// 应用与插件共用的远程更新清单。
+/// 应用更新清单。
 /// </summary>
 public sealed class UpdateManifest
 {
-    /// <summary>
-    /// 清单结构版本。旧版 Notice 缺少该字段时保持为 1。
-    /// </summary>
-    public int SchemaVersion { get; set; } = 1;
-
     /// <summary>
     /// 稳定版应用更新信息。
     /// </summary>
@@ -29,10 +23,6 @@ public sealed class UpdateManifest
     [JsonPropertyName("min_required_version")]
     public string? MinRequiredVersion { get; set; }
 
-    /// <summary>
-    /// 远程插件目录，键为插件 ID。
-    /// </summary>
-    public Dictionary<string, RemotePluginInfo> Plugins { get; set; } = new();
 }
 
 /// <summary>

@@ -39,7 +39,8 @@ namespace AkashaNavigator.Core.Interfaces
         /// 创建插件更新提示对话框
         /// </summary>
         /// <param name="updates">可用更新列表</param>
-        PluginUpdatePromptDialog CreatePluginUpdatePromptDialog(List<UpdateCheckResult> updates);
+        PluginUpdatePromptDialog CreatePluginUpdatePromptDialog(
+            IReadOnlyList<Models.PluginRepository.PluginSubscriptionUpdate> updates);
 
         /// <summary>
         /// 创建 Profile 更新提示对话框

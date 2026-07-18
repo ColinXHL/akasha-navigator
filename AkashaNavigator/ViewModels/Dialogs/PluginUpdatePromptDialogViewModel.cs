@@ -3,7 +3,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using AkashaNavigator.Core.Interfaces;
-using AkashaNavigator.Models.Common;
+using AkashaNavigator.Models.PluginRepository;
 
 namespace AkashaNavigator.ViewModels.Dialogs
 {
@@ -18,7 +18,8 @@ namespace AkashaNavigator.ViewModels.Dialogs
         /// <summary>
         /// 有更新的插件列表
         /// </summary>
-        public List<UpdateCheckResult> UpdatesAvailable { get; private set; } = new();
+        public IReadOnlyList<PluginSubscriptionUpdate> UpdatesAvailable { get; private set; } =
+            Array.Empty<PluginSubscriptionUpdate>();
 
         /// <summary>
         /// 更新提示消息（自动生成属性和通知）
@@ -53,7 +54,7 @@ namespace AkashaNavigator.ViewModels.Dialogs
         /// <summary>
         /// 初始化方法 - 接收运行时参数
         /// </summary>
-        public void Initialize(List<UpdateCheckResult> updates)
+        public void Initialize(IReadOnlyList<PluginSubscriptionUpdate> updates)
         {
             UpdatesAvailable = updates ?? throw new System.ArgumentNullException(nameof(updates));
 

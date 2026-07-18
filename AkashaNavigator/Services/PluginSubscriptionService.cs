@@ -14,24 +14,27 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
 {
     private readonly ILogService _logService;
     private readonly IPluginLibrary? _pluginLibrary;
+    private readonly IPluginRepositoryService? _repositoryService;
     private readonly string _stateFilePath;
     private readonly object _stateLock = new();
     private PluginSubscriptionState _state;
 
     public PluginSubscriptionService(
         ILogService logService,
-        IPluginLibrary pluginLibrary)
+        IPluginLibrary pluginLibrary,
+        IPluginRepositoryService repositoryService)
         : this(
             logService,
             AppPaths.PluginRepositorySubscriptionsFilePath,
-            pluginLibrary)
+            pluginLibrary,
+            repositoryService)
     {
     }
 
     internal PluginSubscriptionService(
         ILogService logService,
         string stateFilePath)
-        : this(logService, stateFilePath, null)
+        : this(logService, stateFilePath, null, null)
     {
     }
 
@@ -39,9 +42,19 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
         ILogService logService,
         string stateFilePath,
         IPluginLibrary? pluginLibrary)
+        : this(logService, stateFilePath, pluginLibrary, null)
+    {
+    }
+
+    internal PluginSubscriptionService(
+        ILogService logService,
+        string stateFilePath,
+        IPluginLibrary? pluginLibrary,
+        IPluginRepositoryService? repositoryService)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _pluginLibrary = pluginLibrary;
+        _repositoryService = repositoryService;
         _stateFilePath = stateFilePath ?? throw new ArgumentNullException(nameof(stateFilePath));
         _state = LoadState();
     }
@@ -110,6 +123,43 @@ public sealed class PluginSubscriptionService : IPluginSubscriptionService
                 .OrderBy(update => update.PluginId, StringComparer.Ordinal)
                 .ToArray();
         }
+    }
+
+    public async Task<Result<IReadOnlyList<PluginSubscriptionUpdate>>>
+        CheckForUpdatesAsync(
+            bool refreshRepository = true,
+            CancellationToken cancellationToken = default)
+    {
+        if (_repositoryService == null)
+        {
+            return Result<IReadOnlyList<PluginSubscriptionUpdate>>.Failure(
+                Error.Configuration(
+                    "PLUGIN_REPOSITORY_SERVICE_UNAVAILABLE",
+                    "插件仓库服务不可用"));
+        }
+
+        var repositoryResult = refreshRepository
+            ? await _repositoryService.RefreshAsync(cancellationToken)
+                .ConfigureAwait(false)
+            : await _repositoryService.InitializeAsync(cancellationToken)
+                .ConfigureAwait(false);
+        if (repositoryResult.IsFailure)
+        {
+            return Result<IReadOnlyList<PluginSubscriptionUpdate>>.Failure(
+                repositoryResult.Error!);
+        }
+
+        var reconcileResult = Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            repositoryResult.Value!);
+        if (reconcileResult.IsFailure)
+        {
+            return Result<IReadOnlyList<PluginSubscriptionUpdate>>.Failure(
+                reconcileResult.Error!);
+        }
+
+        return Result<IReadOnlyList<PluginSubscriptionUpdate>>.Success(
+            GetAvailableUpdates());
     }
 
     public Result<PluginSubscriptionRecord> Subscribe(

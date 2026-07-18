@@ -85,20 +85,6 @@ public static class PluginErrorCodes
 }
 
 /// <summary>
-/// 插件独立资源更新错误码。
-/// </summary>
-public static class PluginResourceErrorCodes
-{
-    public const string MetadataInvalid = "PLUGIN_RESOURCE_METADATA_INVALID";
-    public const string DownloadFailed = "PLUGIN_RESOURCE_DOWNLOAD_FAILED";
-    public const string SizeMismatch = "PLUGIN_RESOURCE_SIZE_MISMATCH";
-    public const string HashMismatch = "PLUGIN_RESOURCE_HASH_MISMATCH";
-    public const string ContentInvalid = "PLUGIN_RESOURCE_CONTENT_INVALID";
-    public const string SaveFailed = "PLUGIN_RESOURCE_SAVE_FAILED";
-    public const string DownloadCanceled = "PLUGIN_RESOURCE_DOWNLOAD_CANCELED";
-}
-
-/// <summary>
 /// Profile 相关错误码
 /// </summary>
 public static class ProfileErrorCodes

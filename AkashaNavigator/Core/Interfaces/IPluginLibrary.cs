@@ -90,24 +90,5 @@ public interface IPluginLibrary
     Result UninstallPlugin(string pluginId, bool force = false,
                            Func<string, List<string>>? getReferencingProfiles = null);
 
-    /// <summary>
-    /// 检查插件是否有可用更新
-    /// </summary>
-    /// <param name="pluginId">插件ID</param>
-    /// <returns>更新检查结果</returns>
-    UpdateCheckResult CheckForUpdate(string pluginId);
-
-    /// <summary>
-    /// 检查所有已安装插件的更新
-    /// </summary>
-    /// <returns>有更新的插件列表</returns>
-    List<UpdateCheckResult> CheckAllUpdates();
-
-    /// <summary>
-    /// 更新插件到最新版本
-    /// </summary>
-    /// <param name="pluginId">插件ID</param>
-    /// <returns>更新结果</returns>
-    UpdateResult UpdatePlugin(string pluginId);
 }
 }

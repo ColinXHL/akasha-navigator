@@ -32,7 +32,6 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     private readonly IPluginRepositoryService _pluginRepositoryService;
     private readonly IPluginSubscriptionService _pluginSubscriptionService;
     private readonly IPluginInstaller _pluginInstaller;
-    private readonly IPluginPackageService _pluginPackageService;
     private readonly IConfigService _configService;
     private readonly Dictionary<string, CancellationTokenSource> _downloads =
         new(StringComparer.OrdinalIgnoreCase);
@@ -93,7 +92,6 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         IPluginRepositoryService pluginRepositoryService,
         IPluginSubscriptionService pluginSubscriptionService,
         IPluginInstaller pluginInstaller,
-        IPluginPackageService pluginPackageService,
         IConfigService configService)
     {
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
@@ -105,8 +103,6 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
             pluginSubscriptionService ?? throw new ArgumentNullException(nameof(pluginSubscriptionService));
         _pluginInstaller =
             pluginInstaller ?? throw new ArgumentNullException(nameof(pluginInstaller));
-        _pluginPackageService =
-            pluginPackageService ?? throw new ArgumentNullException(nameof(pluginPackageService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
 
         LoadRepositorySettings();
@@ -330,33 +326,15 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         if (plugin == null)
             return;
 
-        if (FindRepositoryEntry(plugin.Id) != null)
+        if (FindRepositoryEntry(plugin.Id) == null)
         {
-            await InstallCatalogPluginAsync(plugin);
+            _notificationService.Show(
+                "该插件已从当前仓库中移除，无法安装或更新",
+                NotificationType.Warning);
             return;
         }
 
-        if (plugin.IsRemote)
-        {
-            await InstallRemoteAsync(plugin);
-            return;
-        }
-
-        var result = _pluginLibrary.InstallPlugin(plugin.Id, plugin.SourceDirectory);
-        if (result.IsSuccess)
-        {
-            _notificationService.Show($"插件 \"{plugin.Name}\" 安装成功！", NotificationType.Success);
-
-            // 更新插件状态
-            plugin.IsInstalled = true;
-
-            // 通知刷新
-            RefreshRequested?.Invoke(this, EventArgs.Empty);
-        }
-        else
-        {
-            _notificationService.Show($"安装失败: {result.Error?.Message}", NotificationType.Error);
-        }
+        await InstallCatalogPluginAsync(plugin);
     }
 
     [RelayCommand]
@@ -749,73 +727,6 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
             _notificationService.Show(
                 $"同步插件订阅状态失败: {result.Error?.Message}",
                 NotificationType.Warning);
-        }
-    }
-
-    private async Task InstallRemoteAsync(AvailablePluginItemModel plugin)
-    {
-        if (_downloads.ContainsKey(plugin.Id))
-        {
-            return;
-        }
-
-        var cancellation = new CancellationTokenSource();
-        _downloads[plugin.Id] = cancellation;
-        _downloadItems[plugin.Id] = plugin;
-        var wasInstalled = plugin.IsInstalled;
-        plugin.IsDownloading = true;
-        plugin.DownloadProgress = 0;
-        plugin.DownloadStatus = "正在选择下载源…";
-
-        var progress = new Progress<PluginDownloadProgress>(
-            value =>
-            {
-                plugin.SelectedSourceText = $"下载源：{GetSourceDisplayName(value.SourceId)}";
-                plugin.DownloadProgress = Math.Clamp(value.Percentage, 0, 100);
-                plugin.DownloadStatus =
-                    $"{FormatBytes(value.BytesReceived)} / {FormatBytes(value.TotalBytes)}";
-            });
-
-        try
-        {
-            var result = await _pluginPackageService.InstallOrUpdateAsync(
-                plugin.Id,
-                progress,
-                cancellation.Token);
-            if (result.IsSuccess)
-            {
-                plugin.IsInstalled = true;
-                plugin.InstalledVersion = result.Value!.Version;
-                plugin.InstalledVersionText = $"已安装: v{result.Value.Version}";
-                plugin.HasUpdate = false;
-                _notificationService.Show(
-                    $"插件 \"{plugin.Name}\" {(wasInstalled ? "更新" : "安装")}成功！",
-                    NotificationType.Success);
-                RefreshRequested?.Invoke(this, EventArgs.Empty);
-            }
-            else if (result.Error?.Code == PluginErrorCodes.RemoteDownloadCanceled)
-            {
-                _notificationService.Show("插件下载已取消", NotificationType.Info);
-            }
-            else
-            {
-                _notificationService.Show(
-                    $"远程插件安装失败: {result.Error?.Message}\n可使用“从 ZIP 安装”手动导入。",
-                    NotificationType.Error);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            _notificationService.Show("插件下载已取消", NotificationType.Info);
-        }
-        finally
-        {
-            plugin.IsDownloading = false;
-            plugin.DownloadStatus = string.Empty;
-            _downloads.Remove(plugin.Id);
-            _downloadItems.Remove(plugin.Id);
-            cancellation.Dispose();
-            RefreshPluginList();
         }
     }
 

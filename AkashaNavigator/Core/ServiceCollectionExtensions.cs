@@ -105,11 +105,8 @@ public static class ServiceCollectionExtensions
         // DownloadSourceSelector（依赖 HttpClient + ConfigService）
         services.AddSingleton<IDownloadSourceSelector, DownloadSourceSelector>();
 
-        // PluginPackageService（依赖 Manifest、下载源选择器和 PluginLibrary）
+        // PluginPackageService（catalog Release 包下载与完整性校验）
         services.AddSingleton<IPluginPackageService, PluginPackageService>();
-
-        // PluginResourceUpdateService（仅在对应插件已安装时更新独立资源）
-        services.AddSingleton<IPluginResourceUpdateService, PluginResourceUpdateService>();
 
         // AppUpdateService（依赖 LogService + UpdateManifestService）
         services.AddSingleton<IAppUpdateService, AppUpdateService>();

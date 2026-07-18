@@ -1,15 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Threading;
-using System.Threading.Tasks;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Common;
-using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.Update;
 using AkashaNavigator.Services;
 using Moq;
@@ -22,21 +16,23 @@ public sealed class PluginPackageServiceTests
     private const string PluginId = "akasha-genshin-automation";
 
     [Fact]
-    public async Task InstallOrUpdateAsync_WhenFirstSourceHashFails_UsesSecondSource()
+    public async Task DownloadPackageAsync_WhenFirstSourceHashFails_UsesSecondSource()
     {
-        var validBytes = Enumerable.Range(0, 2048).Select(index => (byte)(index % 251)).ToArray();
+        var validBytes = Enumerable.Range(0, 2048)
+            .Select(index => (byte)(index % 251))
+            .ToArray();
         var invalidBytes = validBytes.ToArray();
         invalidBytes[0] ^= 0xff;
         var package = CreatePackage(validBytes);
-        var manifestService = CreateManifestService(package);
         var selector = CreateSelector(package.Sources);
         var attemptedHosts = new List<string>();
-        string? installedPath = null;
         using var httpClient = CreateClient(
             (request, _) =>
             {
                 attemptedHosts.Add(request.RequestUri!.Host);
-                var bytes = request.RequestUri.Host.StartsWith("github", StringComparison.Ordinal)
+                var bytes = request.RequestUri.Host.StartsWith(
+                    "github",
+                    StringComparison.Ordinal)
                     ? invalidBytes
                     : validBytes;
                 return Task.FromResult(
@@ -44,179 +40,95 @@ public sealed class PluginPackageServiceTests
                         Content = new ByteArrayContent(bytes)
                     });
             });
-        var library = new Mock<IPluginLibrary>();
-        library.Setup(service => service.GetInstalledPluginInfo(PluginId))
-            .Returns((InstalledPluginInfo?)null);
-        library.Setup(service => service.InstallPluginPackage(It.IsAny<string>()))
-            .Callback<string>(
-                path =>
-                {
-                    installedPath = path;
-                    Assert.True(File.Exists(path));
-                })
-            .Returns(
-                Result<InstalledPluginInfo>.Success(
-                    new InstalledPluginInfo {
-                        Id = PluginId,
-                        Name = "Automation",
-                        Version = "0.3.2"
-                    }));
         var progress = new SynchronousProgress();
-        var service = new PluginPackageService(
-            httpClient,
-            manifestService.Object,
-            selector.Object,
-            library.Object,
-            () => "1.3.0-alpha.4");
+        var service = new PluginPackageService(httpClient, selector.Object);
 
-        var result = await service.InstallOrUpdateAsync(PluginId, progress);
+        var result = await service.DownloadPackageAsync(
+            PluginId,
+            package,
+            progress);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(new[] { "github.example.test", "cnb.example.test" }, attemptedHosts);
-        Assert.Contains(progress.Values, value => value.SourceId == "cnb" && value.Percentage == 100);
-        Assert.NotNull(installedPath);
-        Assert.False(File.Exists(installedPath));
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        Assert.Equal(
+            new[] { "github.example.test", "cnb.example.test" },
+            attemptedHosts);
+        Assert.Contains(
+            progress.Values,
+            value => value.SourceId == "cnb" && value.Percentage == 100);
+        var downloaded = result.Value!;
+        Assert.True(File.Exists(downloaded.FilePath));
+        downloaded.Dispose();
+        Assert.False(File.Exists(downloaded.FilePath));
     }
 
     [Fact]
-    public async Task InstallOrUpdateAsync_WhenAllSourcesFail_ReturnsAttempts()
+    public async Task DownloadPackageAsync_WhenAllSourcesFail_ReturnsAttempts()
     {
-        var validBytes = new byte[1024];
-        var package = CreatePackage(validBytes);
-        var manifestService = CreateManifestService(package);
+        var package = CreatePackage(new byte[1024]);
         var selector = CreateSelector(package.Sources);
         using var httpClient = CreateClient(
-            (_, _) => Task.FromException<HttpResponseMessage>(new HttpRequestException("offline")));
-        var library = new Mock<IPluginLibrary>();
-        library.Setup(service => service.GetInstalledPluginInfo(PluginId))
-            .Returns((InstalledPluginInfo?)null);
-        var service = new PluginPackageService(
-            httpClient,
-            manifestService.Object,
-            selector.Object,
-            library.Object,
-            () => "1.3.0-alpha.4");
+            (_, _) => Task.FromException<HttpResponseMessage>(
+                new HttpRequestException("offline")));
+        var service = new PluginPackageService(httpClient, selector.Object);
 
-        var result = await service.InstallOrUpdateAsync(PluginId);
+        var result = await service.DownloadPackageAsync(PluginId, package);
 
         Assert.True(result.IsFailure);
         Assert.Equal(PluginErrorCodes.RemoteDownloadFailed, result.Error?.Code);
-        var attempted = Assert.IsType<string[]>(result.Error?.Metadata["AttemptedSources"]);
+        var attempted = Assert.IsType<string[]>(
+            result.Error?.Metadata["AttemptedSources"]);
         Assert.Equal(new[] { "github", "cnb" }, attempted);
-        library.Verify(
-            service => service.InstallPluginPackage(It.IsAny<string>()),
-            Times.Never);
     }
 
     [Fact]
-    public async Task InstallOrUpdateAsync_WhenHostVersionIsTooLow_DoesNotDownload()
+    public async Task DownloadPackageAsync_WhenCanceled_ReturnsCanceledResult()
     {
         var package = CreatePackage(new byte[1024]);
-        var manifestService = CreateManifestService(package);
-        var selector = CreateSelector(package.Sources);
-        var requestCount = 0;
-        using var httpClient = CreateClient(
-            (_, _) =>
-            {
-                requestCount++;
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
-            });
-        var library = new Mock<IPluginLibrary>();
-        library.Setup(service => service.GetInstalledPluginInfo(PluginId))
-            .Returns((InstalledPluginInfo?)null);
-        var service = new PluginPackageService(
-            httpClient,
-            manifestService.Object,
-            selector.Object,
-            library.Object,
-            () => "1.2.0");
-
-        var result = await service.InstallOrUpdateAsync(PluginId);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal(PluginErrorCodes.HostVersionTooLow, result.Error?.Code);
-        Assert.Equal(0, requestCount);
-        selector.Verify(
-            service => service.GetOrderedSourcesAsync(
-                It.IsAny<PluginPackageInfo>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
-    }
-
-    [Fact]
-    public async Task InstallOrUpdateAsync_WhenCanceled_ReturnsCanceledResult()
-    {
-        var package = CreatePackage(new byte[1024]);
-        var manifestService = CreateManifestService(package);
         var selector = CreateSelector(package.Sources);
         using var httpClient = CreateClient(
             async (_, cancellationToken) =>
             {
-                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                await Task.Delay(
+                    Timeout.InfiniteTimeSpan,
+                    cancellationToken);
                 return new HttpResponseMessage(HttpStatusCode.OK);
             });
-        var library = new Mock<IPluginLibrary>();
-        library.Setup(service => service.GetInstalledPluginInfo(PluginId))
-            .Returns((InstalledPluginInfo?)null);
-        var service = new PluginPackageService(
-            httpClient,
-            manifestService.Object,
-            selector.Object,
-            library.Object,
-            () => "1.3.0-alpha.4");
+        var service = new PluginPackageService(httpClient, selector.Object);
         using var cancellation = new CancellationTokenSource();
         cancellation.CancelAfter(TimeSpan.FromMilliseconds(20));
 
-        var result = await service.InstallOrUpdateAsync(
+        var result = await service.DownloadPackageAsync(
             PluginId,
+            package,
             cancellationToken: cancellation.Token);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(PluginErrorCodes.RemoteDownloadCanceled, result.Error?.Code);
-        library.Verify(
-            item => item.InstallPluginPackage(It.IsAny<string>()),
-            Times.Never);
+        Assert.Equal(
+            PluginErrorCodes.RemoteDownloadCanceled,
+            result.Error?.Code);
     }
 
     [Fact]
-    public void GetRemoteCatalog_ReturnsManifestPlugins()
+    public async Task DownloadPackageAsync_WhenMetadataIsInvalid_DoesNotSelectSource()
     {
-        var package = CreatePackage(new byte[32]);
-        var manifestService = CreateManifestService(package);
+        var selector = new Mock<IDownloadSourceSelector>();
         var service = new PluginPackageService(
             new HttpClient(),
-            manifestService.Object,
-            Mock.Of<IDownloadSourceSelector>(),
-            Mock.Of<IPluginLibrary>(),
-            () => "1.3.0-alpha.4");
+            selector.Object);
+        var package = CreatePackage(new byte[32]);
+        package.FileName = "../plugin.zip";
 
-        var catalog = service.GetRemoteCatalog();
+        var result = await service.DownloadPackageAsync(PluginId, package);
 
-        var entry = Assert.Single(catalog);
-        Assert.Equal(PluginId, entry.Id);
-        Assert.True(entry.IsRemote);
-        Assert.Null(entry.LocalSourceDirectory);
-        Assert.Same(package, entry.Package);
-    }
-
-    private static Mock<IUpdateManifestService> CreateManifestService(PluginPackageInfo package)
-    {
-        var manifest = new UpdateManifest {
-            Stable = new AppUpdateChannelInfo { Version = "1.2.1" },
-            Plugins = {
-                [PluginId] = new RemotePluginInfo {
-                    Name = "Akasha 原神自动化",
-                    Version = "0.3.2",
-                    MinHostVersion = "1.3.0-alpha.4",
-                    Package = package
-                }
-            }
-        };
-        var service = new Mock<IUpdateManifestService>();
-        service.SetupGet(item => item.Current).Returns(manifest);
-        service.Setup(item => item.RefreshAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<UpdateManifest>.Success(manifest));
-        return service;
+        Assert.True(result.IsFailure);
+        Assert.Equal(
+            PluginErrorCodes.RemotePackageNotFound,
+            result.Error?.Code);
+        selector.Verify(
+            item => item.GetOrderedSourcesAsync(
+                It.IsAny<PluginPackageInfo>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     private static Mock<IDownloadSourceSelector> CreateSelector(
@@ -227,7 +139,9 @@ public sealed class PluginPackageServiceTests
                 service => service.GetOrderedSourcesAsync(
                     It.IsAny<PluginPackageInfo>(),
                     It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<IReadOnlyList<DownloadSourceInfo>>.Success(sources));
+            .ReturnsAsync(
+                Result<IReadOnlyList<DownloadSourceInfo>>.Success(
+                    sources));
         return selector;
     }
 
@@ -236,7 +150,8 @@ public sealed class PluginPackageServiceTests
         return new PluginPackageInfo {
             FileName = "plugin.zip",
             Size = bytes.Length,
-            Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+            Sha256 = Convert.ToHexString(SHA256.HashData(bytes))
+                .ToLowerInvariant(),
             Sources = {
                 new DownloadSourceInfo {
                     Id = "github",
@@ -251,7 +166,8 @@ public sealed class PluginPackageServiceTests
     }
 
     private static HttpClient CreateClient(
-        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>
+            handler)
     {
         return new HttpClient(new DelegateHandler(handler)) {
             Timeout = Timeout.InfiniteTimeSpan
@@ -260,10 +176,16 @@ public sealed class PluginPackageServiceTests
 
     private sealed class DelegateHandler : HttpMessageHandler
     {
-        private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _handler;
+        private readonly Func<
+            HttpRequestMessage,
+            CancellationToken,
+            Task<HttpResponseMessage>> _handler;
 
         public DelegateHandler(
-            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+            Func<
+                HttpRequestMessage,
+                CancellationToken,
+                Task<HttpResponseMessage>> handler)
         {
             _handler = handler;
         }
@@ -276,7 +198,8 @@ public sealed class PluginPackageServiceTests
         }
     }
 
-    private sealed class SynchronousProgress : IProgress<PluginDownloadProgress>
+    private sealed class SynchronousProgress :
+        IProgress<PluginDownloadProgress>
     {
         public List<PluginDownloadProgress> Values { get; } = new();
 

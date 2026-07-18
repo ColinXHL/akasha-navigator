@@ -1,5 +1,6 @@
 using System.IO;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.PluginRepository;
 using AkashaNavigator.Services;
@@ -122,6 +123,68 @@ public sealed class PluginSubscriptionServiceTests : IDisposable
         Assert.Equal("1.0.0", update.InstalledVersion);
         Assert.Equal("2.0.0", update.AvailableVersion);
         Assert.True(update.AutoUpdate);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CheckForUpdatesAsync_UsesCatalogAndReturnsSubscriptionUpdates(
+        bool refreshRepository)
+    {
+        var installed = new InstalledPluginInfo {
+            Id = "sample-plugin",
+            Name = "Sample",
+            Version = "1.0.0",
+            Source = AppConstants.PluginInstallSourceRepository
+        };
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        pluginLibrary
+            .Setup(library => library.GetInstalledPlugins())
+            .Returns(new List<InstalledPluginInfo> { installed });
+        var entry = CreateEntry();
+        entry.Version = "2.0.0";
+        var snapshot = CreateSnapshot(entry);
+        var repositoryService = new Mock<IPluginRepositoryService>();
+        repositoryService
+            .Setup(service => service.RefreshAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Result<PluginRepositorySnapshot>.Success(snapshot));
+        repositoryService
+            .Setup(service => service.InitializeAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Result<PluginRepositorySnapshot>.Success(snapshot));
+        var service = new PluginSubscriptionService(
+            _logService.Object,
+            GetStatePath(),
+            pluginLibrary.Object,
+            repositoryService.Object);
+        var subscribedEntry = CreateEntry();
+        Assert.True(
+            service.Subscribe(
+                AppConstants.OfficialPluginRepositoryId,
+                subscribedEntry).IsSuccess);
+        Assert.True(
+            service.MarkInstalled(
+                installed.Id,
+                installed.Version,
+                new string('a', 40)).IsSuccess);
+
+        var result =
+            await service.CheckForUpdatesAsync(refreshRepository);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        var update = Assert.Single(result.Value!);
+        Assert.Equal(installed.Id, update.PluginId);
+        Assert.Equal(installed.Version, update.InstalledVersion);
+        Assert.Equal(entry.Version, update.AvailableVersion);
+        repositoryService.Verify(
+            item => item.RefreshAsync(It.IsAny<CancellationToken>()),
+            refreshRepository ? Times.Once() : Times.Never());
+        repositoryService.Verify(
+            item => item.InitializeAsync(It.IsAny<CancellationToken>()),
+            refreshRepository ? Times.Never() : Times.Once());
     }
 
     [Fact]

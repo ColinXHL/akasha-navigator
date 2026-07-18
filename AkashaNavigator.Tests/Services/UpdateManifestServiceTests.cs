@@ -58,15 +58,13 @@ public sealed class UpdateManifestServiceTests : IDisposable
         var manifest = JsonHelper.Deserialize<UpdateManifest>(json);
 
         Assert.NotNull(manifest);
-        Assert.Equal(1, manifest.SchemaVersion);
         Assert.Equal("1.2.1", manifest.Stable?.Version);
         Assert.Equal("1.3.0-alpha.4", manifest.Alpha?.Version);
         Assert.Equal("1.2.0", manifest.MinRequiredVersion);
-        Assert.Empty(manifest.Plugins);
     }
 
     [Fact]
-    public void Deserialize_ManifestV2_ReadsPluginPackageAndResource()
+    public void Deserialize_NoticeWithLegacyPlugins_IgnoresPluginEntries()
     {
         const string json =
             """
@@ -107,12 +105,7 @@ public sealed class UpdateManifestServiceTests : IDisposable
         var manifest = JsonHelper.Deserialize<UpdateManifest>(json);
 
         Assert.NotNull(manifest);
-        Assert.Equal(2, manifest.SchemaVersion);
-        var plugin = manifest.Plugins["akasha-genshin-automation"];
-        Assert.Equal("0.3.2", plugin.Version);
-        Assert.Equal(2, plugin.Package?.Sources.Count);
-        Assert.Equal(68712360, plugin.Package?.Size);
-        Assert.Equal(4914, plugin.Resources["pickBlacklist"].EntryCount);
+        Assert.Equal("1.2.1", manifest.Stable?.Version);
     }
 
     [Fact]
