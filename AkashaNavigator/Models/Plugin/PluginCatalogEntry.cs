@@ -24,6 +24,8 @@ public sealed class PluginCatalogEntry
 
     public bool IsRemote { get; init; }
 
+    public string DistributionType { get; init; } = string.Empty;
+
     public string? MinHostVersion { get; init; }
 
     public PluginPackageInfo? Package { get; init; }

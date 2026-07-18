@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using AkashaNavigator.Core.Events;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Common;
@@ -47,6 +48,9 @@ public sealed class AvailablePluginsPageViewModelTests
         Assert.Equal("2.0.0", alpha.Version);
         Assert.True(alpha.IsInstalled);
         Assert.True(alpha.HasUpdate);
+        Assert.Equal(
+            AppConstants.PluginDistributionRepository,
+            alpha.DistributionType);
         Assert.Equal(
             Path.Combine("C:\\catalog-cache", "plugins/alpha-plugin"),
             alpha.SourceDirectory);
@@ -108,19 +112,174 @@ public sealed class AvailablePluginsPageViewModelTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task InstallCommand_UsesUnifiedInstallerForRepositoryPlugin()
+    {
+        var snapshot = CreateSnapshot(usedCache: false);
+        var repositoryService = CreateRepositoryService(snapshot);
+        var installer = new Mock<IPluginInstaller>();
+        installer
+            .Setup(service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"))
+            .Returns(
+                Result<InstalledPluginInfo>.Success(
+                    new InstalledPluginInfo {
+                        Id = "alpha-plugin",
+                        Name = "Alpha",
+                        Version = "2.0.0"
+                    }));
+        var viewModel = CreateViewModel(
+            repositoryService.Object,
+            installer: installer.Object);
+        viewModel.RefreshPluginList();
+        var plugin = Assert.Single(
+            viewModel.Plugins.Where(item => item.Id == "alpha-plugin"));
+
+        await viewModel.InstallCommand.ExecuteAsync(plugin);
+
+        Assert.True(plugin.IsInstalled);
+        Assert.True(plugin.IsSubscribed);
+        Assert.False(plugin.HasUpdate);
+        installer.Verify(
+            service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"),
+            Times.Once);
+    }
+
+    [Fact]
+    public void SubscribeAndUnsubscribeCommands_OnlyChangeSubscriptionState()
+    {
+        var snapshot = CreateSnapshot(usedCache: false);
+        var repositoryService = CreateRepositoryService(snapshot);
+        var subscriptions = new Mock<IPluginSubscriptionService>();
+        subscriptions
+            .Setup(service => service.Subscribe(
+                AppConstants.OfficialPluginRepositoryId,
+                It.Is<PluginRepositoryEntry>(
+                    entry => entry.Id == "alpha-plugin")))
+            .Returns(
+                Result<PluginSubscriptionRecord>.Success(
+                    new PluginSubscriptionRecord {
+                        PluginId = "alpha-plugin"
+                    }));
+        subscriptions
+            .Setup(service => service.Unsubscribe("alpha-plugin"))
+            .Returns(Result.Success());
+        subscriptions
+            .Setup(service => service.Reconcile(
+                It.IsAny<string>(),
+                It.IsAny<PluginRepositorySnapshot>()))
+            .Returns(Result.Success());
+        subscriptions
+            .Setup(service => service.GetSubscriptions())
+            .Returns(Array.Empty<PluginSubscriptionRecord>());
+        var library = CreatePluginLibrary();
+        var viewModel = CreateViewModel(
+            repositoryService.Object,
+            library.Object,
+            subscriptionService: subscriptions.Object);
+        viewModel.RefreshPluginList();
+        var plugin = Assert.Single(
+            viewModel.Plugins.Where(item => item.Id == "alpha-plugin"));
+
+        viewModel.SubscribeCommand.Execute(plugin);
+        Assert.True(plugin.IsSubscribed);
+        viewModel.UnsubscribeCommand.Execute(plugin);
+
+        Assert.False(plugin.IsSubscribed);
+        library.Verify(
+            service => service.UninstallPlugin(
+                It.IsAny<string>(),
+                It.IsAny<bool>(),
+                It.IsAny<Func<string, List<string>>?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void UpdateAllSubscribedCommand_InstallsEveryAvailableUpdate()
+    {
+        var snapshot = CreateSnapshot(usedCache: false);
+        var subscriptions = CreateSubscriptionService();
+        subscriptions
+            .Setup(service => service.GetAvailableUpdates())
+            .Returns(
+                new List<PluginSubscriptionUpdate> {
+                    new() {
+                        PluginId = "alpha-plugin",
+                        InstalledVersion = "1.0.0",
+                        AvailableVersion = "2.0.0",
+                        AutoUpdate = true
+                    }
+                });
+        var installer = new Mock<IPluginInstaller>();
+        installer
+            .Setup(service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"))
+            .Returns(
+                Result<InstalledPluginInfo>.Success(
+                    new InstalledPluginInfo {
+                        Id = "alpha-plugin",
+                        Name = "Alpha",
+                        Version = "2.0.0"
+                    }));
+        var viewModel = CreateViewModel(
+            CreateRepositoryService(snapshot).Object,
+            subscriptionService: subscriptions.Object,
+            installer: installer.Object);
+
+        viewModel.UpdateAllSubscribedCommand.Execute(null);
+
+        installer.Verify(
+            service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"),
+            Times.Once);
+    }
+
+    [Fact]
+    public void RefreshPluginList_ShowsRemovedSubscriptionWithoutInstallAction()
+    {
+        var snapshot = CreateSnapshot(usedCache: false);
+        var subscriptions = CreateSubscriptionService();
+        subscriptions
+            .Setup(service => service.GetSubscriptions())
+            .Returns(
+                new List<PluginSubscriptionRecord> {
+                    new() {
+                        PluginId = "removed-plugin",
+                        RepositoryId = AppConstants.OfficialPluginRepositoryId,
+                        RepositoryPath = "plugins/removed-plugin",
+                        LastKnownVersion = "1.0.0",
+                        IsAvailable = false
+                    }
+                });
+        var viewModel = CreateViewModel(
+            CreateRepositoryService(snapshot).Object,
+            subscriptionService: subscriptions.Object);
+
+        viewModel.RefreshPluginList();
+
+        var removed = Assert.Single(
+            viewModel.Plugins.Where(
+                plugin => plugin.Id == "removed-plugin"));
+        Assert.False(removed.IsRepositoryAvailable);
+        Assert.Equal(Visibility.Visible, removed.RemovedTagVisibility);
+        Assert.Equal(Visibility.Collapsed, removed.InstallButtonVisibility);
+    }
+
     private static AvailablePluginsPageViewModel CreateViewModel(
         IPluginRepositoryService repositoryService,
         IPluginLibrary? pluginLibrary = null,
-        IPluginPackageService? packageService = null)
+        IPluginPackageService? packageService = null,
+        IPluginSubscriptionService? subscriptionService = null,
+        IPluginInstaller? installer = null)
     {
         var library = pluginLibrary ?? CreatePluginLibrary().Object;
         var configService = new Mock<IConfigService>();
         configService.SetupGet(service => service.Config).Returns(new AppConfig());
+        var subscriptions = subscriptionService ?? CreateSubscriptionService().Object;
         return new AvailablePluginsPageViewModel(
             library,
             Mock.Of<INotificationService>(),
             Mock.Of<IEventBus>(),
             repositoryService,
+            subscriptions,
+            installer ?? Mock.Of<IPluginInstaller>(),
             packageService ?? Mock.Of<IPluginPackageService>(),
             configService.Object);
     }
@@ -132,6 +291,20 @@ public sealed class AvailablePluginsPageViewModelTests
             .Setup(library => library.GetInstalledPlugins())
             .Returns(new List<InstalledPluginInfo>());
         return pluginLibrary;
+    }
+
+    private static Mock<IPluginSubscriptionService> CreateSubscriptionService()
+    {
+        var subscriptions = new Mock<IPluginSubscriptionService>();
+        subscriptions
+            .Setup(service => service.Reconcile(
+                It.IsAny<string>(),
+                It.IsAny<PluginRepositorySnapshot>()))
+            .Returns(Result.Success());
+        subscriptions
+            .Setup(service => service.GetSubscriptions())
+            .Returns(Array.Empty<PluginSubscriptionRecord>());
+        return subscriptions;
     }
 
     private static Mock<IPluginRepositoryService> CreateRepositoryService(

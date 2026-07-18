@@ -44,6 +44,10 @@ namespace AkashaNavigator.Models.Plugin
         /// </summary>
         public bool IsRemote { get; set; }
 
+        public string DistributionType { get; set; } = string.Empty;
+
+        public bool IsRepositoryAvailable { get; set; } = true;
+
         /// <summary>
         /// 已安装版本；未安装时为空。
         /// </summary>
@@ -112,14 +116,37 @@ namespace AkashaNavigator.Models.Plugin
         [ObservableProperty]
         private string _selectedSourceText = string.Empty;
 
+        [ObservableProperty]
+        private bool _isSubscribed;
+
+        public bool IsRepositoryDistribution =>
+            string.Equals(
+                DistributionType,
+                AppConstants.PluginDistributionRepository,
+                StringComparison.Ordinal);
+
+        private bool CanUseCatalogEntry =>
+            !IsRepositoryDistribution || IsRepositoryAvailable;
+
         public Visibility AvailableTagVisibility =>
-            !IsInstalled && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+            CanUseCatalogEntry && !IsInstalled && !IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         public Visibility InstalledTagVisibility =>
-            IsInstalled && !HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+            CanUseCatalogEntry && IsInstalled && !HasUpdate && !IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         public Visibility UpdateTagVisibility =>
-            IsInstalled && HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+            CanUseCatalogEntry && IsInstalled && HasUpdate && !IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        public Visibility RemovedTagVisibility =>
+            IsRepositoryDistribution && !IsRepositoryAvailable
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         public Visibility RemoteInfoVisibility =>
             IsRemote ? Visibility.Visible : Visibility.Collapsed;
@@ -128,16 +155,38 @@ namespace AkashaNavigator.Models.Plugin
             IsDownloading ? Visibility.Visible : Visibility.Collapsed;
 
         public Visibility InstallButtonVisibility =>
-            !IsInstalled && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+            IsRepositoryAvailable && !IsInstalled && !IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         public Visibility UpdateButtonVisibility =>
-            IsInstalled && HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+            IsRepositoryAvailable && IsInstalled && HasUpdate && !IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         public Visibility UninstallButtonVisibility =>
             IsInstalled && !HasUpdate && !IsDownloading ? Visibility.Visible : Visibility.Collapsed;
 
         public Visibility CancelButtonVisibility =>
             IsDownloading ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility SubscribeButtonVisibility =>
+            IsRepositoryDistribution &&
+            IsRepositoryAvailable &&
+            !IsSubscribed &&
+            !IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        public Visibility UnsubscribeButtonVisibility =>
+            IsRepositoryDistribution && IsSubscribed && !IsDownloading
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        public Visibility SubscriptionStatusVisibility =>
+            IsRepositoryDistribution && IsSubscribed
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         partial void OnIsInstalledChanged(bool value)
         {
@@ -154,6 +203,11 @@ namespace AkashaNavigator.Models.Plugin
             NotifyStateVisibilities();
         }
 
+        partial void OnIsSubscribedChanged(bool value)
+        {
+            NotifyStateVisibilities();
+        }
+
         private void NotifyStateVisibilities()
         {
             OnPropertyChanged(nameof(AvailableTagVisibility));
@@ -164,6 +218,9 @@ namespace AkashaNavigator.Models.Plugin
             OnPropertyChanged(nameof(UpdateButtonVisibility));
             OnPropertyChanged(nameof(UninstallButtonVisibility));
             OnPropertyChanged(nameof(CancelButtonVisibility));
+            OnPropertyChanged(nameof(SubscribeButtonVisibility));
+            OnPropertyChanged(nameof(UnsubscribeButtonVisibility));
+            OnPropertyChanged(nameof(SubscriptionStatusVisibility));
         }
     }
 }

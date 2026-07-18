@@ -70,6 +70,7 @@ public class PluginLibrary : IPluginLibrary
     private readonly object _indexLock = new();
     private readonly ICompanionProcessManager _companionProcessManager;
     private readonly IPluginPermissionConsentService _permissionConsentService;
+    private readonly PluginWriteCoordinator _writeCoordinator;
     private readonly string _libraryDirectory;
     private readonly string _libraryIndexPath;
     private readonly string _builtInPluginsDirectory;
@@ -85,12 +86,15 @@ public class PluginLibrary : IPluginLibrary
     /// </summary>
     public PluginLibrary(
         ICompanionProcessManager companionProcessManager,
-        IPluginPermissionConsentService permissionConsentService)
+        IPluginPermissionConsentService permissionConsentService,
+        PluginWriteCoordinator writeCoordinator)
     {
         _companionProcessManager = companionProcessManager ??
                                    throw new ArgumentNullException(nameof(companionProcessManager));
         _permissionConsentService = permissionConsentService ??
                                     throw new ArgumentNullException(nameof(permissionConsentService));
+        _writeCoordinator =
+            writeCoordinator ?? throw new ArgumentNullException(nameof(writeCoordinator));
         _libraryDirectory = AppPaths.InstalledPluginsDirectory;
         _libraryIndexPath = AppPaths.LibraryIndexPath;
         _builtInPluginsDirectory = AppPaths.BuiltInPluginsDirectory;
@@ -111,6 +115,7 @@ public class PluginLibrary : IPluginLibrary
                                    throw new ArgumentNullException(nameof(companionProcessManager));
         _permissionConsentService = permissionConsentService ??
                                     throw new ArgumentNullException(nameof(permissionConsentService));
+        _writeCoordinator = new PluginWriteCoordinator();
         _libraryDirectory = Path.GetFullPath(libraryDirectory);
         _libraryIndexPath = Path.GetFullPath(indexPath);
         _builtInPluginsDirectory = Path.GetFullPath(builtInPluginsDirectory);
@@ -291,76 +296,26 @@ public class PluginLibrary : IPluginLibrary
 
         // 确定源目录
         var sourcePath = sourceDirectory ?? GetContainedPluginDirectory(_builtInPluginsDirectory, pluginId);
-
-        // 检查源目录是否存在
-        if (!Directory.Exists(sourcePath))
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.FileSystem(PluginErrorCodes.SourceNotFound, $"源目录不存在: {sourcePath}", filePath: sourcePath));
-        }
-
-        // 检查清单文件
-        var manifestPath = Path.Combine(sourcePath, "plugin.json");
-        var manifestResult = PluginManifest.LoadFromFile(manifestPath);
-        if (!manifestResult.IsSuccess)
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Plugin(PluginErrorCodes.InvalidManifest, $"清单无效: {manifestResult.ErrorMessage ?? "未知错误"}",
-                             pluginId: pluginId));
-        }
-
-        var manifest = manifestResult.Manifest!;
-
-        // 确保插件ID匹配
-        if (!string.Equals(manifest.Id, pluginId, StringComparison.OrdinalIgnoreCase))
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Plugin(PluginErrorCodes.InvalidManifest,
-                             $"清单中的ID ({manifest.Id}) 与请求的ID ({pluginId}) 不匹配", pluginId: pluginId));
-        }
-
-        if (!_permissionConsentService.EnsureHighRiskPermissionsApproved(
-                manifest,
-                PluginPermissionConsentOperation.Install))
+        var manifestResult = PluginManifest.LoadFromFile(
+            Path.Combine(sourcePath, AppConstants.PluginManifestFileName));
+        if (!manifestResult.IsSuccess ||
+            manifestResult.Manifest == null ||
+            !string.Equals(
+                manifestResult.Manifest.Id,
+                pluginId,
+                StringComparison.OrdinalIgnoreCase))
         {
             return Result<InstalledPluginInfo>.Failure(
                 Error.Plugin(
-                    PluginErrorCodes.PermissionConsentDeclined,
-                    "未获得或无法保存插件请求的高风险权限授权",
+                    PluginErrorCodes.InvalidManifest,
+                    $"插件源清单与请求的 ID {pluginId} 不匹配",
                     pluginId: pluginId));
         }
 
-        // 复制插件文件到用户插件库（不要写入内置 Repos 目录）
-        var targetDir = GetContainedPluginDirectory(LibraryDirectory, pluginId);
-        try
-        {
-            CopyDirectory(sourcePath, targetDir);
-        }
-        catch (Exception ex)
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.FileSystem(PluginErrorCodes.CopyFailed, $"文件复制失败: {ex.Message}", ex, filePath: targetDir));
-        }
-
-        // 更新索引
-        var entry =
-            new InstalledPluginEntry { Id = pluginId, Version = manifest.Version ?? "1.0.0", InstalledAt = DateTime.Now,
-                                       Source = sourceDirectory == null ? "builtin" : "external" };
-
-        lock (_indexLock)
-        {
-            _index.Plugins.Add(entry);
-            SaveIndex();
-        }
-
-        // 创建插件信息
-        var pluginInfo = InstalledPluginInfo.FromManifest(manifest, entry.Source);
-        pluginInfo.InstalledAt = entry.InstalledAt;
-
-        // 触发事件
-        OnPluginChanged(new PluginLibraryChangedEventArgs(PluginLibraryChangeType.Installed, pluginId, pluginInfo));
-
-        return Result<InstalledPluginInfo>.Success(pluginInfo);
+        return InstallOrUpdateFromDirectory(
+            sourcePath,
+            Array.Empty<string>(),
+            sourceDirectory == null ? "builtin" : "external");
     }
 
     /// <summary>
@@ -403,9 +358,10 @@ public class PluginLibrary : IPluginLibrary
             var pluginId = manifest.Id!;
             ValidatePackageEntryFiles(pluginDirectory, manifest);
 
-            return IsInstalled(pluginId)
-                ? UpdatePluginFromDirectory(pluginDirectory, manifest)
-                : InstallPlugin(pluginId, pluginDirectory);
+            return InstallOrUpdateFromDirectory(
+                pluginDirectory,
+                Array.Empty<string>(),
+                "external");
         }
         catch (InvalidDataException ex)
         {
@@ -442,10 +398,49 @@ public class PluginLibrary : IPluginLibrary
         }
     }
 
-    private Result<InstalledPluginInfo> UpdatePluginFromDirectory(
+    public Result<InstalledPluginInfo> InstallOrUpdateFromDirectory(
         string sourceDirectory,
-        PluginManifest manifest)
+        IReadOnlyList<string> savedFiles,
+        string source)
     {
+        if (savedFiles == null)
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Validation(
+                    PluginErrorCodes.InvalidManifest,
+                    "savedFiles 不能为空"));
+        }
+
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Validation(
+                    PluginErrorCodes.InvalidManifest,
+                    "插件安装来源不能为空"));
+        }
+
+        if (string.IsNullOrWhiteSpace(sourceDirectory) ||
+            !Directory.Exists(sourceDirectory))
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.FileSystem(
+                    PluginErrorCodes.SourceNotFound,
+                    $"插件源目录不存在: {sourceDirectory}",
+                    filePath: sourceDirectory));
+        }
+
+        using var writeOperation = _writeCoordinator.Acquire();
+        var manifestResult = PluginManifest.LoadFromFile(
+            Path.Combine(sourceDirectory, AppConstants.PluginManifestFileName));
+        if (!manifestResult.IsSuccess || manifestResult.Manifest == null)
+        {
+            return Result<InstalledPluginInfo>.Failure(
+                Error.Plugin(
+                    PluginErrorCodes.InvalidManifest,
+                    $"清单无效: {manifestResult.ErrorMessage ?? "未知错误"}"));
+        }
+
+        var manifest = manifestResult.Manifest;
         var pluginId = manifest.Id!;
         InstalledPluginEntry? entry;
         lock (_indexLock)
@@ -454,34 +449,30 @@ public class PluginLibrary : IPluginLibrary
                 item => string.Equals(item.Id, pluginId, StringComparison.OrdinalIgnoreCase));
         }
 
-        if (entry == null)
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Plugin(PluginErrorCodes.NotInstalled, $"插件 {pluginId} 未安装", pluginId: pluginId));
-        }
-
         var incomingVersion = manifest.Version ?? "0.0.0";
-        if (CompareVersions(incomingVersion, entry.Version) <= 0)
+        var isUpdate = entry != null;
+        if (isUpdate && CompareVersions(incomingVersion, entry!.Version) <= 0)
         {
             return Result<InstalledPluginInfo>.Failure(
                 Error.Plugin(
                     PluginErrorCodes.VersionNotNewer,
-                    $"插件包版本 {incomingVersion} 不高于已安装版本 {entry.Version}",
+                    $"插件版本 {incomingVersion} 不高于已安装版本 {entry.Version}",
                     pluginId: pluginId));
         }
 
         if (!_permissionConsentService.EnsureHighRiskPermissionsApproved(
                 manifest,
-                PluginPermissionConsentOperation.Update))
+                isUpdate
+                    ? PluginPermissionConsentOperation.Update
+                    : PluginPermissionConsentOperation.Install))
         {
             return Result<InstalledPluginInfo>.Failure(
                 Error.Plugin(
                     PluginErrorCodes.PermissionConsentDeclined,
-                    "未获得或无法保存更新所需的高风险权限授权",
+                    "未获得或无法保存插件所需的高风险权限授权",
                     pluginId: pluginId));
         }
 
-        Directory.CreateDirectory(LibraryDirectory);
         var targetDirectory = GetContainedPluginDirectory(LibraryDirectory, pluginId);
         var stagingDirectory = Path.Combine(
             LibraryDirectory,
@@ -489,40 +480,87 @@ public class PluginLibrary : IPluginLibrary
         var backupDirectory = Path.Combine(
             LibraryDirectory,
             $".package-backup-{pluginId}-{Guid.NewGuid():N}");
-        InstalledPluginInfo pluginInfo;
+        var previousVersion = entry?.Version;
+        var previousSource = entry?.Source;
+        var addedEntry = false;
+        var targetMovedToBackup = false;
+        var stagingMovedToTarget = false;
 
         try
         {
+            Directory.CreateDirectory(LibraryDirectory);
             CopyDirectory(sourceDirectory, stagingDirectory);
+            if (isUpdate)
+            {
+                RestoreSavedFiles(
+                    targetDirectory,
+                    stagingDirectory,
+                    savedFiles);
+            }
+
             StopCompanionBeforeFileMutation(pluginId);
 
             if (Directory.Exists(targetDirectory))
             {
                 Directory.Move(targetDirectory, backupDirectory);
+                targetMovedToBackup = true;
             }
 
             Directory.Move(stagingDirectory, targetDirectory);
+            stagingMovedToTarget = true;
 
             lock (_indexLock)
             {
-                entry.Version = incomingVersion;
-                entry.Source = "external";
-                SaveIndex();
-            }
+                if (entry == null)
+                {
+                    entry = new InstalledPluginEntry {
+                        Id = pluginId,
+                        Version = incomingVersion,
+                        InstalledAt = DateTime.Now,
+                        Source = source
+                    };
+                    _index.Plugins.Add(entry);
+                    addedEntry = true;
+                }
+                else
+                {
+                    entry.Version = incomingVersion;
+                    entry.Source = source;
+                }
 
-            pluginInfo = InstalledPluginInfo.FromManifest(manifest, entry.Source);
-            pluginInfo.InstalledAt = entry.InstalledAt;
+                var saveResult = JsonHelper.SaveToFile(LibraryIndexPath, _index);
+                if (saveResult.IsFailure)
+                {
+                    throw new IOException(saveResult.Error?.Message);
+                }
+            }
         }
         catch (Exception ex)
         {
+            lock (_indexLock)
+            {
+                if (addedEntry && entry != null)
+                {
+                    _index.Plugins.Remove(entry);
+                }
+                else if (entry != null)
+                {
+                    entry.Version = previousVersion ?? entry.Version;
+                    entry.Source = previousSource ?? entry.Source;
+                }
+            }
+
             try
             {
-                if (Directory.Exists(targetDirectory) && Directory.Exists(backupDirectory))
+                if (stagingMovedToTarget &&
+                    Directory.Exists(targetDirectory))
                 {
                     Directory.Delete(targetDirectory, recursive: true);
                 }
 
-                if (!Directory.Exists(targetDirectory) && Directory.Exists(backupDirectory))
+                if (targetMovedToBackup &&
+                    !Directory.Exists(targetDirectory) &&
+                    Directory.Exists(backupDirectory))
                 {
                     Directory.Move(backupDirectory, targetDirectory);
                 }
@@ -539,11 +577,14 @@ public class PluginLibrary : IPluginLibrary
 
             return Result<InstalledPluginInfo>.Failure(
                 Error.FileSystem(
-                    PluginErrorCodes.CopyFailed,
-                    $"插件更新失败: {ex.Message}",
+                    PluginErrorCodes.InstallTransactionFailed,
+                    $"插件安装事务失败: {ex.Message}",
                     ex,
                     filePath: targetDirectory));
         }
+
+        var pluginInfo = InstalledPluginInfo.FromManifest(manifest, entry!.Source);
+        pluginInfo.InstalledAt = entry.InstalledAt;
 
         try
         {
@@ -557,11 +598,90 @@ public class PluginLibrary : IPluginLibrary
             // 新版本已经提交；旧版本备份可在后续维护时清理，不能因此回滚索引。
         }
 
+        writeOperation.Dispose();
         OnPluginChanged(new PluginLibraryChangedEventArgs(
-            PluginLibraryChangeType.Updated,
+            isUpdate
+                ? PluginLibraryChangeType.Updated
+                : PluginLibraryChangeType.Installed,
             pluginId,
             pluginInfo));
         return Result<InstalledPluginInfo>.Success(pluginInfo);
+    }
+
+    private static void RestoreSavedFiles(
+        string sourceRoot,
+        string stagingRoot,
+        IEnumerable<string> savedFiles)
+    {
+        if (!Directory.Exists(sourceRoot))
+        {
+            return;
+        }
+
+        foreach (var relativePath in savedFiles.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var sourcePath = GetContainedRelativePath(sourceRoot, relativePath);
+            var destinationPath = GetContainedRelativePath(stagingRoot, relativePath);
+            if (File.Exists(sourcePath))
+            {
+                DeletePathIfExists(destinationPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                File.Copy(sourcePath, destinationPath, overwrite: true);
+            }
+            else if (Directory.Exists(sourcePath))
+            {
+                DeletePathIfExists(destinationPath);
+                CopyDirectory(sourcePath, destinationPath);
+            }
+        }
+    }
+
+    private static string GetContainedRelativePath(
+        string rootDirectory,
+        string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath) ||
+            Path.IsPathRooted(relativePath) ||
+            relativePath.Contains('\\') ||
+            relativePath.Contains(':') ||
+            relativePath.Split(
+                    '/',
+                    StringSplitOptions.None)
+                .Any(
+                    segment =>
+                        string.IsNullOrWhiteSpace(segment) ||
+                        segment == "." ||
+                        segment == ".."))
+        {
+            throw new InvalidDataException(
+                $"savedFiles 包含不安全路径: {relativePath}");
+        }
+
+        var root = Path.GetFullPath(rootDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var candidate = Path.GetFullPath(
+            Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (!candidate.StartsWith(
+                root + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                $"savedFiles 路径逃逸插件目录: {relativePath}");
+        }
+
+        return candidate;
+    }
+
+    private static void DeletePathIfExists(string path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+        else if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: true);
+        }
     }
 
     private static void ExtractPluginPackage(string archivePath, string extractionRoot)
@@ -809,6 +929,8 @@ public class PluginLibrary : IPluginLibrary
                 Error.Plugin(PluginErrorCodes.InvalidManifest, "插件 ID 格式无效", pluginId: pluginId));
         }
 
+        using var writeOperation = _writeCoordinator.Acquire();
+
         // 检查是否已安装
         if (!IsInstalled(pluginId))
         {
@@ -861,6 +983,7 @@ public class PluginLibrary : IPluginLibrary
             SaveIndex();
         }
 
+        writeOperation.Dispose();
         // 触发事件
         OnPluginChanged(new PluginLibraryChangedEventArgs(PluginLibraryChangeType.Uninstalled, pluginId));
 
@@ -974,6 +1097,8 @@ public class PluginLibrary : IPluginLibrary
     /// <returns>更新结果</returns>
     public UpdateResult UpdatePlugin(string pluginId)
     {
+        using var writeOperation = _writeCoordinator.Acquire();
+
         // 检查是否有可用更新
         var checkResult = CheckForUpdate(pluginId);
         if (!checkResult.HasUpdate)
@@ -1038,6 +1163,7 @@ public class PluginLibrary : IPluginLibrary
             // 获取更新后的插件信息
             var pluginInfo = GetInstalledPluginInfo(pluginId);
 
+            writeOperation.Dispose();
             // 触发 PluginChanged 事件 (Updated)
             OnPluginChanged(new PluginLibraryChangedEventArgs(PluginLibraryChangeType.Updated, pluginId, pluginInfo));
 

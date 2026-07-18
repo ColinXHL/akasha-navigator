@@ -81,8 +81,17 @@ public static class ServiceCollectionExtensions
         // ConfigService（依赖LogService）
         services.AddSingleton<IConfigService, ConfigService>();
 
+        // 仓库同步、插件安装和卸载共享写入互斥。
+        services.AddSingleton<PluginWriteCoordinator>();
+
         // PluginRepositoryService（官方 catalog 缓存与索引）
         services.AddSingleton<IPluginRepositoryService, PluginRepositoryService>();
+
+        // PluginSubscriptionService（聚合仓库插件订阅）
+        services.AddSingleton<IPluginSubscriptionService, PluginSubscriptionService>();
+
+        // PluginInstaller（Manifest v2 适配与原子安装事务）
+        services.AddSingleton<IPluginInstaller, PluginInstaller>();
 
         // ShutdownCoordinator（依赖 LogService，统一编排幂等关停阶段）
         services.AddSingleton<ShutdownCoordinator>();

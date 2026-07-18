@@ -72,6 +72,14 @@ public interface IPluginLibrary
     Result<InstalledPluginInfo> InstallPluginPackage(string archivePath);
 
     /// <summary>
+    /// 从已验证的目录执行统一安装或更新事务。
+    /// </summary>
+    Result<InstalledPluginInfo> InstallOrUpdateFromDirectory(
+        string sourceDirectory,
+        IReadOnlyList<string> savedFiles,
+        string source);
+
+    /// <summary>
     /// 卸载插件
     /// </summary>
     /// <param name="pluginId">插件 ID</param>

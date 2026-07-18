@@ -56,6 +56,9 @@
             <CheckBox Content="启动时更新仓库" Margin="0,0,12,0"
                       Foreground="#CCC" VerticalAlignment="Center"
                       IsChecked="{Binding AutoUpdateRepository}"/>
+            <CheckBox Content="自动更新已订阅插件" Margin="0,0,12,0"
+                      Foreground="#CCC" VerticalAlignment="Center"
+                      IsChecked="{Binding AutoUpdateSubscribedPlugins}"/>
             <Button Content="保存" Style="{StaticResource ActionButtonStyle}"
                     Margin="0,0,8,0"
                     Command="{Binding SaveRepositorySettingsCommand}"/>
@@ -63,7 +66,10 @@
                     Margin="0,0,8,0"
                     Command="{Binding UpdateRepositoryCommand}"/>
             <Button Content="重置仓库" Style="{StaticResource ActionButtonStyle}"
+                    Margin="0,0,8,0"
                     Command="{Binding ResetRepositoryCommand}"/>
+            <Button Content="一键更新订阅" Style="{StaticResource ActionButtonStyle}"
+                    Command="{Binding UpdateAllSubscribedCommand}"/>
         </WrapPanel>
 
         <!-- 统计信息 -->
@@ -125,6 +131,10 @@
                                                 Visibility="{Binding UpdateTagVisibility}">
                                             <TextBlock Text="可更新" Foreground="#FBBF24" FontSize="11"/>
                                         </Border>
+                                        <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
+                                                Visibility="{Binding RemovedTagVisibility}">
+                                            <TextBlock Text="仓库中已移除" Foreground="#F87171" FontSize="11"/>
+                                        </Border>
                                     </Grid>
 
                                     <!-- 第二行：描述和作者 -->
@@ -134,6 +144,9 @@
                                         <TextBlock Text="{Binding Author, StringFormat='作者: {0}'}"
                                                    Foreground="#666" FontSize="11" Margin="0,4,0,0"
                                                    Visibility="{Binding HasAuthorVisibility}"/>
+                                        <TextBlock Text="已订阅仓库更新"
+                                                   Foreground="#A78BFA" FontSize="11" Margin="0,4,0,0"
+                                                   Visibility="{Binding SubscriptionStatusVisibility}"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,5,0,0"
                                                     Visibility="{Binding RemoteInfoVisibility}">
                                             <TextBlock Text="{Binding PackageSizeText, StringFormat='包大小: {0}'}"
@@ -167,7 +180,18 @@
                                                     Command="{Binding DataContext.CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding CancelButtonVisibility}"/>
+                                            <Button Content="订阅" Style="{StaticResource ActionButtonStyle}"
+                                                    Margin="8,0,0,0"
+                                                    Command="{Binding DataContext.SubscribeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding SubscribeButtonVisibility}"/>
+                                            <Button Content="取消订阅" Style="{StaticResource ActionButtonStyle}"
+                                                    Margin="8,0,0,0"
+                                                    Command="{Binding DataContext.UnsubscribeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding UnsubscribeButtonVisibility}"/>
                                             <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
+                                                    Margin="8,0,0,0"
                                                     Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding UninstallButtonVisibility}"/>

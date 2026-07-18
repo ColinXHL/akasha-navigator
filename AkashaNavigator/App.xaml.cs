@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
@@ -191,6 +192,10 @@ public partial class App : System.Windows.Application
             serviceProvider.GetRequiredService<IPluginResourceUpdateService>();
         var pluginRepositoryService =
             serviceProvider.GetRequiredService<IPluginRepositoryService>();
+        var pluginSubscriptionService =
+            serviceProvider.GetRequiredService<IPluginSubscriptionService>();
+        var pluginInstaller =
+            serviceProvider.GetRequiredService<IPluginInstaller>();
         var notificationService = serviceProvider.GetRequiredService<INotificationService>();
         _ = RefreshUpdateManifestInBackgroundAsync(
             updateManifestService,
@@ -199,19 +204,27 @@ public partial class App : System.Windows.Application
             logService);
         _ = RefreshPluginRepositoryInBackgroundAsync(
             pluginRepositoryService,
+            pluginSubscriptionService,
+            pluginInstaller,
             logService);
     }
 
     private static async Task RefreshPluginRepositoryInBackgroundAsync(
         IPluginRepositoryService pluginRepositoryService,
+        IPluginSubscriptionService pluginSubscriptionService,
+        IPluginInstaller pluginInstaller,
         ILogService logService)
     {
-        if (!pluginRepositoryService.Settings.AutoUpdateRepository)
+        var settings = pluginRepositoryService.Settings;
+        if (!settings.AutoUpdateRepository &&
+            !settings.AutoUpdateSubscribedPlugins)
         {
             return;
         }
 
-        var result = await pluginRepositoryService.RefreshAsync();
+        var result = settings.AutoUpdateRepository
+            ? await pluginRepositoryService.RefreshAsync()
+            : await pluginRepositoryService.InitializeAsync();
         if (result.IsFailure)
         {
             logService.Warn(
@@ -225,6 +238,45 @@ public partial class App : System.Windows.Application
                 nameof(App),
                 "后台更新插件仓库失败，继续使用本地缓存");
         }
+
+        if (result.IsFailure)
+        {
+            return;
+        }
+
+        var reconcileResult = pluginSubscriptionService.Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            result.Value!);
+        if (reconcileResult.IsFailure)
+        {
+            logService.Warn(
+                nameof(App),
+                "同步插件订阅状态失败: {ErrorMessage}",
+                reconcileResult.Error?.Message ?? "未知错误");
+            return;
+        }
+
+        if (!settings.AutoUpdateSubscribedPlugins)
+        {
+            return;
+        }
+
+        foreach (var update in pluginSubscriptionService
+                     .GetAvailableUpdates()
+                     .Where(item => item.AutoUpdate))
+        {
+            var updateResult =
+                pluginInstaller.InstallOrUpdateRepositoryPlugin(update.PluginId);
+            if (updateResult.IsFailure)
+            {
+                logService.Warn(
+                    nameof(App),
+                    "自动更新插件 {PluginId} 失败: {ErrorMessage}",
+                    update.PluginId,
+                    updateResult.Error?.Message ?? "未知错误");
+            }
+        }
+
     }
 
     private static async Task RefreshUpdateManifestInBackgroundAsync(

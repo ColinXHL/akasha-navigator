@@ -74,6 +74,14 @@ public static class PluginErrorCodes
     /// 用户取消远程插件下载。
     /// </summary>
     public const string RemoteDownloadCanceled = "PLUGIN_REMOTE_DOWNLOAD_CANCELED";
+
+    public const string RepositoryPluginNotFound = "PLUGIN_REPOSITORY_NOT_FOUND";
+
+    public const string RepositoryManifestInvalid = "PLUGIN_REPOSITORY_MANIFEST_INVALID";
+
+    public const string DistributionUnsupported = "PLUGIN_DISTRIBUTION_UNSUPPORTED";
+
+    public const string InstallTransactionFailed = "PLUGIN_INSTALL_TRANSACTION_FAILED";
 }
 
 /// <summary>

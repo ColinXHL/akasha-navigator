@@ -250,6 +250,11 @@ public static class AppConstants
     /// </summary>
     public const string PluginRepositoriesConfigFileName = "plugin-repositories.json";
 
+    public const string PluginRepositorySubscriptionsFileName =
+        "plugin-repository-subscriptions.json";
+
+    public const string PluginRepositoryManifestFileName = "manifest.json";
+
     /// <summary>
     /// 插件配置文件名
     /// </summary>
@@ -294,6 +299,8 @@ public static class AppConstants
     public const string PluginDistributionRepository = "repository";
 
     public const string PluginDistributionRelease = "release";
+
+    public const string PluginInstallSourceRepository = "repository";
 
     /// <summary>
     /// Notice 中拾取黑名单资源的键。
