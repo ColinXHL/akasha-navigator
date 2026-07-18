@@ -20,6 +20,7 @@ namespace AkashaNavigator.ViewModels.Pages
 public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposable
 {
     private readonly IPluginLibrary _pluginLibrary;
+    private readonly IPluginUpdateService _pluginUpdateService;
     private readonly IPluginAssociationManager _pluginAssociationManager;
     private readonly INotificationService _notificationService;
     private readonly IEventBus _eventBus;
@@ -56,10 +57,13 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
     /// 构造函数
     /// </summary>
     public InstalledPluginsPageViewModel(IPluginLibrary pluginLibrary,
+                                         IPluginUpdateService pluginUpdateService,
                                          IPluginAssociationManager pluginAssociationManager,
                                          INotificationService notificationService, IEventBus eventBus)
     {
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
+        _pluginUpdateService =
+            pluginUpdateService ?? throw new ArgumentNullException(nameof(pluginUpdateService));
         _pluginAssociationManager =
             pluginAssociationManager ?? throw new ArgumentNullException(nameof(pluginAssociationManager));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
@@ -73,9 +77,9 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
     /// <summary>
     /// 插件列表变化事件处理
     /// </summary>
-    private void OnPluginListChanged(PluginListChangedEvent e)
+    private async void OnPluginListChanged(PluginListChangedEvent e)
     {
-        CheckAndRefreshPluginList();
+        await CheckAndRefreshPluginListAsync();
     }
 
     /// <summary>
@@ -90,9 +94,9 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
     /// 页面加载时检查更新并刷新插件列表
     /// </summary>
     [RelayCommand]
-    public void OnLoaded()
+    public async Task OnLoadedAsync()
     {
-        CheckAndRefreshPluginList();
+        await CheckAndRefreshPluginListAsync();
     }
 
     /// <summary>
@@ -106,10 +110,12 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
     /// <summary>
     /// 检查更新并刷新插件列表
     /// </summary>
-    public void CheckAndRefreshPluginList()
+    public async Task CheckAndRefreshPluginListAsync()
     {
-        var updates = _pluginLibrary.CheckAllUpdates();
-        _updateCache = updates.ToDictionary(u => u.PluginId, u => u) ?? new Dictionary<string, UpdateCheckResult>();
+        var result = await _pluginUpdateService.CheckAllUpdatesAsync();
+        _updateCache = result.IsSuccess
+            ? result.Value!.ToDictionary(update => update.PluginId, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, UpdateCheckResult>(StringComparer.OrdinalIgnoreCase);
         RefreshPluginList();
     }
 
@@ -185,10 +191,21 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
     /// 检查更新命令（自动生成 CheckUpdateCommand）
     /// </summary>
     [RelayCommand]
-    private void CheckUpdate()
+    private async Task CheckUpdateAsync()
     {
-        var updates = _pluginLibrary.CheckAllUpdates();
-        _updateCache = updates.ToDictionary(u => u.PluginId, u => u) ?? new Dictionary<string, UpdateCheckResult>();
+        var result = await _pluginUpdateService.CheckAllUpdatesAsync();
+        if (result.IsFailure)
+        {
+            _notificationService.Show(
+                $"检查插件更新失败: {result.Error?.Message}",
+                NotificationType.Error);
+            return;
+        }
+
+        var updates = result.Value!;
+        _updateCache = updates.ToDictionary(
+            update => update.PluginId,
+            StringComparer.OrdinalIgnoreCase);
 
         if (updates.Count == 0)
         {
@@ -205,7 +222,7 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
     /// 更新插件命令（自动生成 UpdatePluginCommand）
     /// </summary>
     [RelayCommand]
-    private void UpdatePlugin(string? pluginId)
+    private async Task UpdatePluginAsync(string? pluginId)
     {
         if (string.IsNullOrWhiteSpace(pluginId))
             return;
@@ -213,12 +230,18 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
         var pluginInfo = _pluginLibrary.GetInstalledPluginInfo(pluginId);
         var pluginName = pluginInfo?.Name ?? pluginId;
 
-        var result = _pluginLibrary.UpdatePlugin(pluginId);
+        if (!_updateCache.TryGetValue(pluginId, out var update))
+        {
+            _notificationService.Show("请先检查插件更新", NotificationType.Info);
+            return;
+        }
+
+        var result = await _pluginUpdateService.UpdatePluginAsync(update);
 
         if (result.IsSuccess)
         {
             _notificationService.Show($"{pluginName} 已更新到 v{result.NewVersion}", NotificationType.Success);
-            CheckAndRefreshPluginList();
+            await CheckAndRefreshPluginListAsync();
         }
         else
         {

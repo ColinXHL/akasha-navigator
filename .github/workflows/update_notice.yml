@@ -1,7 +1,10 @@
 name: Update Qiniu Notice
-run-name: "Update notice ${{ github.event.inputs.version }}"
+run-name: "Update notice ${{ github.event.client_payload.version || github.event.inputs.version }}"
 
 on:
+  repository_dispatch:
+    types:
+      - automation_plugin_released
   workflow_dispatch:
     inputs:
       version:
@@ -76,25 +79,72 @@ jobs:
       installer_name: ${{ steps.validate.outputs.installer_name }}
       notes: ${{ steps.validate.outputs.notes }}
       source: ${{ steps.validate.outputs.source }}
+      plugin_only: ${{ steps.validate.outputs.plugin_only }}
+      plugin_version: ${{ steps.validate.outputs.plugin_version }}
+      plugin_min_host_version: ${{ steps.validate.outputs.plugin_min_host_version }}
+      plugin_resource_min_version: ${{ steps.validate.outputs.plugin_resource_min_version }}
+      plugin_package_size: ${{ steps.validate.outputs.plugin_package_size }}
+      plugin_package_sha256: ${{ steps.validate.outputs.plugin_package_sha256 }}
+      plugin_github_url: ${{ steps.validate.outputs.plugin_github_url }}
+      plugin_cnb_url: ${{ steps.validate.outputs.plugin_cnb_url }}
     steps:
       - uses: actions/checkout@v5
 
       - name: Validate inputs
         id: validate
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_CHANNEL: ${{ github.event.inputs.channel }}
+          INPUT_MIN_REQUIRED_VERSION: ${{ github.event.inputs.min_required_version }}
+          INPUT_NOTES: ${{ github.event.inputs.notes }}
+          INPUT_SOURCE: ${{ github.event.inputs.source }}
+          INPUT_PLUGIN_VERSION: ${{ github.event.inputs.plugin_version }}
+          INPUT_PLUGIN_MIN_HOST_VERSION: ${{ github.event.inputs.plugin_min_host_version }}
+          INPUT_PLUGIN_RESOURCE_MIN_VERSION: ${{ github.event.inputs.plugin_resource_min_version }}
+          INPUT_PLUGIN_PACKAGE_SIZE: ${{ github.event.inputs.plugin_package_size }}
+          INPUT_PLUGIN_PACKAGE_SHA256: ${{ github.event.inputs.plugin_package_sha256 }}
+          INPUT_PLUGIN_GITHUB_URL: ${{ github.event.inputs.plugin_github_url }}
+          INPUT_PLUGIN_CNB_URL: ${{ github.event.inputs.plugin_cnb_url }}
+          DISPATCH_PLUGIN_VERSION: ${{ github.event.client_payload.version }}
+          DISPATCH_PLUGIN_MIN_HOST_VERSION: ${{ github.event.client_payload.min_host_version }}
+          DISPATCH_PLUGIN_PACKAGE_SIZE: ${{ github.event.client_payload.package_size }}
+          DISPATCH_PLUGIN_PACKAGE_SHA256: ${{ github.event.client_payload.package_sha256 }}
+          DISPATCH_PLUGIN_GITHUB_URL: ${{ github.event.client_payload.github_url }}
+          DISPATCH_PLUGIN_CNB_URL: ${{ github.event.client_payload.cnb_url }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          CHANNEL="${{ github.event.inputs.channel }}"
-          MIN_REQUIRED_VERSION="${{ github.event.inputs.min_required_version }}"
-          NOTES="${{ github.event.inputs.notes }}"
-          SOURCE="${{ github.event.inputs.source }}"
-          PLUGIN_VERSION="${{ github.event.inputs.plugin_version }}"
-          PLUGIN_MIN_HOST_VERSION="${{ github.event.inputs.plugin_min_host_version }}"
-          PLUGIN_RESOURCE_MIN_VERSION="${{ github.event.inputs.plugin_resource_min_version }}"
-          PLUGIN_PACKAGE_SIZE="${{ github.event.inputs.plugin_package_size }}"
-          PLUGIN_PACKAGE_SHA256="${{ github.event.inputs.plugin_package_sha256 }}"
-          PLUGIN_GITHUB_URL="${{ github.event.inputs.plugin_github_url }}"
-          PLUGIN_CNB_URL="${{ github.event.inputs.plugin_cnb_url }}"
+          CSPROJ_VERSION=$(grep -oP '(?<=<Version>)[^<]+' AkashaNavigator/AkashaNavigator.csproj)
+          PLUGIN_ONLY=false
+
+          if [[ "$EVENT_NAME" == "repository_dispatch" ]]; then
+            PLUGIN_ONLY=true
+            VERSION="$CSPROJ_VERSION"
+            CHANNEL="stable"
+            MIN_REQUIRED_VERSION="0.0.0"
+            NOTES=""
+            SOURCE="qiniu"
+            PLUGIN_VERSION="$DISPATCH_PLUGIN_VERSION"
+            PLUGIN_MIN_HOST_VERSION="$DISPATCH_PLUGIN_MIN_HOST_VERSION"
+            PLUGIN_RESOURCE_MIN_VERSION=""
+            PLUGIN_PACKAGE_SIZE="$DISPATCH_PLUGIN_PACKAGE_SIZE"
+            PLUGIN_PACKAGE_SHA256="$DISPATCH_PLUGIN_PACKAGE_SHA256"
+            PLUGIN_GITHUB_URL="$DISPATCH_PLUGIN_GITHUB_URL"
+            PLUGIN_CNB_URL="$DISPATCH_PLUGIN_CNB_URL"
+          else
+            VERSION="$INPUT_VERSION"
+            CHANNEL="$INPUT_CHANNEL"
+            MIN_REQUIRED_VERSION="$INPUT_MIN_REQUIRED_VERSION"
+            NOTES="$INPUT_NOTES"
+            SOURCE="$INPUT_SOURCE"
+            PLUGIN_VERSION="$INPUT_PLUGIN_VERSION"
+            PLUGIN_MIN_HOST_VERSION="$INPUT_PLUGIN_MIN_HOST_VERSION"
+            PLUGIN_RESOURCE_MIN_VERSION="$INPUT_PLUGIN_RESOURCE_MIN_VERSION"
+            PLUGIN_PACKAGE_SIZE="$INPUT_PLUGIN_PACKAGE_SIZE"
+            PLUGIN_PACKAGE_SHA256="$INPUT_PLUGIN_PACKAGE_SHA256"
+            PLUGIN_GITHUB_URL="$INPUT_PLUGIN_GITHUB_URL"
+            PLUGIN_CNB_URL="$INPUT_PLUGIN_CNB_URL"
+          fi
 
           # 自动生成安装包文件名
           INSTALLER_NAME="AkashaNavigator.Install.${VERSION}.exe"
@@ -111,14 +161,17 @@ jobs:
             exit 1
           fi
 
-          CSPROJ_VERSION=$(grep -oP '(?<=<Version>)[^<]+' AkashaNavigator/AkashaNavigator.csproj)
-
           echo "输入版本: $VERSION"
           echo "csproj版本: $CSPROJ_VERSION"
           echo "安装包名称: $INSTALLER_NAME"
 
-          if [[ "$VERSION" != "$CSPROJ_VERSION" ]]; then
+          if [[ "$PLUGIN_ONLY" != "true" && "$VERSION" != "$CSPROJ_VERSION" ]]; then
             echo "❌ 输入版本号与 csproj 中 <Version> 不一致"
+            exit 1
+          fi
+
+          if [[ "$PLUGIN_ONLY" == "true" && -z "$PLUGIN_VERSION" ]]; then
+            echo "❌ 插件发布事件缺少 version"
             exit 1
           fi
 
@@ -149,23 +202,21 @@ jobs:
             fi
           fi
 
-          case "$CHANNEL" in
-            stable|alpha) ;;
-            *)
-              echo "❌ channel 只能是 stable 或 alpha"
-              exit 1
-              ;;
-          esac
+          if [[ "$PLUGIN_ONLY" != "true" ]]; then
+            case "$CHANNEL" in
+              stable|alpha) ;;
+              *)
+                echo "❌ channel 只能是 stable 或 alpha"
+                exit 1
+                ;;
+            esac
 
-          if [[ "$CHANNEL" == "stable" ]]; then
-            if [[ "$VERSION" == *"-"* ]]; then
+            if [[ "$CHANNEL" == "stable" && "$VERSION" == *"-"* ]]; then
               echo "❌ stable 通道不应使用预发布版本号"
               exit 1
             fi
-          fi
 
-          if [[ "$CHANNEL" == "alpha" ]]; then
-            if [[ "$VERSION" != *"-"* ]]; then
+            if [[ "$CHANNEL" == "alpha" && "$VERSION" != *"-"* ]]; then
               echo "⚠️ alpha 通道通常建议使用预发布版本号，例如 1.1.0-alpha.3"
             fi
           fi
@@ -178,6 +229,14 @@ jobs:
           echo "$NOTES" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
           echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          echo "plugin_only=$PLUGIN_ONLY" >> "$GITHUB_OUTPUT"
+          echo "plugin_version=$PLUGIN_VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_min_host_version=$PLUGIN_MIN_HOST_VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_resource_min_version=$PLUGIN_RESOURCE_MIN_VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_package_size=$PLUGIN_PACKAGE_SIZE" >> "$GITHUB_OUTPUT"
+          echo "plugin_package_sha256=$PLUGIN_PACKAGE_SHA256" >> "$GITHUB_OUTPUT"
+          echo "plugin_github_url=$PLUGIN_GITHUB_URL" >> "$GITHUB_OUTPUT"
+          echo "plugin_cnb_url=$PLUGIN_CNB_URL" >> "$GITHUB_OUTPUT"
           echo "✅ 参数校验通过"
 
   build_notice:
@@ -224,13 +283,14 @@ jobs:
           INSTALLER_NAME: ${{ needs.validate.outputs.installer_name }}
           NOTES: ${{ needs.validate.outputs.notes }}
           SOURCE: ${{ needs.validate.outputs.source }}
-          PLUGIN_VERSION: ${{ github.event.inputs.plugin_version }}
-          PLUGIN_MIN_HOST_VERSION: ${{ github.event.inputs.plugin_min_host_version }}
-          PLUGIN_RESOURCE_MIN_VERSION: ${{ github.event.inputs.plugin_resource_min_version }}
-          PLUGIN_PACKAGE_SIZE: ${{ github.event.inputs.plugin_package_size }}
-          PLUGIN_PACKAGE_SHA256: ${{ github.event.inputs.plugin_package_sha256 }}
-          PLUGIN_GITHUB_URL: ${{ github.event.inputs.plugin_github_url }}
-          PLUGIN_CNB_URL: ${{ github.event.inputs.plugin_cnb_url }}
+          PLUGIN_ONLY: ${{ needs.validate.outputs.plugin_only }}
+          PLUGIN_VERSION: ${{ needs.validate.outputs.plugin_version }}
+          PLUGIN_MIN_HOST_VERSION: ${{ needs.validate.outputs.plugin_min_host_version }}
+          PLUGIN_RESOURCE_MIN_VERSION: ${{ needs.validate.outputs.plugin_resource_min_version }}
+          PLUGIN_PACKAGE_SIZE: ${{ needs.validate.outputs.plugin_package_size }}
+          PLUGIN_PACKAGE_SHA256: ${{ needs.validate.outputs.plugin_package_sha256 }}
+          PLUGIN_GITHUB_URL: ${{ needs.validate.outputs.plugin_github_url }}
+          PLUGIN_CNB_URL: ${{ needs.validate.outputs.plugin_cnb_url }}
         run: |
           python - <<'PY'
           import json
@@ -243,19 +303,21 @@ jobs:
           notes = os.environ["NOTES"]
           source = os.environ["SOURCE"]
           plugin_version = os.environ.get("PLUGIN_VERSION", "").strip()
+          plugin_only = os.environ.get("PLUGIN_ONLY", "false") == "true"
 
           with open("out/notice_existing.json", "r", encoding="utf-8") as f:
               data = json.load(f)
               print("✅ 读取现有配置成功")
 
-          # 只更新指定通道
-          data[channel] = {
-              "version": version,
-              "installer": installer_name,
-              "source": source,
-              "notes": notes
-          }
-          data["min_required_version"] = min_required_version
+          if not plugin_only:
+              # 手动发布应用时只更新指定通道。
+              data[channel] = {
+                  "version": version,
+                  "installer": installer_name,
+                  "source": source,
+                  "notes": notes
+              }
+              data["min_required_version"] = min_required_version
 
           if plugin_version:
               plugin_id = "akasha-genshin-automation"
@@ -304,7 +366,8 @@ jobs:
               data["schemaVersion"] = 2
               print(f"✅ 更新远程插件目录: {plugin_id} v{plugin_version}")
 
-          print(f"✅ 更新 {channel} 通道: {version}")
+          if not plugin_only:
+              print(f"✅ 更新 {channel} 通道: {version}")
 
           # 写入压缩格式的 JSON（无缩进、无空格）
           with open("out/notice.json", "w", encoding="utf-8") as f:

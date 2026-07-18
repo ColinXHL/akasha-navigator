@@ -93,6 +93,9 @@ public static class ServiceCollectionExtensions
         // PluginPackageService（依赖 Manifest、下载源选择器和 PluginLibrary）
         services.AddSingleton<IPluginPackageService, PluginPackageService>();
 
+        // PluginUpdateService（统一合并内置目录与远程插件包更新）
+        services.AddSingleton<IPluginUpdateService, PluginUpdateService>();
+
         // PluginResourceUpdateService（仅在对应插件已安装时更新独立资源）
         services.AddSingleton<IPluginResourceUpdateService, PluginResourceUpdateService>();
 

@@ -87,7 +87,7 @@ public partial class PluginCenterViewModel : ObservableObject
             _ = _profileMarketPageVM.LoadProfilesAsync();
             break;
         case PluginCenterPageType.InstalledPlugins:
-            _installedPluginsPageVM.CheckAndRefreshPluginList();
+            _ = _installedPluginsPageVM.CheckAndRefreshPluginListAsync();
             break;
         case PluginCenterPageType.AvailablePlugins:
             _availablePluginsPageVM.RefreshPluginList();
@@ -110,7 +110,7 @@ public partial class PluginCenterViewModel : ObservableObject
             _ = _profileMarketPageVM.LoadProfilesAsync();
             break;
         case PluginCenterPageType.InstalledPlugins:
-            _installedPluginsPageVM.CheckAndRefreshPluginList();
+            _ = _installedPluginsPageVM.CheckAndRefreshPluginListAsync();
             break;
         case PluginCenterPageType.AvailablePlugins:
             _availablePluginsPageVM.RefreshPluginList();

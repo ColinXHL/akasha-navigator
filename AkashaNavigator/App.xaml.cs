@@ -495,12 +495,12 @@ _hotkeyManager = Services.GetRequiredService<HotkeyManager>();
     /// </summary>
     private void SetupPluginUpdateCheck(Views.Windows.PlayerWindow playerWindow)
     {
-        var pluginLibrary = Services.GetRequiredService<IPluginLibrary>();
+        var pluginUpdateService = Services.GetRequiredService<IPluginUpdateService>();
         var profileMarketplaceService = Services.GetRequiredService<ProfileMarketplaceService>();
         var notificationService = Services.GetRequiredService<INotificationService>();
         var eventBus = Services.GetRequiredService<Core.Events.IEventBus>();
 
-        var checker = new PluginUpdateChecker(pluginLibrary, profileMarketplaceService, notificationService, Services,
+        var checker = new PluginUpdateChecker(pluginUpdateService, profileMarketplaceService, notificationService, Services,
                                               eventBus, playerWindow, _config);
         checker.SetupUpdateCheck();
     }

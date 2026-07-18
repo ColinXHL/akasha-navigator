@@ -35,10 +35,10 @@ public partial class InstalledPluginsPage : UserControl, IDisposable
         Loaded += InstalledPluginsPage_Loaded;
     }
 
-    private void InstalledPluginsPage_Loaded(object sender, RoutedEventArgs e)
+    private async void InstalledPluginsPage_Loaded(object sender, RoutedEventArgs e)
     {
         // 委托给 ViewModel 的 OnLoaded 方法
-        _viewModel.OnLoaded();
+        await _viewModel.OnLoadedAsync();
     }
 
     /// <summary>
@@ -52,9 +52,9 @@ public partial class InstalledPluginsPage : UserControl, IDisposable
     /// <summary>
     /// 检查更新并刷新插件列表（公共方法）
     /// </summary>
-    public void CheckAndRefreshPluginList()
+    public async System.Threading.Tasks.Task CheckAndRefreshPluginListAsync()
     {
-        _viewModel.CheckAndRefreshPluginList();
+        await _viewModel.CheckAndRefreshPluginListAsync();
     }
 
     /// <summary>

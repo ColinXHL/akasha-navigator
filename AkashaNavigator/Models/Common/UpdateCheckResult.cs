@@ -27,6 +27,11 @@ public class UpdateCheckResult
     public bool HasUpdate { get; set; }
 
     /// <summary>
+    /// 更新包来源。
+    /// </summary>
+    public PluginUpdateSource Source { get; set; } = PluginUpdateSource.BuiltIn;
+
+    /// <summary>
     /// 更新源路径（内置插件目录路径）
     /// </summary>
     public string? SourcePath { get; set; }
@@ -74,6 +79,23 @@ public class UpdateCheckResult
     {
         return new UpdateCheckResult { PluginId = pluginId, CurrentVersion = currentVersion,
                                        AvailableVersion = availableVersion, HasUpdate = true, SourcePath = sourcePath };
+    }
+
+    /// <summary>
+    /// 创建远程插件包更新结果。
+    /// </summary>
+    public static UpdateCheckResult WithRemoteUpdate(
+        string pluginId,
+        string currentVersion,
+        string availableVersion)
+    {
+        return new UpdateCheckResult {
+            PluginId = pluginId,
+            CurrentVersion = currentVersion,
+            AvailableVersion = availableVersion,
+            HasUpdate = true,
+            Source = PluginUpdateSource.RemotePackage
+        };
     }
 }
 }

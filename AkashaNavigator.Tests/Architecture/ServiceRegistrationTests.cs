@@ -107,6 +107,8 @@ public class ServiceRegistrationTests
             service => service.ServiceType == typeof(IDownloadSourceSelector));
         var packages = services.Single(
             service => service.ServiceType == typeof(IPluginPackageService));
+        var updates = services.Single(
+            service => service.ServiceType == typeof(IPluginUpdateService));
         var resources = services.Single(
             service => service.ServiceType == typeof(IPluginResourceUpdateService));
 
@@ -114,6 +116,8 @@ public class ServiceRegistrationTests
         Assert.Equal(typeof(DownloadSourceSelector), selector.ImplementationType);
         Assert.Equal(ServiceLifetime.Singleton, packages.Lifetime);
         Assert.Equal(typeof(PluginPackageService), packages.ImplementationType);
+        Assert.Equal(ServiceLifetime.Singleton, updates.Lifetime);
+        Assert.Equal(typeof(PluginUpdateService), updates.ImplementationType);
         Assert.Equal(ServiceLifetime.Singleton, resources.Lifetime);
         Assert.Equal(typeof(PluginResourceUpdateService), resources.ImplementationType);
     }

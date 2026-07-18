@@ -20,7 +20,7 @@ namespace AkashaNavigator.Core
     /// </summary>
     public class PluginUpdateChecker
     {
-        private readonly IPluginLibrary _pluginLibrary;
+        private readonly IPluginUpdateService _pluginUpdateService;
         private readonly ProfileMarketplaceService _profileMarketplaceService;
         private readonly INotificationService _notificationService;
         private readonly IServiceProvider _serviceProvider;
@@ -32,7 +32,7 @@ namespace AkashaNavigator.Core
         /// 初始化 PluginUpdateChecker
         /// </summary>
         public PluginUpdateChecker(
-            IPluginLibrary pluginLibrary,
+            IPluginUpdateService pluginUpdateService,
             ProfileMarketplaceService profileMarketplaceService,
             INotificationService notificationService,
             IServiceProvider serviceProvider,
@@ -40,7 +40,8 @@ namespace AkashaNavigator.Core
             PlayerWindow playerWindow,
             AppConfig config)
         {
-            _pluginLibrary = pluginLibrary;
+            _pluginUpdateService =
+                pluginUpdateService ?? throw new ArgumentNullException(nameof(pluginUpdateService));
             _profileMarketplaceService = profileMarketplaceService;
             _notificationService = notificationService;
             _serviceProvider = serviceProvider;
@@ -81,18 +82,31 @@ namespace AkashaNavigator.Core
         {
             try
             {
-                var updates = _pluginLibrary.CheckAllUpdates();
+                var checkResult = await _pluginUpdateService.CheckAllUpdatesAsync();
+                if (checkResult.IsFailure)
+                {
+                    var logService = _serviceProvider.GetRequiredService<ILogService>();
+                    logService.Warn(
+                        nameof(PluginUpdateChecker),
+                        "检查远程插件更新失败，将继续检查 Profile: {ErrorMessage}",
+                        checkResult.Error?.Message ?? "未知错误");
+                    await CheckAndPromptProfileUpdatesAsync();
+                    return;
+                }
+
+                var updates = checkResult.Value!;
                 var continueCheckingProfiles = true;
 
                 if (updates.Count > 0)
                 {
                     var dialogFactory = _serviceProvider.GetRequiredService<IDialogFactory>();
-                    var dialog = dialogFactory.CreatePluginUpdatePromptDialog(updates);
+                    var dialog = dialogFactory.CreatePluginUpdatePromptDialog(
+                        new System.Collections.Generic.List<UpdateCheckResult>(updates));
                     var result = dialog.ShowDialog();
 
                     if (result == true)
                     {
-                        continueCheckingProfiles = HandlePluginUpdateDialogResult(dialog, updates);
+                        continueCheckingProfiles = await HandlePluginUpdateDialogResultAsync(dialog, updates);
                     }
                 }
 
@@ -111,8 +125,9 @@ namespace AkashaNavigator.Core
         /// <summary>
         /// 处理更新对话框结果
         /// </summary>
-        private bool HandlePluginUpdateDialogResult(PluginUpdatePromptDialog dialog,
-                                                    System.Collections.Generic.List<UpdateCheckResult> updates)
+        private async System.Threading.Tasks.Task<bool> HandlePluginUpdateDialogResultAsync(
+            PluginUpdatePromptDialog dialog,
+            System.Collections.Generic.IReadOnlyList<UpdateCheckResult> updates)
         {
             switch (dialog.Result)
             {
@@ -121,7 +136,7 @@ namespace AkashaNavigator.Core
                     return false;
 
                 case PluginUpdatePromptResult.UpdateAll:
-                    UpdateAllPlugins(updates);
+                    await UpdateAllPluginsAsync(updates);
                     return true;
 
                 default:
@@ -193,13 +208,14 @@ namespace AkashaNavigator.Core
         /// <summary>
         /// 执行一键更新所有插件
         /// </summary>
-        private void UpdateAllPlugins(System.Collections.Generic.List<UpdateCheckResult> updates)
+        private async System.Threading.Tasks.Task UpdateAllPluginsAsync(
+            System.Collections.Generic.IReadOnlyList<UpdateCheckResult> updates)
         {
             var successCount = 0;
             var failCount = 0;
             foreach (var update in updates)
             {
-                var updateResult = _pluginLibrary.UpdatePlugin(update.PluginId);
+                var updateResult = await _pluginUpdateService.UpdatePluginAsync(update);
                 if (updateResult.IsSuccess)
                     successCount++;
                 else
