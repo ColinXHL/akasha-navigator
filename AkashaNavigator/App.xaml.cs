@@ -189,12 +189,42 @@ public partial class App : System.Windows.Application
         var updateManifestService = serviceProvider.GetRequiredService<IUpdateManifestService>();
         var pluginResourceUpdateService =
             serviceProvider.GetRequiredService<IPluginResourceUpdateService>();
+        var pluginRepositoryService =
+            serviceProvider.GetRequiredService<IPluginRepositoryService>();
         var notificationService = serviceProvider.GetRequiredService<INotificationService>();
         _ = RefreshUpdateManifestInBackgroundAsync(
             updateManifestService,
             pluginResourceUpdateService,
             notificationService,
             logService);
+        _ = RefreshPluginRepositoryInBackgroundAsync(
+            pluginRepositoryService,
+            logService);
+    }
+
+    private static async Task RefreshPluginRepositoryInBackgroundAsync(
+        IPluginRepositoryService pluginRepositoryService,
+        ILogService logService)
+    {
+        if (!pluginRepositoryService.Settings.AutoUpdateRepository)
+        {
+            return;
+        }
+
+        var result = await pluginRepositoryService.RefreshAsync();
+        if (result.IsFailure)
+        {
+            logService.Warn(
+                nameof(App),
+                "后台更新插件仓库失败: {ErrorMessage}",
+                result.Error?.Message ?? "未知错误");
+        }
+        else if (result.Value!.UsedCache)
+        {
+            logService.Warn(
+                nameof(App),
+                "后台更新插件仓库失败，继续使用本地缓存");
+        }
     }
 
     private static async Task RefreshUpdateManifestInBackgroundAsync(

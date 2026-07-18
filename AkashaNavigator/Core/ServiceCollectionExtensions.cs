@@ -81,6 +81,9 @@ public static class ServiceCollectionExtensions
         // ConfigService（依赖LogService）
         services.AddSingleton<IConfigService, ConfigService>();
 
+        // PluginRepositoryService（官方 catalog 缓存与索引）
+        services.AddSingleton<IPluginRepositoryService, PluginRepositoryService>();
+
         // ShutdownCoordinator（依赖 LogService，统一编排幂等关停阶段）
         services.AddSingleton<ShutdownCoordinator>();
 
