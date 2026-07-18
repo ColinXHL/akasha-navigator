@@ -127,6 +127,11 @@ public static class AppPaths
     /// </summary>
     public static string PluginRepositoriesConfigFilePath { get; }
 
+    /// <summary>
+    /// 聚合仓库插件订阅记录。
+    /// </summary>
+    public static string PluginRepositorySubscriptionsFilePath { get; }
+
     static AppPaths()
     {
         // 获取应用程序目录
@@ -181,6 +186,8 @@ public static class AppPaths
             Path.Combine(PluginRepositoriesDirectory, AppConstants.OfficialPluginRepositoryId);
         PluginRepositoriesConfigFilePath =
             Path.Combine(DataDirectory, AppConstants.PluginRepositoriesConfigFileName);
+        PluginRepositorySubscriptionsFilePath =
+            Path.Combine(DataDirectory, AppConstants.PluginRepositorySubscriptionsFileName);
 
         // 确保目录存在
         EnsureDirectoriesExist();

@@ -111,6 +111,29 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ConfigureAppServices_RegistersRepositoryPluginServicesAsSingletons()
+    {
+        var services = new ServiceCollection();
+        services.ConfigureAppServices();
+
+        var subscriptions = services.Single(
+            service =>
+                service.ServiceType == typeof(IPluginSubscriptionService));
+        var installer = services.Single(
+            service => service.ServiceType == typeof(IPluginInstaller));
+        var writeCoordinator = services.Single(
+            service => service.ServiceType == typeof(PluginWriteCoordinator));
+
+        Assert.Equal(ServiceLifetime.Singleton, subscriptions.Lifetime);
+        Assert.Equal(
+            typeof(PluginSubscriptionService),
+            subscriptions.ImplementationType);
+        Assert.Equal(ServiceLifetime.Singleton, installer.Lifetime);
+        Assert.Equal(typeof(PluginInstaller), installer.ImplementationType);
+        Assert.Equal(ServiceLifetime.Singleton, writeCoordinator.Lifetime);
+    }
+
+    [Fact]
     public void ConfigureAppServices_RegistersRemotePluginServicesAsSingletons()
     {
         var services = new ServiceCollection();

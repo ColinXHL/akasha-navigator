@@ -424,6 +424,14 @@ public sealed class FakePluginLibrary : IPluginLibrary
         return InstallPlugin(Path.GetFileNameWithoutExtension(archivePath));
     }
 
+    public Result<InstalledPluginInfo> InstallOrUpdateFromDirectory(
+        string sourceDirectory,
+        IReadOnlyList<string> savedFiles,
+        string source)
+    {
+        return InstallPlugin(Path.GetFileName(sourceDirectory), sourceDirectory);
+    }
+
     public Result UninstallPlugin(string pluginId, bool force = false, Func<string, List<string>>? getReferencingProfiles = null)
     {
         InstalledPlugins.Remove(pluginId);

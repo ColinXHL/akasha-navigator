@@ -17,18 +17,22 @@ public sealed class PluginRepositoryService : IPluginRepositoryService
     private readonly IPluginRepositoryGitClient _gitClient;
     private readonly string _repositoryDirectory;
     private readonly string _settingsFilePath;
+    private readonly PluginWriteCoordinator _writeCoordinator;
     private readonly object _settingsLock = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     private PluginRepositorySnapshot? _current;
     private PluginRepositorySettings _settings;
 
-    public PluginRepositoryService(ILogService logService)
+    public PluginRepositoryService(
+        ILogService logService,
+        PluginWriteCoordinator writeCoordinator)
         : this(
             logService,
             new PluginRepositoryGitClient(),
             AppPaths.OfficialPluginRepositoryDirectory,
-            AppPaths.PluginRepositoriesConfigFilePath)
+            AppPaths.PluginRepositoriesConfigFilePath,
+            writeCoordinator)
     {
     }
 
@@ -37,6 +41,21 @@ public sealed class PluginRepositoryService : IPluginRepositoryService
         IPluginRepositoryGitClient gitClient,
         string repositoryDirectory,
         string settingsFilePath)
+        : this(
+            logService,
+            gitClient,
+            repositoryDirectory,
+            settingsFilePath,
+            new PluginWriteCoordinator())
+    {
+    }
+
+    private PluginRepositoryService(
+        ILogService logService,
+        IPluginRepositoryGitClient gitClient,
+        string repositoryDirectory,
+        string settingsFilePath,
+        PluginWriteCoordinator writeCoordinator)
     {
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _gitClient = gitClient ?? throw new ArgumentNullException(nameof(gitClient));
@@ -44,6 +63,8 @@ public sealed class PluginRepositoryService : IPluginRepositoryService
             repositoryDirectory ?? throw new ArgumentNullException(nameof(repositoryDirectory));
         _settingsFilePath =
             settingsFilePath ?? throw new ArgumentNullException(nameof(settingsFilePath));
+        _writeCoordinator =
+            writeCoordinator ?? throw new ArgumentNullException(nameof(writeCoordinator));
         _settings = LoadSettings();
         _current = LoadSnapshot(usedCache: true).Value;
     }
@@ -121,6 +142,8 @@ public sealed class PluginRepositoryService : IPluginRepositoryService
         {
             await _writeLock.WaitAsync(cancellationToken);
             lockTaken = true;
+            using var sharedWrite =
+                await _writeCoordinator.AcquireAsync(cancellationToken);
 
             settings = Settings;
             var validation = ValidateSettings(settings);

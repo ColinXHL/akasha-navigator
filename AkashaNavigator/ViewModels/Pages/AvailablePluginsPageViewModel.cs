@@ -30,6 +30,8 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     private readonly INotificationService _notificationService;
     private readonly IEventBus _eventBus;
     private readonly IPluginRepositoryService _pluginRepositoryService;
+    private readonly IPluginSubscriptionService _pluginSubscriptionService;
+    private readonly IPluginInstaller _pluginInstaller;
     private readonly IPluginPackageService _pluginPackageService;
     private readonly IConfigService _configService;
     private readonly Dictionary<string, CancellationTokenSource> _downloads =
@@ -89,6 +91,8 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         INotificationService notificationService,
         IEventBus eventBus,
         IPluginRepositoryService pluginRepositoryService,
+        IPluginSubscriptionService pluginSubscriptionService,
+        IPluginInstaller pluginInstaller,
         IPluginPackageService pluginPackageService,
         IConfigService configService)
     {
@@ -97,6 +101,10 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _pluginRepositoryService =
             pluginRepositoryService ?? throw new ArgumentNullException(nameof(pluginRepositoryService));
+        _pluginSubscriptionService =
+            pluginSubscriptionService ?? throw new ArgumentNullException(nameof(pluginSubscriptionService));
+        _pluginInstaller =
+            pluginInstaller ?? throw new ArgumentNullException(nameof(pluginInstaller));
         _pluginPackageService =
             pluginPackageService ?? throw new ArgumentNullException(nameof(pluginPackageService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
@@ -127,6 +135,7 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         var initializeResult = await _pluginRepositoryService.InitializeAsync();
         if (initializeResult.IsSuccess)
         {
+            ReconcileSubscriptions(initializeResult.Value!);
             UpdateRepositoryStatus(initializeResult.Value);
             RefreshPluginList();
             return;
@@ -189,11 +198,27 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
             return new List<AvailablePluginItemModel>();
         }
 
-        return snapshot.Index.Plugins
+        var items = snapshot.Index.Plugins
             .Select(
                 entry => CreateItem(
                     CreateCatalogEntry(entry),
                     installed.GetValueOrDefault(entry.Id)))
+            .ToList();
+        var catalogIds = snapshot.Index.Plugins
+            .Select(entry => entry.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        items.AddRange(
+            _pluginSubscriptionService
+                .GetSubscriptions()
+                .Where(
+                    subscription =>
+                        !subscription.IsAvailable &&
+                        !catalogIds.Contains(subscription.PluginId))
+                .Select(
+                    subscription => CreateRemovedItem(
+                        subscription,
+                        installed.GetValueOrDefault(subscription.PluginId))));
+        return items
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
@@ -251,6 +276,50 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    private void UpdateAllSubscribed()
+    {
+        var updates = _pluginSubscriptionService.GetAvailableUpdates();
+        if (updates.Count == 0)
+        {
+            _notificationService.Show(
+                "已订阅插件均为最新版本",
+                NotificationType.Info);
+            return;
+        }
+
+        var succeeded = 0;
+        var failures = new List<string>();
+        foreach (var update in updates)
+        {
+            var result =
+                _pluginInstaller.InstallOrUpdateRepositoryPlugin(update.PluginId);
+            if (result.IsSuccess)
+            {
+                succeeded++;
+            }
+            else
+            {
+                failures.Add(
+                    $"{update.PluginId}: {result.Error?.Message ?? "未知错误"}");
+            }
+        }
+
+        RefreshPluginList();
+        RefreshRequested?.Invoke(this, EventArgs.Empty);
+        if (failures.Count == 0)
+        {
+            _notificationService.Show(
+                $"已更新 {succeeded} 个订阅插件",
+                NotificationType.Success);
+            return;
+        }
+
+        _notificationService.Show(
+            $"已更新 {succeeded} 个插件，{failures.Count} 个失败：\n{string.Join("\n", failures)}",
+            NotificationType.Warning);
+    }
+
     /// <summary>
     /// 安装插件命令（自动生成 InstallCommand）
     /// </summary>
@@ -259,6 +328,12 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     {
         if (plugin == null)
             return;
+
+        if (plugin.IsRepositoryDistribution)
+        {
+            InstallRepositoryPlugin(plugin);
+            return;
+        }
 
         if (plugin.IsRemote)
         {
@@ -297,7 +372,7 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     /// </summary>
     public void InstallPackage(string archivePath)
     {
-        var result = _pluginLibrary.InstallPluginPackage(archivePath);
+        var result = _pluginInstaller.InstallPackage(archivePath);
         if (result.IsSuccess)
         {
             _notificationService.Show(
@@ -308,6 +383,65 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         else
         {
             _notificationService.Show($"插件包导入失败: {result.Error?.Message}", NotificationType.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void Subscribe(AvailablePluginItemModel? plugin)
+    {
+        if (plugin == null || !plugin.IsRepositoryDistribution)
+        {
+            return;
+        }
+
+        var entry = FindRepositoryEntry(plugin.Id);
+        if (entry == null)
+        {
+            _notificationService.Show(
+                "插件已不在当前仓库中，无法订阅",
+                NotificationType.Error);
+            return;
+        }
+
+        var result = _pluginSubscriptionService.Subscribe(
+            AppConstants.OfficialPluginRepositoryId,
+            entry);
+        if (result.IsSuccess)
+        {
+            plugin.IsSubscribed = true;
+            _notificationService.Show(
+                $"已订阅插件 \"{plugin.Name}\"",
+                NotificationType.Success);
+        }
+        else
+        {
+            _notificationService.Show(
+                $"订阅失败: {result.Error?.Message}",
+                NotificationType.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void Unsubscribe(AvailablePluginItemModel? plugin)
+    {
+        if (plugin == null)
+        {
+            return;
+        }
+
+        var result = _pluginSubscriptionService.Unsubscribe(plugin.Id);
+        if (result.IsSuccess)
+        {
+            plugin.IsSubscribed = false;
+            _notificationService.Show(
+                $"已取消订阅插件 \"{plugin.Name}\"，已安装文件和配置均已保留",
+                NotificationType.Success);
+        }
+        else
+        {
+            _notificationService.Show(
+                $"取消订阅失败: {result.Error?.Message}",
+                NotificationType.Error);
         }
     }
 
@@ -362,6 +496,9 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
             Author = author,
             SourceDirectory = entry.LocalSourceDirectory ?? string.Empty,
             IsRemote = entry.IsRemote,
+            DistributionType = entry.DistributionType,
+            IsRepositoryAvailable = true,
+            IsSubscribed = IsSubscribedToCurrentRepository(entry.Id),
             InstalledVersion = installed?.Version ?? string.Empty,
             InstalledVersionText = installed == null ? "未安装" : $"已安装: v{installed.Version}",
             PackageSizeText = entry.Package == null ? string.Empty : FormatBytes(entry.Package.Size),
@@ -373,6 +510,30 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
             SelectedSourceText = entry.IsRemote
                 ? $"下载源：{GetPreferenceDisplayName(_configService.Config.PluginDownloadSourcePreference)}"
                 : string.Empty
+        };
+    }
+
+    private static AvailablePluginItemModel CreateRemovedItem(
+        PluginSubscriptionRecord subscription,
+        InstalledPluginInfo? installed)
+    {
+        return new AvailablePluginItemModel {
+            Id = subscription.PluginId,
+            Name = installed?.Name ?? subscription.PluginId,
+            Version = subscription.LastKnownVersion,
+            Description = installed?.Description ?? "该插件已从仓库中移除",
+            Author = installed?.Author,
+            DistributionType = AppConstants.PluginDistributionRepository,
+            IsRepositoryAvailable = false,
+            IsSubscribed = true,
+            InstalledVersion = installed?.Version ?? string.Empty,
+            InstalledVersionText = installed == null
+                ? "未安装"
+                : $"已安装: v{installed.Version}",
+            HasDescription = true,
+            HasAuthor = !string.IsNullOrWhiteSpace(installed?.Author),
+            IsInstalled = installed != null,
+            HasUpdate = false
         };
     }
 
@@ -435,6 +596,7 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         }
 
         UpdateRepositoryStatus(result.Value);
+        ReconcileSubscriptions(result.Value!);
         RefreshPluginList();
         _notificationService.Show(
             result.Value!.UsedCache
@@ -468,11 +630,67 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
             Version = entry.Version,
             Description = entry.Description,
             MinHostVersion = entry.MinHostVersion,
+            DistributionType = entry.DistributionType,
             LocalSourceDirectory = isRelease
                 ? null
                 : Path.Combine(_pluginRepositoryService.RepositoryDirectory, entry.Path),
             IsRemote = isRelease
         };
+    }
+
+    private void InstallRepositoryPlugin(AvailablePluginItemModel plugin)
+    {
+        var wasInstalled = plugin.IsInstalled;
+        var result = _pluginInstaller.InstallOrUpdateRepositoryPlugin(plugin.Id);
+        if (result.IsFailure)
+        {
+            _notificationService.Show(
+                $"仓库插件安装失败: {result.Error?.Message}",
+                NotificationType.Error);
+            return;
+        }
+
+        plugin.IsInstalled = true;
+        plugin.IsSubscribed = true;
+        plugin.InstalledVersion = result.Value!.Version;
+        plugin.InstalledVersionText = $"已安装: v{result.Value.Version}";
+        plugin.HasUpdate = false;
+        _notificationService.Show(
+            $"插件 \"{plugin.Name}\" {(wasInstalled ? "更新" : "安装")}成功！",
+            NotificationType.Success);
+        RefreshRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private PluginRepositoryEntry? FindRepositoryEntry(string pluginId)
+    {
+        return _pluginRepositoryService.Current?.Index.Plugins.FirstOrDefault(
+            entry => string.Equals(
+                entry.Id,
+                pluginId,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool IsSubscribedToCurrentRepository(string pluginId)
+    {
+        var subscription = _pluginSubscriptionService.GetSubscription(pluginId);
+        return subscription != null &&
+               string.Equals(
+                   subscription.RepositoryId,
+                   AppConstants.OfficialPluginRepositoryId,
+                   StringComparison.Ordinal);
+    }
+
+    private void ReconcileSubscriptions(PluginRepositorySnapshot snapshot)
+    {
+        var result = _pluginSubscriptionService.Reconcile(
+            AppConstants.OfficialPluginRepositoryId,
+            snapshot);
+        if (result.IsFailure)
+        {
+            _notificationService.Show(
+                $"同步插件订阅状态失败: {result.Error?.Message}",
+                NotificationType.Warning);
+        }
     }
 
     private async Task InstallRemoteAsync(AvailablePluginItemModel plugin)
