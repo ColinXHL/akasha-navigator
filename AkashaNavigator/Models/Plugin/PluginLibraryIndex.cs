@@ -26,9 +26,9 @@ public class InstalledPluginEntry
     public DateTime InstalledAt { get; set; } = DateTime.Now;
 
     /// <summary>
-    /// 安装来源（builtin/remote）
+    /// 安装来源（builtin/external/migrated/repository）
     /// </summary>
-    public string Source { get; set; } = "builtin";
+    public string Source { get; set; } = AppConstants.PluginInstallSourceBuiltIn;
 }
 
 /// <summary>

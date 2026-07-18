@@ -40,9 +40,9 @@ public class InstalledPluginInfo
     public DateTime InstalledAt { get; set; } = DateTime.Now;
 
     /// <summary>
-    /// 安装来源（builtin/remote）
+    /// 安装来源（builtin/external/migrated/repository）
     /// </summary>
-    public string Source { get; set; } = "builtin";
+    public string Source { get; set; } = AppConstants.PluginInstallSourceBuiltIn;
 
     /// <summary>
     /// 被引用的 Profile 数量（运行时计算，不序列化）
@@ -56,7 +56,9 @@ public class InstalledPluginInfo
     /// <param name="manifest">插件清单</param>
     /// <param name="source">安装来源</param>
     /// <returns>已安装插件信息</returns>
-    public static InstalledPluginInfo FromManifest(PluginManifest manifest, string source = "builtin")
+    public static InstalledPluginInfo FromManifest(
+        PluginManifest manifest,
+        string source = AppConstants.PluginInstallSourceBuiltIn)
     {
         return new InstalledPluginInfo { Id = manifest.Id ?? string.Empty,
                                          Name = manifest.Name ?? string.Empty,
