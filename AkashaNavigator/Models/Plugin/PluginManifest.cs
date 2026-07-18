@@ -227,12 +227,17 @@ public class PluginManifest
             result.AddError("companion.executable", "伴生进程必须是 EXE 文件");
         }
 
-        if (Companion.ProtocolVersion != 1)
+        if (Companion.ProtocolVersion != AppConstants.CompanionProtocolVersion)
         {
-            result.AddError("companion.protocolVersion", "仅支持 companion 协议版本 1");
+            result.AddError(
+                "companion.protocolVersion",
+                $"仅支持 companion 协议版本 {AppConstants.CompanionProtocolVersion}");
         }
 
-        if (!string.Equals(Companion.Lifetime, "plugin", StringComparison.Ordinal))
+        if (!string.Equals(
+                Companion.Lifetime,
+                AppConstants.CompanionLifetimePlugin,
+                StringComparison.Ordinal))
         {
             result.AddError("companion.lifetime", "companion lifetime 必须是 plugin");
         }
@@ -240,6 +245,15 @@ public class PluginManifest
         if (!Companion.SingleInstance)
         {
             result.AddError("companion.singleInstance", "companion 必须启用单实例");
+        }
+
+        if (Companion.ShutdownTimeoutMs <= 0 ||
+            Companion.ShutdownTimeoutMs >
+            AppConstants.MaxCompanionShutdownTimeoutMs)
+        {
+            result.AddError(
+                "companion.shutdownTimeoutMs",
+                $"companion 关闭超时必须在 1-{AppConstants.MaxCompanionShutdownTimeoutMs} 毫秒之间");
         }
     }
 
@@ -315,11 +329,16 @@ public class CompanionManifest
 {
     public string? Executable { get; set; }
 
-    public int ProtocolVersion { get; set; } = 1;
+    public int ProtocolVersion { get; set; } =
+        AppConstants.CompanionProtocolVersion;
 
-    public string Lifetime { get; set; } = "plugin";
+    public string Lifetime { get; set; } =
+        AppConstants.CompanionLifetimePlugin;
 
     public bool SingleInstance { get; set; } = true;
+
+    public int ShutdownTimeoutMs { get; set; } =
+        AppConstants.DefaultCompanionShutdownTimeoutMs;
 }
 
 /// <summary>

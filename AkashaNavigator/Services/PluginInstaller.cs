@@ -1,10 +1,13 @@
 using System.IO;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.PluginRepository;
+using AkashaNavigator.Models.Update;
 
 namespace AkashaNavigator.Services;
 
@@ -16,19 +19,22 @@ public sealed class PluginInstaller : IPluginInstaller
     private readonly IPluginRepositoryService _repositoryService;
     private readonly IPluginSubscriptionService _subscriptionService;
     private readonly IPluginLibrary _pluginLibrary;
+    private readonly IPluginDistributionResolver _distributionResolver;
     private readonly ILogService? _logService;
     private readonly Func<string> _hostVersionProvider;
-    private readonly object _installLock = new();
+    private readonly SemaphoreSlim _installGate = new(1, 1);
 
     public PluginInstaller(
         IPluginRepositoryService repositoryService,
         IPluginSubscriptionService subscriptionService,
         IPluginLibrary pluginLibrary,
+        IPluginDistributionResolver distributionResolver,
         ILogService logService)
         : this(
             repositoryService,
             subscriptionService,
             pluginLibrary,
+            distributionResolver,
             GetCurrentHostVersion,
             logService)
     {
@@ -43,6 +49,23 @@ public sealed class PluginInstaller : IPluginInstaller
             repositoryService,
             subscriptionService,
             pluginLibrary,
+            PluginDistributionResolver.CreateUnavailable(),
+            hostVersionProvider,
+            null)
+    {
+    }
+
+    internal PluginInstaller(
+        IPluginRepositoryService repositoryService,
+        IPluginSubscriptionService subscriptionService,
+        IPluginLibrary pluginLibrary,
+        IPluginPackageService pluginPackageService,
+        Func<string> hostVersionProvider)
+        : this(
+            repositoryService,
+            subscriptionService,
+            pluginLibrary,
+            new PluginDistributionResolver(pluginPackageService),
             hostVersionProvider,
             null)
     {
@@ -52,6 +75,7 @@ public sealed class PluginInstaller : IPluginInstaller
         IPluginRepositoryService repositoryService,
         IPluginSubscriptionService subscriptionService,
         IPluginLibrary pluginLibrary,
+        IPluginDistributionResolver distributionResolver,
         Func<string> hostVersionProvider,
         ILogService? logService)
     {
@@ -60,6 +84,9 @@ public sealed class PluginInstaller : IPluginInstaller
         _subscriptionService =
             subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
+        _distributionResolver =
+            distributionResolver ??
+            throw new ArgumentNullException(nameof(distributionResolver));
         _hostVersionProvider =
             hostVersionProvider ?? throw new ArgumentNullException(nameof(hostVersionProvider));
         _logService = logService;
@@ -67,6 +94,17 @@ public sealed class PluginInstaller : IPluginInstaller
 
     public Result<InstalledPluginInfo> InstallOrUpdateRepositoryPlugin(
         string pluginId)
+    {
+        return InstallOrUpdateRepositoryPluginAsync(pluginId)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    public async Task<Result<InstalledPluginInfo>>
+        InstallOrUpdateRepositoryPluginAsync(
+            string pluginId,
+            IProgress<PluginDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default)
     {
         if (!PluginIdValidator.IsValid(pluginId))
         {
@@ -76,22 +114,39 @@ public sealed class PluginInstaller : IPluginInstaller
                     "插件 ID 无效"));
         }
 
-        lock (_installLock)
+        await _installGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            return InstallOrUpdateRepositoryPluginCore(pluginId);
+            return await InstallOrUpdateRepositoryPluginCoreAsync(
+                    pluginId,
+                    progress,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _installGate.Release();
         }
     }
 
     public Result<InstalledPluginInfo> InstallPackage(string archivePath)
     {
-        lock (_installLock)
+        _installGate.Wait();
+        try
         {
             return _pluginLibrary.InstallPluginPackage(archivePath);
         }
+        finally
+        {
+            _installGate.Release();
+        }
     }
 
-    private Result<InstalledPluginInfo> InstallOrUpdateRepositoryPluginCore(
-        string pluginId)
+    private async Task<Result<InstalledPluginInfo>>
+        InstallOrUpdateRepositoryPluginCoreAsync(
+            string pluginId,
+            IProgress<PluginDownloadProgress>? progress,
+            CancellationToken cancellationToken)
     {
         var snapshot = _repositoryService.Current;
         var entry = snapshot?.Index.Plugins.FirstOrDefault(
@@ -108,18 +163,6 @@ public sealed class PluginInstaller : IPluginInstaller
                     pluginId: pluginId));
         }
 
-        if (!string.Equals(
-                entry.DistributionType,
-                AppConstants.PluginDistributionRepository,
-                StringComparison.Ordinal))
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Plugin(
-                    PluginErrorCodes.DistributionUnsupported,
-                    $"当前阶段尚不支持 {entry.DistributionType} 分发",
-                    pluginId: pluginId));
-        }
-
         var sourceDirectory = GetContainedPluginDirectory(
             _repositoryService.RepositoryDirectory,
             entry);
@@ -133,7 +176,15 @@ public sealed class PluginInstaller : IPluginInstaller
         }
 
         var manifest = manifestResult.Value!;
-        var validation = ValidateManifest(entry, manifest, sourceDirectory);
+        var isRelease = string.Equals(
+            entry.DistributionType,
+            AppConstants.PluginDistributionRelease,
+            StringComparison.Ordinal);
+        var validation = ValidateManifest(
+            entry,
+            manifest,
+            sourceDirectory,
+            validatePayload: !isRelease);
         if (validation != null)
         {
             return Result<InstalledPluginInfo>.Failure(validation);
@@ -147,16 +198,57 @@ public sealed class PluginInstaller : IPluginInstaller
             return Result<InstalledPluginInfo>.Failure(subscriptionResult.Error!);
         }
 
-        var preparationDirectory = Path.Combine(
-            Path.GetTempPath(),
-            $"AkashaNavigator.RepositoryPlugin.{pluginId}.{Guid.NewGuid():N}");
         try
         {
-            CopyDirectorySecure(sourceDirectory, preparationDirectory);
+            var distributionResult =
+                await _distributionResolver.ResolveAsync(
+                        pluginId,
+                        entry,
+                        manifest,
+                        sourceDirectory,
+                        progress,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            if (distributionResult.IsFailure)
+            {
+                return Result<InstalledPluginInfo>.Failure(
+                    distributionResult.Error!);
+            }
+
+            using var distribution = distributionResult.Value!;
+            var installSourceDirectory = distribution.SourceDirectory;
+            if (isRelease)
+            {
+                var packageManifestResult =
+                    JsonHelper.LoadFromFile<CatalogPluginManifest>(
+                        Path.Combine(
+                            installSourceDirectory,
+                            AppConstants.PluginRepositoryManifestFileName));
+                if (packageManifestResult.IsFailure)
+                {
+                    return Result<InstalledPluginInfo>.Failure(
+                        packageManifestResult.Error!);
+                }
+
+                var packageManifest = packageManifestResult.Value!;
+                var packageValidation = ValidateReleasePackageManifest(
+                    entry,
+                    manifest,
+                    packageManifest,
+                    installSourceDirectory);
+                if (packageValidation != null)
+                {
+                    return Result<InstalledPluginInfo>.Failure(
+                        packageValidation);
+                }
+
+                manifest = packageManifest;
+            }
+
             var runtimeManifest = manifest.ToRuntimeManifest();
             var saveResult = JsonHelper.SaveToFile(
                 Path.Combine(
-                    preparationDirectory,
+                    installSourceDirectory,
                     AppConstants.PluginManifestFileName),
                 runtimeManifest);
             if (saveResult.IsFailure)
@@ -165,7 +257,7 @@ public sealed class PluginInstaller : IPluginInstaller
             }
 
             var installResult = _pluginLibrary.InstallOrUpdateFromDirectory(
-                preparationDirectory,
+                installSourceDirectory,
                 manifest.SavedFiles,
                 AppConstants.PluginInstallSourceRepository);
             if (installResult.IsFailure)
@@ -196,16 +288,14 @@ public sealed class PluginInstaller : IPluginInstaller
                     ex,
                     sourceDirectory));
         }
-        finally
-        {
-            TryDeleteDirectory(preparationDirectory);
-        }
     }
 
     private Error? ValidateManifest(
         PluginRepositoryEntry entry,
         CatalogPluginManifest manifest,
-        string sourceDirectory)
+        string sourceDirectory,
+        bool validatePayload,
+        bool requireReleaseIntegrity = true)
     {
         if (manifest.ManifestVersion != 2 ||
             !string.Equals(manifest.Id, entry.Id, StringComparison.Ordinal) ||
@@ -232,11 +322,34 @@ public sealed class PluginInstaller : IPluginInstaller
             manifest.Distribution == null ||
             !string.Equals(
                 manifest.Distribution.Type,
-                AppConstants.PluginDistributionRepository,
+                entry.DistributionType,
                 StringComparison.Ordinal) ||
-            manifest.Backend != null)
+            (entry.DistributionType != AppConstants.PluginDistributionRepository &&
+             entry.DistributionType != AppConstants.PluginDistributionRelease) ||
+            entry.HasBackend != (manifest.Backend != null))
         {
             return InvalidManifest(entry.Id, "Manifest v2 与 repo.json 不一致");
+        }
+
+        if (entry.DistributionType == AppConstants.PluginDistributionRepository &&
+            manifest.Backend != null)
+        {
+            return InvalidManifest(
+                entry.Id,
+                "带后端插件必须使用 Release 分发");
+        }
+
+        if (entry.DistributionType == AppConstants.PluginDistributionRelease)
+        {
+            var distributionError = ValidateReleaseDistribution(
+                entry.Id,
+                entry.Version,
+                manifest.Distribution,
+                requireReleaseIntegrity);
+            if (distributionError != null)
+            {
+                return distributionError;
+            }
         }
 
         if (PluginLibrary.CompareVersions(
@@ -258,18 +371,55 @@ public sealed class PluginInstaller : IPluginInstaller
             return InvalidManifest(entry.Id, "插件权限声明无效");
         }
 
-        if (!ValidateRequiredFile(sourceDirectory, manifest.Main) ||
-            (!string.IsNullOrWhiteSpace(manifest.Settings) &&
-             !ValidateRequiredFile(sourceDirectory, manifest.Settings)))
+        if (manifest.Backend != null &&
+            (!manifest.Permissions.Contains(
+                 PluginPermissions.Companion,
+                 StringComparer.Ordinal) ||
+             !string.Equals(
+                 manifest.Backend.Type,
+                 AppConstants.CompanionBackendType,
+                 StringComparison.Ordinal) ||
+             !IsSafeRelativePath(manifest.Backend.Entry) ||
+             !string.Equals(
+                 Path.GetExtension(manifest.Backend.Entry),
+                 ".exe",
+                 StringComparison.OrdinalIgnoreCase) ||
+             manifest.Backend.ProtocolVersion !=
+             AppConstants.CompanionProtocolVersion ||
+             !string.Equals(
+                 manifest.Backend.Lifetime,
+                 AppConstants.CompanionLifetimePlugin,
+                 StringComparison.Ordinal) ||
+             !string.Equals(
+                 manifest.Backend.IntegrityLevel,
+                 AppConstants.CompanionIntegrityLevelInherit,
+                 StringComparison.Ordinal) ||
+             manifest.Backend.ShutdownTimeoutMs <= 0 ||
+             manifest.Backend.ShutdownTimeoutMs >
+             AppConstants.MaxCompanionShutdownTimeoutMs))
         {
-            return InvalidManifest(entry.Id, "插件入口或设置文件不存在");
+            return InvalidManifest(entry.Id, "插件后端声明无效");
+        }
+
+        if (validatePayload &&
+            (!ValidateRequiredFile(sourceDirectory, manifest.Main) ||
+             (!string.IsNullOrWhiteSpace(manifest.Settings) &&
+              !ValidateRequiredFile(sourceDirectory, manifest.Settings)) ||
+             (manifest.Backend != null &&
+              !ValidateRequiredFile(
+                  sourceDirectory,
+                  manifest.Backend.Entry))))
+        {
+            return InvalidManifest(
+                entry.Id,
+                "插件入口、设置文件或后端可执行文件不存在");
         }
 
         if (manifest.Library == null ||
             manifest.Library.Distinct(StringComparer.Ordinal).Count() !=
             manifest.Library.Count ||
-            manifest.Library.Any(
-                path => !ValidateRequiredDirectory(sourceDirectory, path)))
+            (validatePayload && manifest.Library.Any(
+                path => !ValidateRequiredDirectory(sourceDirectory, path))))
         {
             return InvalidManifest(entry.Id, "插件 library 目录无效");
         }
@@ -311,6 +461,99 @@ public sealed class PluginInstaller : IPluginInstaller
         return runtimeValidation.IsValid
             ? null
             : InvalidManifest(entry.Id, "转换后的运行时清单无效");
+    }
+
+    private Error? ValidateReleasePackageManifest(
+        PluginRepositoryEntry entry,
+        CatalogPluginManifest catalogManifest,
+        CatalogPluginManifest packageManifest,
+        string packageDirectory)
+    {
+        var validation = ValidateManifest(
+            entry,
+            packageManifest,
+            packageDirectory,
+            validatePayload: true,
+            requireReleaseIntegrity: false);
+        if (validation != null)
+        {
+            return validation;
+        }
+
+        if (packageManifest.Distribution == null ||
+            catalogManifest.Distribution == null ||
+            (!string.IsNullOrWhiteSpace(
+                 packageManifest.Distribution.Sha256) &&
+             !string.Equals(
+                 packageManifest.Distribution.Sha256,
+                 catalogManifest.Distribution.Sha256,
+                 StringComparison.OrdinalIgnoreCase)) ||
+            (packageManifest.Distribution.Size.HasValue &&
+             packageManifest.Distribution.Size !=
+             catalogManifest.Distribution.Size))
+        {
+            return InvalidManifest(
+                entry.Id,
+                "Release 包内 manifest 的完整性元数据与 catalog 不一致");
+        }
+
+        packageManifest.Distribution.Sha256 =
+            catalogManifest.Distribution.Sha256;
+        packageManifest.Distribution.Size =
+            catalogManifest.Distribution.Size;
+        var catalogJson = JsonSerializer.Serialize(
+            catalogManifest,
+            JsonHelper.WriteOptions);
+        var packageJson = JsonSerializer.Serialize(
+            packageManifest,
+            JsonHelper.WriteOptions);
+        return JsonNode.DeepEquals(
+            JsonNode.Parse(catalogJson),
+            JsonNode.Parse(packageJson))
+            ? null
+            : InvalidManifest(
+                entry.Id,
+                "Release 包内 manifest 与 catalog 不一致");
+    }
+
+    private static Error? ValidateReleaseDistribution(
+        string pluginId,
+        string version,
+        CatalogPluginDistribution distribution,
+        bool requireIntegrity)
+    {
+        var expectedTag = $"{pluginId}-v{version}";
+        var expectedAsset = $"{pluginId}-{version}-win-x64.zip";
+        if (!string.Equals(
+                distribution.Tag,
+                expectedTag,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                distribution.Asset,
+                expectedAsset,
+                StringComparison.Ordinal) ||
+            (requireIntegrity &&
+             (!IsSha256(distribution.Sha256) ||
+              distribution.Size is null or <= 0)) ||
+            (!string.IsNullOrWhiteSpace(distribution.Sha256) &&
+             !IsSha256(distribution.Sha256)) ||
+            (distribution.Size.HasValue && distribution.Size <= 0))
+        {
+            return InvalidManifest(
+                pluginId,
+                "Release 标签、资源名或完整性元数据无效");
+        }
+
+        return null;
+    }
+
+    private static bool IsSha256(string? value)
+    {
+        return value is { Length: 64 } &&
+               value.All(
+                   character =>
+                       character is >= '0' and <= '9' or
+                           >= 'a' and <= 'f');
     }
 
     private static bool ValidateRequiredFile(
@@ -390,45 +633,6 @@ public sealed class PluginInstaller : IPluginInstaller
         return candidate;
     }
 
-    private static void CopyDirectorySecure(
-        string sourceDirectory,
-        string targetDirectory)
-    {
-        var source = new DirectoryInfo(sourceDirectory);
-        if (!source.Exists)
-        {
-            throw new DirectoryNotFoundException(sourceDirectory);
-        }
-
-        if ((source.Attributes & FileAttributes.ReparsePoint) != 0)
-        {
-            throw new InvalidDataException("插件目录不能是重解析点");
-        }
-
-        Directory.CreateDirectory(targetDirectory);
-        foreach (var file in source.EnumerateFiles())
-        {
-            if ((file.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new InvalidDataException($"插件包含重解析文件: {file.Name}");
-            }
-
-            file.CopyTo(Path.Combine(targetDirectory, file.Name), overwrite: true);
-        }
-
-        foreach (var directory in source.EnumerateDirectories())
-        {
-            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new InvalidDataException($"插件包含重解析目录: {directory.Name}");
-            }
-
-            CopyDirectorySecure(
-                directory.FullName,
-                Path.Combine(targetDirectory, directory.Name));
-        }
-    }
-
     private static Error InvalidManifest(
         string pluginId,
         string message)
@@ -456,18 +660,4 @@ public sealed class PluginInstaller : IPluginInstaller
         return assembly.GetName().Version?.ToString(3) ?? AppConstants.Version;
     }
 
-    private static void TryDeleteDirectory(string directory)
-    {
-        try
-        {
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
-        }
-        catch
-        {
-            // 准备目录由系统后续清理。
-        }
-    }
 }

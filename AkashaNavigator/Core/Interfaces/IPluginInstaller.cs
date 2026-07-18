@@ -1,5 +1,6 @@
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Plugin;
+using AkashaNavigator.Models.Update;
 
 namespace AkashaNavigator.Core.Interfaces;
 
@@ -8,6 +9,11 @@ namespace AkashaNavigator.Core.Interfaces;
 /// </summary>
 public interface IPluginInstaller
 {
+    Task<Result<InstalledPluginInfo>> InstallOrUpdateRepositoryPluginAsync(
+        string pluginId,
+        IProgress<PluginDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
     Result<InstalledPluginInfo> InstallOrUpdateRepositoryPlugin(
         string pluginId);
 

@@ -1,9 +1,13 @@
 using System.IO;
+using System.IO.Compression;
+using System.Text;
+using System.Text.Json;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.PluginRepository;
+using AkashaNavigator.Models.Update;
 using AkashaNavigator.Services;
 using Moq;
 using Xunit;
@@ -129,13 +133,24 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
-    public void InstallOrUpdateRepositoryPlugin_RejectsUnsupportedDistribution()
+    public void InstallOrUpdateRepositoryPlugin_RejectsReleaseWhenDownloaderIsUnavailable()
     {
         var entry = CreateEntry();
         entry.DistributionType = AppConstants.PluginDistributionRelease;
+        var manifest = CreateManifest();
+        manifest.Distribution = CreateReleaseDistribution();
+        WriteCatalogPlugin(manifest);
+        var subscriptions = new Mock<IPluginSubscriptionService>();
+        subscriptions
+            .Setup(service => service.Subscribe(
+                AppConstants.OfficialPluginRepositoryId,
+                entry))
+            .Returns(
+                Result<PluginSubscriptionRecord>.Success(
+                    new PluginSubscriptionRecord { PluginId = PluginId }));
         var installer = new PluginInstaller(
             CreateRepositoryService(entry).Object,
-            Mock.Of<IPluginSubscriptionService>(),
+            subscriptions.Object,
             Mock.Of<IPluginLibrary>(),
             () => "1.4.0");
 
@@ -210,6 +225,159 @@ public sealed class PluginInstallerTests : IDisposable
         var subscription = subscriptions.GetSubscription(PluginId);
         Assert.Equal("2.0.0", subscription?.InstalledVersion);
         Assert.Equal(new string('b', 40), subscription?.InstalledCommit);
+    }
+
+    [Fact]
+    public async Task InstallOrUpdateRepositoryPluginAsync_InstallsValidatedReleasePackage()
+    {
+        var entry = CreateEntry();
+        entry.DistributionType = AppConstants.PluginDistributionRelease;
+        entry.HasBackend = true;
+        var catalogManifest = CreateReleaseManifest();
+        WriteCatalogPlugin(catalogManifest);
+        var packageManifest = CreateReleaseManifest();
+        packageManifest.Distribution.Sha256 = null;
+        packageManifest.Distribution.Size = null;
+        var archivePath = WriteReleaseArchive(packageManifest);
+        PluginPackageInfo? requestedPackage = null;
+        var packageService = new Mock<IPluginPackageService>();
+        packageService
+            .Setup(service => service.DownloadPackageAsync(
+                PluginId,
+                It.IsAny<PluginPackageInfo>(),
+                It.IsAny<IProgress<PluginDownloadProgress>?>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, PluginPackageInfo,
+                IProgress<PluginDownloadProgress>?, CancellationToken>(
+                (_, package, _, _) => requestedPackage = package)
+            .ReturnsAsync(
+                Result<DownloadedPluginPackage>.Success(
+                    new DownloadedPluginPackage(archivePath, "github")));
+        var subscriptions = new Mock<IPluginSubscriptionService>();
+        subscriptions
+            .Setup(service => service.Subscribe(
+                AppConstants.OfficialPluginRepositoryId,
+                entry))
+            .Returns(
+                Result<PluginSubscriptionRecord>.Success(
+                    new PluginSubscriptionRecord { PluginId = PluginId }));
+        subscriptions
+            .Setup(service => service.MarkInstalled(
+                PluginId,
+                "1.0.0",
+                new string('b', 40)))
+            .Returns(Result.Success());
+        PluginManifest? installedManifest = null;
+        var library = new Mock<IPluginLibrary>();
+        library
+            .Setup(service => service.InstallOrUpdateFromDirectory(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<string>>(),
+                AppConstants.PluginInstallSourceRepository))
+            .Callback<string, IReadOnlyList<string>, string>(
+                (directory, savedFiles, _) =>
+                {
+                    installedManifest = PluginManifest.LoadFromFile(
+                        Path.Combine(
+                            directory,
+                            AppConstants.PluginManifestFileName)).Manifest;
+                    Assert.True(
+                        File.Exists(
+                            Path.Combine(
+                                directory,
+                                "runtime",
+                                "worker.exe")));
+                    Assert.Equal(new[] { "data/user.json" }, savedFiles);
+                })
+            .Returns(
+                Result<InstalledPluginInfo>.Success(
+                    new InstalledPluginInfo {
+                        Id = PluginId,
+                        Name = "Sample",
+                        Version = "1.0.0"
+                    }));
+        var installer = new PluginInstaller(
+            CreateRepositoryService(entry).Object,
+            subscriptions.Object,
+            library.Object,
+            packageService.Object,
+            () => "1.4.0");
+
+        var result =
+            await installer.InstallOrUpdateRepositoryPluginAsync(PluginId);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        Assert.NotNull(installedManifest?.Companion);
+        Assert.Equal(
+            4321,
+            installedManifest!.Companion!.ShutdownTimeoutMs);
+        Assert.NotNull(requestedPackage);
+        Assert.Equal(1024, requestedPackage!.Size);
+        Assert.Equal(new string('a', 64), requestedPackage.Sha256);
+        Assert.Equal(
+            new[] { "github", "cnb" },
+            requestedPackage.Sources.Select(source => source.Id));
+        Assert.Contains(
+            "/releases/download/sample-plugin-v1.0.0/",
+            requestedPackage.Sources[0].Url);
+        Assert.Contains(
+            "/-/releases/download/sample-plugin-v1.0.0/",
+            requestedPackage.Sources[1].Url);
+        Assert.False(File.Exists(archivePath));
+    }
+
+    [Fact]
+    public async Task InstallOrUpdateRepositoryPluginAsync_RejectsReleaseManifestMismatch()
+    {
+        var entry = CreateEntry();
+        entry.DistributionType = AppConstants.PluginDistributionRelease;
+        entry.HasBackend = true;
+        WriteCatalogPlugin(CreateReleaseManifest());
+        var packageManifest = CreateReleaseManifest();
+        packageManifest.Description = "tampered";
+        packageManifest.Distribution.Sha256 = null;
+        packageManifest.Distribution.Size = null;
+        var archivePath = WriteReleaseArchive(packageManifest);
+        var packageService = new Mock<IPluginPackageService>();
+        packageService
+            .Setup(service => service.DownloadPackageAsync(
+                PluginId,
+                It.IsAny<PluginPackageInfo>(),
+                It.IsAny<IProgress<PluginDownloadProgress>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Result<DownloadedPluginPackage>.Success(
+                    new DownloadedPluginPackage(archivePath, "github")));
+        var subscriptions = new Mock<IPluginSubscriptionService>();
+        subscriptions
+            .Setup(service => service.Subscribe(
+                AppConstants.OfficialPluginRepositoryId,
+                entry))
+            .Returns(
+                Result<PluginSubscriptionRecord>.Success(
+                    new PluginSubscriptionRecord { PluginId = PluginId }));
+        var library = new Mock<IPluginLibrary>();
+        var installer = new PluginInstaller(
+            CreateRepositoryService(entry).Object,
+            subscriptions.Object,
+            library.Object,
+            packageService.Object,
+            () => "1.4.0");
+
+        var result =
+            await installer.InstallOrUpdateRepositoryPluginAsync(PluginId);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(
+            PluginErrorCodes.RepositoryManifestInvalid,
+            result.Error?.Code);
+        library.Verify(
+            service => service.InstallOrUpdateFromDirectory(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string>()),
+            Times.Never);
+        Assert.False(File.Exists(archivePath));
     }
 
     public void Dispose()
@@ -301,6 +469,70 @@ public sealed class PluginInstallerTests : IDisposable
                 Type = AppConstants.PluginDistributionRepository
             }
         };
+    }
+
+    private static CatalogPluginDistribution CreateReleaseDistribution()
+    {
+        return new CatalogPluginDistribution {
+            Type = AppConstants.PluginDistributionRelease,
+            Tag = $"{PluginId}-v1.0.0",
+            Asset = $"{PluginId}-1.0.0-win-x64.zip",
+            Sha256 = new string('a', 64),
+            Size = 1024
+        };
+    }
+
+    private static CatalogPluginManifest CreateReleaseManifest()
+    {
+        var manifest = CreateManifest();
+        manifest.Main = "frontend/main.js";
+        manifest.Permissions = new List<string> {
+            PluginPermissions.Companion
+        };
+        manifest.SavedFiles = new List<string> { "data/user.json" };
+        manifest.Distribution = CreateReleaseDistribution();
+        manifest.Backend = new CatalogPluginBackend {
+            Type = AppConstants.CompanionBackendType,
+            Entry = "runtime/worker.exe",
+            ProtocolVersion = AppConstants.CompanionProtocolVersion,
+            Lifetime = AppConstants.CompanionLifetimePlugin,
+            IntegrityLevel = AppConstants.CompanionIntegrityLevelInherit,
+            ShutdownTimeoutMs = 4321
+        };
+        return manifest;
+    }
+
+    private string WriteReleaseArchive(
+        CatalogPluginManifest packageManifest)
+    {
+        var archivePath = Path.Combine(
+            _repositoryDirectory,
+            $"release-{Guid.NewGuid():N}.zip");
+        Directory.CreateDirectory(_repositoryDirectory);
+        using var archive = ZipFile.Open(
+            archivePath,
+            ZipArchiveMode.Create);
+        WriteArchiveEntry(
+            archive,
+            AppConstants.PluginRepositoryManifestFileName,
+            JsonSerializer.Serialize(
+                packageManifest,
+                JsonHelper.WriteOptions));
+        WriteArchiveEntry(archive, "frontend/main.js", "main");
+        WriteArchiveEntry(archive, "runtime/worker.exe", "worker");
+        return archivePath;
+    }
+
+    private static void WriteArchiveEntry(
+        ZipArchive archive,
+        string path,
+        string content)
+    {
+        var entry = archive.CreateEntry(path);
+        using var writer = new StreamWriter(
+            entry.Open(),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        writer.Write(content);
     }
 
     private static IPluginPermissionConsentService CreateConsentService()

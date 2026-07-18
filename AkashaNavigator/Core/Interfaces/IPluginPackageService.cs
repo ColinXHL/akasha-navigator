@@ -17,6 +17,12 @@ public interface IPluginPackageService
 
     bool IsUpdateAvailable(string pluginId);
 
+    Task<Result<DownloadedPluginPackage>> DownloadPackageAsync(
+        string pluginId,
+        PluginPackageInfo package,
+        IProgress<PluginDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
     Task<Result<InstalledPluginInfo>> InstallOrUpdateAsync(
         string pluginId,
         IProgress<PluginDownloadProgress>? progress = null,

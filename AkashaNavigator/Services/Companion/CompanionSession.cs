@@ -7,12 +7,11 @@ namespace AkashaNavigator.Services.Companion;
 
 internal sealed class CompanionSession : IAsyncDisposable
 {
-    private static readonly TimeSpan GracefulShutdownTimeout = TimeSpan.FromSeconds(3);
-
     private readonly Process _process;
     private readonly NamedPipeServerStream _pipe;
     private readonly CompanionJobObject _jobObject;
     private readonly CompanionRequestMultiplexer _requests;
+    private readonly TimeSpan _gracefulShutdownTimeout;
     private int _stopping;
 
     public CompanionSession(
@@ -20,13 +19,15 @@ internal sealed class CompanionSession : IAsyncDisposable
         Process process,
         NamedPipeServerStream pipe,
         CompanionJobObject jobObject,
-        CompanionFraming framing)
+        CompanionFraming framing,
+        TimeSpan gracefulShutdownTimeout)
     {
         PluginId = pluginId;
         _process = process;
         _pipe = pipe;
         _jobObject = jobObject;
         _requests = new CompanionRequestMultiplexer(pipe, framing);
+        _gracefulShutdownTimeout = gracefulShutdownTimeout;
     }
 
     public string PluginId { get; }
@@ -73,10 +74,11 @@ internal sealed class CompanionSession : IAsyncDisposable
             return;
         }
 
+        var shutdownStopwatch = Stopwatch.StartNew();
         try
         {
             using var shutdownCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            shutdownCancellation.CancelAfter(GracefulShutdownTimeout);
+            shutdownCancellation.CancelAfter(_gracefulShutdownTimeout);
 
             try
             {
@@ -103,8 +105,19 @@ internal sealed class CompanionSession : IAsyncDisposable
             {
                 if (!_process.HasExited)
                 {
-                    using var exitCancellation = new CancellationTokenSource(GracefulShutdownTimeout);
-                    await _process.WaitForExitAsync(exitCancellation.Token).ConfigureAwait(false);
+                    var remaining =
+                        _gracefulShutdownTimeout -
+                        shutdownStopwatch.Elapsed;
+                    if (remaining <= TimeSpan.Zero)
+                    {
+                        TryKillProcessTree();
+                    }
+                    else
+                    {
+                        using var exitCancellation =
+                            new CancellationTokenSource(remaining);
+                        await _process.WaitForExitAsync(exitCancellation.Token).ConfigureAwait(false);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -132,7 +145,8 @@ internal sealed class CompanionSession : IAsyncDisposable
         try
         {
             _process.Kill(entireProcessTree: true);
-            _process.WaitForExit((int)GracefulShutdownTimeout.TotalMilliseconds);
+            _process.WaitForExit(
+                (int)_gracefulShutdownTimeout.TotalMilliseconds);
         }
         catch
         {

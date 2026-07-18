@@ -6,6 +6,7 @@ using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Models.PluginRepository;
+using AkashaNavigator.Models.Update;
 using AkashaNavigator.Services;
 using AkashaNavigator.ViewModels.Pages;
 using Moq;
@@ -54,6 +55,13 @@ public sealed class AvailablePluginsPageViewModelTests
         Assert.Equal(
             Path.Combine("C:\\catalog-cache", "plugins/alpha-plugin"),
             alpha.SourceDirectory);
+        var beta = Assert.Single(
+            viewModel.Plugins.Where(
+                plugin => plugin.Id == "beta-plugin"));
+        Assert.True(beta.IsCatalogDistribution);
+        Assert.Equal(
+            Visibility.Visible,
+            beta.SubscribeButtonVisibility);
         packageService.Verify(
             service => service.GetRemoteCatalog(),
             Times.Never);
@@ -119,8 +127,11 @@ public sealed class AvailablePluginsPageViewModelTests
         var repositoryService = CreateRepositoryService(snapshot);
         var installer = new Mock<IPluginInstaller>();
         installer
-            .Setup(service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"))
-            .Returns(
+            .Setup(service => service.InstallOrUpdateRepositoryPluginAsync(
+                "alpha-plugin",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
                 Result<InstalledPluginInfo>.Success(
                     new InstalledPluginInfo {
                         Id = "alpha-plugin",
@@ -140,8 +151,56 @@ public sealed class AvailablePluginsPageViewModelTests
         Assert.True(plugin.IsSubscribed);
         Assert.False(plugin.HasUpdate);
         installer.Verify(
-            service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"),
+            service => service.InstallOrUpdateRepositoryPluginAsync(
+                "alpha-plugin",
+                null,
+                It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task InstallCommand_UsesCatalogInstallerForReleasePlugin()
+    {
+        var snapshot = CreateSnapshot(usedCache: false);
+        var installer = new Mock<IPluginInstaller>();
+        installer
+            .Setup(service => service.InstallOrUpdateRepositoryPluginAsync(
+                "beta-plugin",
+                It.IsAny<IProgress<PluginDownloadProgress>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Result<InstalledPluginInfo>.Success(
+                    new InstalledPluginInfo {
+                        Id = "beta-plugin",
+                        Name = "Beta",
+                        Version = "1.0.0"
+                    }));
+        var legacyPackageService = new Mock<IPluginPackageService>();
+        var viewModel = CreateViewModel(
+            CreateRepositoryService(snapshot).Object,
+            packageService: legacyPackageService.Object,
+            installer: installer.Object);
+        viewModel.RefreshPluginList();
+        var plugin = Assert.Single(
+            viewModel.Plugins.Where(
+                item => item.Id == "beta-plugin"));
+
+        await viewModel.InstallCommand.ExecuteAsync(plugin);
+
+        Assert.True(plugin.IsInstalled);
+        Assert.True(plugin.IsSubscribed);
+        installer.Verify(
+            service => service.InstallOrUpdateRepositoryPluginAsync(
+                "beta-plugin",
+                It.IsAny<IProgress<PluginDownloadProgress>?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        legacyPackageService.Verify(
+            service => service.InstallOrUpdateAsync(
+                It.IsAny<string>(),
+                It.IsAny<IProgress<PluginDownloadProgress>?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -194,7 +253,7 @@ public sealed class AvailablePluginsPageViewModelTests
     }
 
     [Fact]
-    public void UpdateAllSubscribedCommand_InstallsEveryAvailableUpdate()
+    public async Task UpdateAllSubscribedCommand_InstallsEveryAvailableUpdate()
     {
         var snapshot = CreateSnapshot(usedCache: false);
         var subscriptions = CreateSubscriptionService();
@@ -211,8 +270,11 @@ public sealed class AvailablePluginsPageViewModelTests
                 });
         var installer = new Mock<IPluginInstaller>();
         installer
-            .Setup(service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"))
-            .Returns(
+            .Setup(service => service.InstallOrUpdateRepositoryPluginAsync(
+                "alpha-plugin",
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
                 Result<InstalledPluginInfo>.Success(
                     new InstalledPluginInfo {
                         Id = "alpha-plugin",
@@ -224,10 +286,13 @@ public sealed class AvailablePluginsPageViewModelTests
             subscriptionService: subscriptions.Object,
             installer: installer.Object);
 
-        viewModel.UpdateAllSubscribedCommand.Execute(null);
+        await viewModel.UpdateAllSubscribedCommand.ExecuteAsync(null);
 
         installer.Verify(
-            service => service.InstallOrUpdateRepositoryPlugin("alpha-plugin"),
+            service => service.InstallOrUpdateRepositoryPluginAsync(
+                "alpha-plugin",
+                null,
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

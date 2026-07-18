@@ -68,6 +68,22 @@ public sealed class PluginPermissionConsentServiceTests
     }
 
     [Fact]
+    public void ChangedShutdownPolicy_ShouldChangePermissionFingerprint()
+    {
+        var manifest = CreateManifest();
+        var original =
+            PluginPermissionConsentService.CreatePermissionFingerprint(
+                manifest);
+
+        manifest.Companion!.ShutdownTimeoutMs++;
+        var changed =
+            PluginPermissionConsentService.CreatePermissionFingerprint(
+                manifest);
+
+        Assert.NotEqual(original, changed);
+    }
+
+    [Fact]
     public void Revoke_ShouldRequireApprovalOnNextEnable()
     {
         using var directory = new TemporaryDirectory();

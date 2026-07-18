@@ -296,6 +296,12 @@ public static class AppConstants
     public const string OfficialPluginRepositoryCnbUrl =
         "https://cnb.cool/AkashaNavigator/akasha-plugins.git";
 
+    public const string OfficialPluginReleaseGitHubUrlFormat =
+        "https://github.com/ColinXHL/akasha-plugins/releases/download/{0}/{1}";
+
+    public const string OfficialPluginReleaseCnbUrlFormat =
+        "https://cnb.cool/AkashaNavigator/akasha-plugins/-/releases/download/{0}/{1}";
+
     public const string PluginDistributionRepository = "repository";
 
     public const string PluginDistributionRelease = "release";
@@ -307,6 +313,18 @@ public static class AppConstants
     public const string PluginInstallSourceExternal = "external";
 
     public const string PluginInstallSourceMigrated = "migrated";
+
+    public const string CompanionBackendType = "companion-process";
+
+    public const string CompanionLifetimePlugin = "plugin";
+
+    public const string CompanionIntegrityLevelInherit = "inherit";
+
+    public const int CompanionProtocolVersion = 1;
+
+    public const int DefaultCompanionShutdownTimeoutMs = 5000;
+
+    public const int MaxCompanionShutdownTimeoutMs = 60000;
 
     /// <summary>
     /// Notice 中拾取黑名单资源的键。
