@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.PluginRepository;
 
@@ -15,6 +17,10 @@ public interface IPluginSubscriptionService
     bool IsSubscribed(string pluginId);
 
     IReadOnlyList<PluginSubscriptionUpdate> GetAvailableUpdates();
+
+    Task<Result<IReadOnlyList<PluginSubscriptionUpdate>>> CheckForUpdatesAsync(
+        bool refreshRepository = true,
+        CancellationToken cancellationToken = default);
 
     Result<PluginSubscriptionRecord> Subscribe(
         string repositoryId,

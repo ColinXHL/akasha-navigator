@@ -192,20 +192,15 @@ public partial class App : System.Windows.Application
     private static void StartBackgroundUpdates()
     {
         var updateManifestService = Services.GetRequiredService<IUpdateManifestService>();
-        var pluginResourceUpdateService =
-            Services.GetRequiredService<IPluginResourceUpdateService>();
         var pluginRepositoryService =
             Services.GetRequiredService<IPluginRepositoryService>();
         var pluginSubscriptionService =
             Services.GetRequiredService<IPluginSubscriptionService>();
         var pluginInstaller =
             Services.GetRequiredService<IPluginInstaller>();
-        var notificationService = Services.GetRequiredService<INotificationService>();
         var logService = Services.GetRequiredService<ILogService>();
         _ = RefreshUpdateManifestInBackgroundAsync(
             updateManifestService,
-            pluginResourceUpdateService,
-            notificationService,
             logService);
         _ = RefreshPluginRepositoryInBackgroundAsync(
             pluginRepositoryService,
@@ -227,9 +222,9 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var result = settings.AutoUpdateRepository
-            ? await pluginRepositoryService.RefreshAsync()
-            : await pluginRepositoryService.InitializeAsync();
+        var result =
+            await pluginSubscriptionService.CheckForUpdatesAsync(
+                settings.AutoUpdateRepository);
         if (result.IsFailure)
         {
             logService.Warn(
@@ -237,27 +232,8 @@ public partial class App : System.Windows.Application
                 "后台更新插件仓库失败: {ErrorMessage}",
                 result.Error?.Message ?? "未知错误");
         }
-        else if (result.Value!.UsedCache)
-        {
-            logService.Warn(
-                nameof(App),
-                "后台更新插件仓库失败，继续使用本地缓存");
-        }
-
         if (result.IsFailure)
         {
-            return;
-        }
-
-        var reconcileResult = pluginSubscriptionService.Reconcile(
-            AppConstants.OfficialPluginRepositoryId,
-            result.Value!);
-        if (reconcileResult.IsFailure)
-        {
-            logService.Warn(
-                nameof(App),
-                "同步插件订阅状态失败: {ErrorMessage}",
-                reconcileResult.Error?.Message ?? "未知错误");
             return;
         }
 
@@ -266,8 +242,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        foreach (var update in pluginSubscriptionService
-                     .GetAvailableUpdates()
+        foreach (var update in result.Value!
                      .Where(item => item.AutoUpdate))
         {
             var updateResult =
@@ -287,8 +262,6 @@ public partial class App : System.Windows.Application
 
     private static async Task RefreshUpdateManifestInBackgroundAsync(
         IUpdateManifestService updateManifestService,
-        IPluginResourceUpdateService pluginResourceUpdateService,
-        INotificationService notificationService,
         ILogService logService)
     {
         var result = await updateManifestService.RefreshAsync();
@@ -298,22 +271,6 @@ public partial class App : System.Windows.Application
                 nameof(App),
                 "后台刷新更新清单失败，远程更新功能暂不可用: {ErrorMessage}",
                 result.Error?.Message ?? "未知错误");
-            return;
-        }
-
-        var resourceResult = await pluginResourceUpdateService.UpdatePickBlacklistAsync();
-        if (resourceResult.IsFailure)
-        {
-            logService.Warn(
-                nameof(App),
-                "后台更新插件资源失败，将继续使用现有资源: {ErrorMessage}",
-                resourceResult.Error?.Message ?? "未知错误");
-        }
-        else if (resourceResult.Value?.TakesEffectOnNextWorkerStart == true)
-        {
-            notificationService.Info(
-                "拾取黑名单已更新，将在下次启用 Akasha Automation 时生效",
-                "插件资源已更新");
         }
     }
 
@@ -588,13 +545,22 @@ _hotkeyManager = Services.GetRequiredService<HotkeyManager>();
     /// </summary>
     private void SetupPluginUpdateCheck(Views.Windows.PlayerWindow playerWindow)
     {
-        var pluginLibrary = Services.GetRequiredService<IPluginLibrary>();
+        var pluginSubscriptionService =
+            Services.GetRequiredService<IPluginSubscriptionService>();
+        var pluginInstaller = Services.GetRequiredService<IPluginInstaller>();
         var profileMarketplaceService = Services.GetRequiredService<ProfileMarketplaceService>();
         var notificationService = Services.GetRequiredService<INotificationService>();
         var eventBus = Services.GetRequiredService<Core.Events.IEventBus>();
 
-        var checker = new PluginUpdateChecker(pluginLibrary, profileMarketplaceService, notificationService, Services,
-                                              eventBus, playerWindow, _config);
+        var checker = new PluginUpdateChecker(
+            pluginSubscriptionService,
+            pluginInstaller,
+            profileMarketplaceService,
+            notificationService,
+            Services,
+            eventBus,
+            playerWindow,
+            _config);
         checker.SetupUpdateCheck();
     }
 

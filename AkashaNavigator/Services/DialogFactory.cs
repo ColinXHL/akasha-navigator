@@ -72,7 +72,8 @@ public class DialogFactory : IDialogFactory
     /// 创建插件更新提示对话框（带 ViewModel）
     /// </summary>
     /// <param name="updates">可用更新列表</param>
-    public PluginUpdatePromptDialog CreatePluginUpdatePromptDialog(List<UpdateCheckResult> updates)
+    public PluginUpdatePromptDialog CreatePluginUpdatePromptDialog(
+        IReadOnlyList<Models.PluginRepository.PluginSubscriptionUpdate> updates)
     {
         var viewModel = _serviceProvider.GetRequiredService<PluginUpdatePromptDialogViewModel>();
         viewModel.Initialize(updates);

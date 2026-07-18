@@ -106,7 +106,24 @@ Press `0` to toggle click-through mode:
 
 1. Open "Plugin Center" (Menu → Plugin Center)
 2. Switch to "Available Plugins" tab
-3. Click "Install" button
+3. Refresh the plugin repository when needed, then click "Install"
+
+Plugin Center is backed by the
+[AkashaPlugins](https://github.com/ColinXHL/akasha-plugins) catalog.
+Installing from this page also creates a subscription. The catalog is the
+only authority for plugin versions, packages, and updates.
+
+### Check and Install Updates
+
+The Installed Plugins page, the startup update prompt, and Plugin Center all
+use the same subscriptions and catalog, so they report the same updates. The
+repository settings provide two independent options:
+
+- Automatically update the plugin repository: refresh the catalog only
+- Automatically update subscribed plugins: install newer catalog versions
+
+Application updates are separate from plugin updates. The application update
+manifest does not publish plugin versions.
 
 ### Enable/Disable Plugins
 
@@ -122,7 +139,9 @@ Some plugins provide configurable options:
 
 ### Manual Plugin Installation
 
-Place the plugin folder in `User/Plugins/` directory and restart the application.
+Use "Install from ZIP" on the Available Plugins page to import a local package.
+An arbitrary ZIP is not treated as an official subscription. Install or
+subscribe to its catalog entry if you want catalog-based updates.
 
 ---
 

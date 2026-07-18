@@ -35,11 +35,9 @@ public sealed class AvailablePluginsPageViewModelTests
                         Version = "1.0.0"
                     }
                 });
-        var packageService = new Mock<IPluginPackageService>();
         var viewModel = CreateViewModel(
             repositoryService.Object,
-            pluginLibrary.Object,
-            packageService.Object);
+            pluginLibrary.Object);
 
         viewModel.RefreshPluginList();
 
@@ -62,9 +60,6 @@ public sealed class AvailablePluginsPageViewModelTests
         Assert.Equal(
             Visibility.Visible,
             beta.SubscribeButtonVisibility);
-        packageService.Verify(
-            service => service.GetRemoteCatalog(),
-            Times.Never);
     }
 
     [Fact]
@@ -175,10 +170,8 @@ public sealed class AvailablePluginsPageViewModelTests
                         Name = "Beta",
                         Version = "1.0.0"
                     }));
-        var legacyPackageService = new Mock<IPluginPackageService>();
         var viewModel = CreateViewModel(
             CreateRepositoryService(snapshot).Object,
-            packageService: legacyPackageService.Object,
             installer: installer.Object);
         viewModel.RefreshPluginList();
         var plugin = Assert.Single(
@@ -195,12 +188,6 @@ public sealed class AvailablePluginsPageViewModelTests
                 It.IsAny<IProgress<PluginDownloadProgress>?>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
-        legacyPackageService.Verify(
-            service => service.InstallOrUpdateAsync(
-                It.IsAny<string>(),
-                It.IsAny<IProgress<PluginDownloadProgress>?>(),
-                It.IsAny<CancellationToken>()),
-            Times.Never);
     }
 
     [Fact]
@@ -330,7 +317,6 @@ public sealed class AvailablePluginsPageViewModelTests
     private static AvailablePluginsPageViewModel CreateViewModel(
         IPluginRepositoryService repositoryService,
         IPluginLibrary? pluginLibrary = null,
-        IPluginPackageService? packageService = null,
         IPluginSubscriptionService? subscriptionService = null,
         IPluginInstaller? installer = null)
     {
@@ -345,7 +331,6 @@ public sealed class AvailablePluginsPageViewModelTests
             repositoryService,
             subscriptions,
             installer ?? Mock.Of<IPluginInstaller>(),
-            packageService ?? Mock.Of<IPluginPackageService>(),
             configService.Object);
     }
 

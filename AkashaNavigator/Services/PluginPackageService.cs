@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +15,7 @@ using AkashaNavigator.Models.Update;
 namespace AkashaNavigator.Services;
 
 /// <summary>
-/// 从共享 Manifest 下载、校验并安装远程插件包。
+/// 下载并校验 catalog Manifest v2 声明的 Release 插件包。
 /// </summary>
 public sealed class PluginPackageService : IPluginPackageService
 {
@@ -24,135 +23,15 @@ public sealed class PluginPackageService : IPluginPackageService
     private static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(15);
 
     private readonly HttpClient _httpClient;
-    private readonly IUpdateManifestService _updateManifestService;
     private readonly IDownloadSourceSelector _downloadSourceSelector;
-    private readonly IPluginLibrary _pluginLibrary;
-    private readonly Func<string> _hostVersionProvider;
 
     public PluginPackageService(
         HttpClient httpClient,
-        IUpdateManifestService updateManifestService,
-        IDownloadSourceSelector downloadSourceSelector,
-        IPluginLibrary pluginLibrary)
-        : this(
-            httpClient,
-            updateManifestService,
-            downloadSourceSelector,
-            pluginLibrary,
-            GetCurrentHostVersion)
-    {
-    }
-
-    internal PluginPackageService(
-        HttpClient httpClient,
-        IUpdateManifestService updateManifestService,
-        IDownloadSourceSelector downloadSourceSelector,
-        IPluginLibrary pluginLibrary,
-        Func<string> hostVersionProvider)
+        IDownloadSourceSelector downloadSourceSelector)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _updateManifestService =
-            updateManifestService ?? throw new ArgumentNullException(nameof(updateManifestService));
         _downloadSourceSelector =
             downloadSourceSelector ?? throw new ArgumentNullException(nameof(downloadSourceSelector));
-        _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
-        _hostVersionProvider =
-            hostVersionProvider ?? throw new ArgumentNullException(nameof(hostVersionProvider));
-    }
-
-    public IReadOnlyList<PluginCatalogEntry> GetRemoteCatalog()
-    {
-        var plugins = _updateManifestService.Current?.Plugins;
-        if (plugins == null)
-        {
-            return Array.Empty<PluginCatalogEntry>();
-        }
-
-        return plugins
-            .Where(item => item.Value.Package != null)
-            .Select(
-                item => new PluginCatalogEntry {
-                    Id = item.Key,
-                    Name = string.IsNullOrWhiteSpace(item.Value.Name) ? item.Key : item.Value.Name,
-                    Version = item.Value.Version,
-                    IsRemote = true,
-                    MinHostVersion = item.Value.MinHostVersion,
-                    Package = item.Value.Package
-                })
-            .OrderBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
-    }
-
-    public bool IsUpdateAvailable(string pluginId)
-    {
-        var remote = GetRemotePlugin(pluginId);
-        var installed = _pluginLibrary.GetInstalledPluginInfo(pluginId);
-        return remote != null &&
-               installed != null &&
-               PluginLibrary.CompareVersions(remote.Version, installed.Version) > 0;
-    }
-
-    public async Task<Result<InstalledPluginInfo>> InstallOrUpdateAsync(
-        string pluginId,
-        IProgress<PluginDownloadProgress>? progress = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(pluginId))
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Validation("REMOTE_PLUGIN_ID_EMPTY", "远程插件 ID 不能为空"));
-        }
-
-        var manifestResult = await _updateManifestService.RefreshAsync(cancellationToken);
-        if (manifestResult.IsFailure)
-        {
-            return Result<InstalledPluginInfo>.Failure(manifestResult.Error!);
-        }
-
-        var remote = GetRemotePlugin(pluginId);
-        if (remote?.Package == null)
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Plugin(
-                    PluginErrorCodes.RemotePackageNotFound,
-                    $"远程插件目录中不存在 {pluginId}",
-                    pluginId: pluginId));
-        }
-
-        var hostVersion = _hostVersionProvider();
-        if (!string.IsNullOrWhiteSpace(remote.MinHostVersion) &&
-            PluginLibrary.CompareVersions(hostVersion, remote.MinHostVersion) < 0)
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Plugin(
-                    PluginErrorCodes.HostVersionTooLow,
-                    $"插件需要 AkashaNavigator {remote.MinHostVersion} 或更高版本，当前版本为 {hostVersion}",
-                    pluginId: pluginId));
-        }
-
-        var installed = _pluginLibrary.GetInstalledPluginInfo(pluginId);
-        if (installed != null &&
-            PluginLibrary.CompareVersions(remote.Version, installed.Version) <= 0)
-        {
-            return Result<InstalledPluginInfo>.Failure(
-                Error.Plugin(
-                    PluginErrorCodes.VersionNotNewer,
-                    $"远程版本 {remote.Version} 不高于已安装版本 {installed.Version}",
-                    pluginId: pluginId));
-        }
-
-        var downloadResult = await DownloadPackageAsync(
-            pluginId,
-            remote.Package,
-            progress,
-            cancellationToken);
-        if (downloadResult.IsFailure)
-        {
-            return Result<InstalledPluginInfo>.Failure(downloadResult.Error!);
-        }
-
-        using var download = downloadResult.Value!;
-        return _pluginLibrary.InstallPluginPackage(download.FilePath);
     }
 
     public async Task<Result<DownloadedPluginPackage>> DownloadPackageAsync(
@@ -243,19 +122,6 @@ public sealed class PluginPackageService : IPluginPackageService
             pluginId: pluginId);
         error.Metadata["AttemptedSources"] = sourcesResult.Value!.Select(source => source.Id).ToArray();
         return Result<DownloadedPluginPackage>.Failure(error);
-    }
-
-    private RemotePluginInfo? GetRemotePlugin(string pluginId)
-    {
-        var plugins = _updateManifestService.Current?.Plugins;
-        if (plugins == null)
-        {
-            return null;
-        }
-
-        return plugins.FirstOrDefault(
-                item => string.Equals(item.Key, pluginId, StringComparison.OrdinalIgnoreCase))
-            .Value;
     }
 
     private async Task DownloadAsync(
@@ -381,18 +247,4 @@ public sealed class PluginPackageService : IPluginPackageService
                            >= 'a' and <= 'f');
     }
 
-    private static string GetCurrentHostVersion()
-    {
-        var assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-        var infoVersion =
-            assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (!string.IsNullOrWhiteSpace(infoVersion))
-        {
-            var plusIndex = infoVersion.IndexOf('+');
-            return plusIndex > 0 ? infoVersion[..plusIndex] : infoVersion;
-        }
-
-        var version = assembly.GetName().Version;
-        return version == null ? "0.0.0" : $"{version.Major}.{version.Minor}.{version.Build}";
-    }
 }

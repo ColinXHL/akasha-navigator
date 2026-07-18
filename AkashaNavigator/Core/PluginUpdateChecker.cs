@@ -3,6 +3,7 @@ using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Common;
+using AkashaNavigator.Models.PluginRepository;
 using AkashaNavigator.Models.Profile;
 using AkashaNavigator.Services;
 using AkashaNavigator.Core.Interfaces;
@@ -20,7 +21,8 @@ namespace AkashaNavigator.Core
     /// </summary>
     public class PluginUpdateChecker
     {
-        private readonly IPluginLibrary _pluginLibrary;
+        private readonly IPluginSubscriptionService _pluginSubscriptionService;
+        private readonly IPluginInstaller _pluginInstaller;
         private readonly ProfileMarketplaceService _profileMarketplaceService;
         private readonly INotificationService _notificationService;
         private readonly IServiceProvider _serviceProvider;
@@ -32,7 +34,8 @@ namespace AkashaNavigator.Core
         /// 初始化 PluginUpdateChecker
         /// </summary>
         public PluginUpdateChecker(
-            IPluginLibrary pluginLibrary,
+            IPluginSubscriptionService pluginSubscriptionService,
+            IPluginInstaller pluginInstaller,
             ProfileMarketplaceService profileMarketplaceService,
             INotificationService notificationService,
             IServiceProvider serviceProvider,
@@ -40,7 +43,11 @@ namespace AkashaNavigator.Core
             PlayerWindow playerWindow,
             AppConfig config)
         {
-            _pluginLibrary = pluginLibrary;
+            _pluginSubscriptionService =
+                pluginSubscriptionService ??
+                throw new ArgumentNullException(nameof(pluginSubscriptionService));
+            _pluginInstaller =
+                pluginInstaller ?? throw new ArgumentNullException(nameof(pluginInstaller));
             _profileMarketplaceService = profileMarketplaceService;
             _notificationService = notificationService;
             _serviceProvider = serviceProvider;
@@ -81,18 +88,40 @@ namespace AkashaNavigator.Core
         {
             try
             {
-                var updates = _pluginLibrary.CheckAllUpdates();
+                var updateResult =
+                    await _pluginSubscriptionService.CheckForUpdatesAsync();
                 var continueCheckingProfiles = true;
 
-                if (updates.Count > 0)
+                if (updateResult.IsFailure)
+                {
+                    var logService =
+                        _serviceProvider.GetRequiredService<ILogService>();
+                    logService.Warn(
+                        nameof(PluginUpdateChecker),
+                        "检查订阅插件更新失败: {ErrorMessage}",
+                        updateResult.Error?.Message ?? "未知错误");
+                }
+                else if (updateResult.Value!.Count > 0)
                 {
                     var dialogFactory = _serviceProvider.GetRequiredService<IDialogFactory>();
-                    var dialog = dialogFactory.CreatePluginUpdatePromptDialog(updates);
+                    var dialog =
+                        dialogFactory.CreatePluginUpdatePromptDialog(
+                            updateResult.Value);
                     var result = dialog.ShowDialog();
 
                     if (result == true)
                     {
-                        continueCheckingProfiles = HandlePluginUpdateDialogResult(dialog, updates);
+                        switch (dialog.Result)
+                        {
+                            case PluginUpdatePromptResult.OpenPluginCenter:
+                                OpenPluginCenter();
+                                continueCheckingProfiles = false;
+                                break;
+                            case PluginUpdatePromptResult.UpdateAll:
+                                await UpdateAllPluginsAsync(
+                                    updateResult.Value);
+                                break;
+                        }
                     }
                 }
 
@@ -105,27 +134,6 @@ namespace AkashaNavigator.Core
             {
                 var logService = _serviceProvider.GetRequiredService<ILogService>();
                 logService.Error(nameof(PluginUpdateChecker), ex, "检查插件更新时发生异常");
-            }
-        }
-
-        /// <summary>
-        /// 处理更新对话框结果
-        /// </summary>
-        private bool HandlePluginUpdateDialogResult(PluginUpdatePromptDialog dialog,
-                                                    System.Collections.Generic.List<UpdateCheckResult> updates)
-        {
-            switch (dialog.Result)
-            {
-                case PluginUpdatePromptResult.OpenPluginCenter:
-                    OpenPluginCenter();
-                    return false;
-
-                case PluginUpdatePromptResult.UpdateAll:
-                    UpdateAllPlugins(updates);
-                    return true;
-
-                default:
-                    return true;
             }
         }
 
@@ -193,13 +201,17 @@ namespace AkashaNavigator.Core
         /// <summary>
         /// 执行一键更新所有插件
         /// </summary>
-        private void UpdateAllPlugins(System.Collections.Generic.List<UpdateCheckResult> updates)
+        private async System.Threading.Tasks.Task UpdateAllPluginsAsync(
+            System.Collections.Generic.IReadOnlyList<PluginSubscriptionUpdate> updates)
         {
             var successCount = 0;
             var failCount = 0;
             foreach (var update in updates)
             {
-                var updateResult = _pluginLibrary.UpdatePlugin(update.PluginId);
+                var updateResult =
+                    await _pluginInstaller
+                        .InstallOrUpdateRepositoryPluginAsync(
+                            update.PluginId);
                 if (updateResult.IsSuccess)
                     successCount++;
                 else

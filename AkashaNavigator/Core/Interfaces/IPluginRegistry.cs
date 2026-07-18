@@ -5,7 +5,7 @@ namespace AkashaNavigator.Core.Interfaces
 {
     /// <summary>
     /// 插件注册表接口
-    /// 管理内置插件的清单和元数据
+    /// 仅用于兼容旧 Profile 推荐插件的存在性索引，不提供版本或更新信息。
     /// </summary>
     public interface IPluginRegistry
     {

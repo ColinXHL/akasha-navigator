@@ -11,7 +11,7 @@ using AkashaNavigator.Models.Plugin;
 namespace AkashaNavigator.Services
 {
 /// <summary>
-/// 内置插件信息（用于插件市场）
+/// 旧内置插件信息（仅用于兼容 Profile 推荐插件）。
 /// </summary>
 public class BuiltInPluginInfo
 {
@@ -26,12 +26,6 @@ public class BuiltInPluginInfo
     /// </summary>
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 插件版本
-    /// </summary>
-    [JsonPropertyName("version")]
-    public string Version { get; set; } = string.Empty;
 
     /// <summary>
     /// 插件作者
@@ -78,7 +72,7 @@ internal class PluginRegistryData
 
 /// <summary>
 /// 插件注册表服务
-/// 管理内置插件索引（只读）
+/// 管理旧内置插件存在性索引（只读，不参与版本检查）。
 /// </summary>
 public class PluginRegistry : IPluginRegistry
 {

@@ -166,7 +166,6 @@ namespace AkashaNavigator.Tests
             Assert.NotNull(plugin);
             Assert.Equal("genshin-direction-marker", plugin!.Id);
             Assert.Equal("原神方向标记", plugin.Name);
-            Assert.Equal("2.0.0", plugin.Version);
             Assert.Equal("ColinXHL", plugin.Author);
             Assert.Contains("subtitle", plugin.Permissions);
             Assert.Contains("overlay", plugin.Permissions);

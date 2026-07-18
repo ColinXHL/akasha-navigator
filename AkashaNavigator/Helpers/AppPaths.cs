@@ -108,7 +108,7 @@ public static class AppPaths
     public static string NoticeStateFilePath { get; }
 
     /// <summary>
-    /// 插件独立资源根目录（User/Data/PluginResources/）。
+    /// 传给伴生进程的插件数据根目录（User/Data/PluginResources/）。
     /// </summary>
     public static string PluginResourcesDirectory { get; }
 
@@ -208,7 +208,7 @@ public static class AppPaths
     }
 
     /// <summary>
-    /// 获取插件独立资源目录。
+    /// 获取伴生进程可使用的插件数据目录。
     /// </summary>
     public static string GetPluginResourceDirectory(string pluginId)
     {

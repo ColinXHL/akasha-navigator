@@ -85,17 +85,23 @@
 
 ### 方式一：提交到官方仓库
 
-1. Fork 官方插件仓库
-2. 在 `plugins/` 目录下创建你的插件文件夹
-3. 提交 Pull Request
-4. 等待审核通过
+1. Fork [AkashaPlugins](https://github.com/ColinXHL/akasha-plugins)
+2. 在 `plugins/<plugin-id>/` 中添加 Manifest v2、代码、资源和测试
+3. 运行仓库提供的 manifest、索引和测试校验
+4. 提交 Pull Request
+5. 合并后由 CI 生成 `repo.json` 并发布 `catalog` 分支
 
 ### 方式二：自托管
 
-1. 将插件打包为 ZIP 文件
-2. 上传到你的服务器或 GitHub Releases
-3. 在 `registry.json` 中添加插件信息
-4. 提交 PR 更新索引
+自托管源也必须提供与官方仓库相同的 catalog 结构，而不是单独维护一个
+`registry.json` 或在应用更新清单中添加 ZIP 地址：
+
+1. 维护 `plugins/*/manifest.json` 和根部 `repo.json`
+2. 将可安装内容发布到 `catalog` 分支
+3. 对带后端的插件发布带大小和 SHA-256 的 Release 资产
+4. 用户在插件仓库设置中选择自定义 Git URL
+
+GitHub、CNB 和自定义 Git URL 是同一逻辑 catalog 的同步或自托管渠道。
 
 ## 插件目录结构
 
@@ -298,9 +304,14 @@ my-plugin/
 
 更新插件时：
 
-1. 更新 `plugin.json` 中的 `version` 字段
+1. 更新 `manifest.json` 中唯一的插件 `version`
 2. 在 README 中添加更新日志
-3. 提交 PR 或更新下载链接
+3. 提交 PR
+4. 等待测试、Release（如需要）和 catalog 发布全部成功
+
+插件中心、启动检查和手动检查都只比较 catalog 版本。不要在
+AkashaNavigator 的 `notice.json`、`repo/plugins` 或其他远程目录重复发布
+插件版本。
 
 版本号遵循语义化版本规范：
 - `MAJOR.MINOR.PATCH`
