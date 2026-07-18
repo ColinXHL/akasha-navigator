@@ -112,6 +112,21 @@ public static class AppPaths
     /// </summary>
     public static string PluginResourcesDirectory { get; }
 
+    /// <summary>
+    /// 插件仓库只读缓存根目录（User/Data/PluginRepositories/）。
+    /// </summary>
+    public static string PluginRepositoriesDirectory { get; }
+
+    /// <summary>
+    /// 官方插件仓库缓存目录。
+    /// </summary>
+    public static string OfficialPluginRepositoryDirectory { get; }
+
+    /// <summary>
+    /// 插件仓库配置文件。
+    /// </summary>
+    public static string PluginRepositoriesConfigFilePath { get; }
+
     static AppPaths()
     {
         // 获取应用程序目录
@@ -161,6 +176,11 @@ public static class AppPaths
         NoticeCacheFilePath = Path.Combine(UpdateDirectory, "notice-cache.json");
         NoticeStateFilePath = Path.Combine(UpdateDirectory, "notice-state.json");
         PluginResourcesDirectory = Path.Combine(DataDirectory, "PluginResources");
+        PluginRepositoriesDirectory = Path.Combine(DataDirectory, "PluginRepositories");
+        OfficialPluginRepositoryDirectory =
+            Path.Combine(PluginRepositoriesDirectory, AppConstants.OfficialPluginRepositoryId);
+        PluginRepositoriesConfigFilePath =
+            Path.Combine(DataDirectory, AppConstants.PluginRepositoriesConfigFileName);
 
         // 确保目录存在
         EnsureDirectoriesExist();
@@ -203,6 +223,7 @@ public static class AppPaths
         Directory.CreateDirectory(InstalledPluginsDirectory);
         Directory.CreateDirectory(UpdateDirectory);
         Directory.CreateDirectory(PluginResourcesDirectory);
+        Directory.CreateDirectory(PluginRepositoriesDirectory);
 
         // 为 WebView2 数据文件夹设置写权限
         EnsureWebView2FolderPermissions();

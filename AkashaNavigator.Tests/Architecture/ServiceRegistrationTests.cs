@@ -98,6 +98,19 @@ public class ServiceRegistrationTests
     }
 
     [Fact]
+    public void ConfigureAppServices_RegistersPluginRepositoryServiceAsSingleton()
+    {
+        var services = new ServiceCollection();
+        services.ConfigureAppServices();
+
+        var descriptor = services.Single(
+            service => service.ServiceType == typeof(IPluginRepositoryService));
+
+        Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
+        Assert.Equal(typeof(PluginRepositoryService), descriptor.ImplementationType);
+    }
+
+    [Fact]
     public void ConfigureAppServices_RegistersRemotePluginServicesAsSingletons()
     {
         var services = new ServiceCollection();

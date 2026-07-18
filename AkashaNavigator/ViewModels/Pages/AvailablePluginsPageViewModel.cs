@@ -13,6 +13,7 @@ using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Common;
 using AkashaNavigator.Models.Plugin;
+using AkashaNavigator.Models.PluginRepository;
 using AkashaNavigator.Models.Update;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Services;
@@ -28,7 +29,7 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     private readonly IPluginLibrary _pluginLibrary;
     private readonly INotificationService _notificationService;
     private readonly IEventBus _eventBus;
-    private readonly IUpdateManifestService _updateManifestService;
+    private readonly IPluginRepositoryService _pluginRepositoryService;
     private readonly IPluginPackageService _pluginPackageService;
     private readonly IConfigService _configService;
     private readonly Dictionary<string, CancellationTokenSource> _downloads =
@@ -59,6 +60,27 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     [ObservableProperty]
     private bool _isEmpty;
 
+    [ObservableProperty]
+    private PluginRepositoryChannel _selectedRepositoryChannel;
+
+    [ObservableProperty]
+    private string _customRepositoryUrl = string.Empty;
+
+    [ObservableProperty]
+    private bool _autoUpdateRepository;
+
+    [ObservableProperty]
+    private bool _autoUpdateSubscribedPlugins;
+
+    [ObservableProperty]
+    private bool _isRepositoryBusy;
+
+    [ObservableProperty]
+    private string _repositoryStatusText = "尚未加载插件仓库";
+
+    public bool IsCustomRepositoryChannel =>
+        SelectedRepositoryChannel == PluginRepositoryChannel.Custom;
+
     /// <summary>
     /// 构造函数
     /// </summary>
@@ -66,18 +88,21 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
         IPluginLibrary pluginLibrary,
         INotificationService notificationService,
         IEventBus eventBus,
-        IUpdateManifestService updateManifestService,
+        IPluginRepositoryService pluginRepositoryService,
         IPluginPackageService pluginPackageService,
         IConfigService configService)
     {
         _pluginLibrary = pluginLibrary ?? throw new ArgumentNullException(nameof(pluginLibrary));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-        _updateManifestService =
-            updateManifestService ?? throw new ArgumentNullException(nameof(updateManifestService));
+        _pluginRepositoryService =
+            pluginRepositoryService ?? throw new ArgumentNullException(nameof(pluginRepositoryService));
         _pluginPackageService =
             pluginPackageService ?? throw new ArgumentNullException(nameof(pluginPackageService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+
+        LoadRepositorySettings();
+        UpdateRepositoryStatus(_pluginRepositoryService.Current);
 
         // 订阅插件列表变化事件
         _eventBus.Subscribe<PluginListChangedEvent>(OnPluginListChanged);
@@ -99,11 +124,18 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     {
         RefreshPluginList();
 
-        var refreshResult = await _updateManifestService.RefreshAsync();
-        if (refreshResult.IsSuccess)
+        var initializeResult = await _pluginRepositoryService.InitializeAsync();
+        if (initializeResult.IsSuccess)
         {
+            UpdateRepositoryStatus(initializeResult.Value);
             RefreshPluginList();
+            return;
         }
+
+        RepositoryStatusText = "插件仓库不可用";
+        _notificationService.Show(
+            $"加载插件仓库失败: {initializeResult.Error?.Message}",
+            NotificationType.Error);
     }
 
     /// <summary>
@@ -149,44 +181,74 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
     /// </summary>
     private List<AvailablePluginItemModel> GetAllCatalogPlugins()
     {
-        var catalog = new Dictionary<string, PluginCatalogEntry>(StringComparer.OrdinalIgnoreCase);
         var installed = _pluginLibrary.GetInstalledPlugins()
             .ToDictionary(plugin => plugin.Id, StringComparer.OrdinalIgnoreCase);
-
-        // 扫描内置插件目录
-        var builtinPluginsDir = AppPaths.BuiltInPluginsDirectory;
-        if (Directory.Exists(builtinPluginsDir))
+        var snapshot = _pluginRepositoryService.Current;
+        if (snapshot == null)
         {
-            foreach (var pluginDir in Directory.GetDirectories(builtinPluginsDir))
-            {
-                var manifestPath = Path.Combine(pluginDir, "plugin.json");
-                if (!File.Exists(manifestPath))
-                    continue;
-
-                var manifest = JsonHelper.LoadFromFile<PluginManifest>(manifestPath);
-                if (manifest.IsFailure || string.IsNullOrEmpty(manifest.Value!.Id))
-                    continue;
-
-                catalog[manifest.Value.Id] = new PluginCatalogEntry {
-                    Id = manifest.Value.Id,
-                    Name = manifest.Value.Name ?? manifest.Value.Id,
-                    Version = manifest.Value.Version ?? "1.0.0",
-                    Description = manifest.Value.Description,
-                    Author = manifest.Value.Author,
-                    LocalSourceDirectory = pluginDir
-                };
-            }
+            return new List<AvailablePluginItemModel>();
         }
 
-        foreach (var remote in _pluginPackageService.GetRemoteCatalog())
-        {
-            catalog[remote.Id] = remote;
-        }
-
-        return catalog.Values
-            .Select(entry => CreateItem(entry, installed.GetValueOrDefault(entry.Id)))
+        return snapshot.Index.Plugins
+            .Select(
+                entry => CreateItem(
+                    CreateCatalogEntry(entry),
+                    installed.GetValueOrDefault(entry.Id)))
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+    }
+
+    [RelayCommand]
+    private void SaveRepositorySettings()
+    {
+        var result = TrySaveRepositorySettings();
+        _notificationService.Show(
+            result.IsSuccess
+                ? "插件仓库设置已保存"
+                : $"保存插件仓库设置失败: {result.Error?.Message}",
+            result.IsSuccess ? NotificationType.Success : NotificationType.Error);
+    }
+
+    [RelayCommand]
+    private async Task UpdateRepositoryAsync()
+    {
+        if (!CanStartRepositoryOperation())
+        {
+            return;
+        }
+
+        IsRepositoryBusy = true;
+        RepositoryStatusText = "正在更新插件仓库…";
+        try
+        {
+            var result = await _pluginRepositoryService.RefreshAsync();
+            HandleRepositoryUpdateResult(result, "插件仓库已更新");
+        }
+        finally
+        {
+            IsRepositoryBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ResetRepositoryAsync()
+    {
+        if (!CanStartRepositoryOperation())
+        {
+            return;
+        }
+
+        IsRepositoryBusy = true;
+        RepositoryStatusText = "正在重置插件仓库…";
+        try
+        {
+            var result = await _pluginRepositoryService.ResetAsync();
+            HandleRepositoryUpdateResult(result, "插件仓库已重置");
+        }
+        finally
+        {
+            IsRepositoryBusy = false;
+        }
     }
 
     /// <summary>
@@ -311,6 +373,105 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
             SelectedSourceText = entry.IsRemote
                 ? $"下载源：{GetPreferenceDisplayName(_configService.Config.PluginDownloadSourcePreference)}"
                 : string.Empty
+        };
+    }
+
+    partial void OnSelectedRepositoryChannelChanged(PluginRepositoryChannel value)
+    {
+        OnPropertyChanged(nameof(IsCustomRepositoryChannel));
+    }
+
+    private void LoadRepositorySettings()
+    {
+        var settings = _pluginRepositoryService.Settings;
+        SelectedRepositoryChannel = settings.SelectedChannel;
+        CustomRepositoryUrl = settings.CustomUrl;
+        AutoUpdateRepository = settings.AutoUpdateRepository;
+        AutoUpdateSubscribedPlugins = settings.AutoUpdateSubscribedPlugins;
+    }
+
+    private Result TrySaveRepositorySettings()
+    {
+        return _pluginRepositoryService.SaveSettings(
+            new PluginRepositorySettings {
+                SelectedChannel = SelectedRepositoryChannel,
+                CustomUrl = CustomRepositoryUrl.Trim(),
+                Branch = AppConstants.OfficialPluginRepositoryBranch,
+                AutoUpdateRepository = AutoUpdateRepository,
+                AutoUpdateSubscribedPlugins = AutoUpdateSubscribedPlugins
+            });
+    }
+
+    private bool CanStartRepositoryOperation()
+    {
+        if (IsRepositoryBusy)
+        {
+            return false;
+        }
+
+        var saveResult = TrySaveRepositorySettings();
+        if (saveResult.IsSuccess)
+        {
+            return true;
+        }
+
+        _notificationService.Show(
+            $"插件仓库设置无效: {saveResult.Error?.Message}",
+            NotificationType.Error);
+        return false;
+    }
+
+    private void HandleRepositoryUpdateResult(
+        Result<PluginRepositorySnapshot> result,
+        string successMessage)
+    {
+        if (result.IsFailure)
+        {
+            RepositoryStatusText = "插件仓库更新失败";
+            _notificationService.Show(
+                $"{RepositoryStatusText}: {result.Error?.Message}",
+                NotificationType.Error);
+            return;
+        }
+
+        UpdateRepositoryStatus(result.Value);
+        RefreshPluginList();
+        _notificationService.Show(
+            result.Value!.UsedCache
+                ? "仓库更新失败，已继续使用本地缓存"
+                : successMessage,
+            result.Value.UsedCache ? NotificationType.Warning : NotificationType.Success);
+    }
+
+    private void UpdateRepositoryStatus(PluginRepositorySnapshot? snapshot)
+    {
+        if (snapshot == null)
+        {
+            RepositoryStatusText = "尚未加载插件仓库";
+            return;
+        }
+
+        var shortCommit = snapshot.CatalogCommit.Length > 8
+            ? snapshot.CatalogCommit[..8]
+            : snapshot.CatalogCommit;
+        RepositoryStatusText =
+            $"{(snapshot.UsedCache ? "本地缓存" : "最新仓库")} · {snapshot.Index.Plugins.Count} 个插件 · {shortCommit}";
+    }
+
+    private PluginCatalogEntry CreateCatalogEntry(PluginRepositoryEntry entry)
+    {
+        var isRelease =
+            entry.DistributionType == AppConstants.PluginDistributionRelease;
+        return new PluginCatalogEntry {
+            Id = entry.Id,
+            Name = entry.Name,
+            Version = entry.Version,
+            Description = entry.Description,
+            MinHostVersion = entry.MinHostVersion,
+            LocalSourceDirectory = isRelease
+                ? null
+                : Path.Combine(_pluginRepositoryService.RepositoryDirectory, entry.Path),
+            IsRemote = isRelease
         };
     }
 
