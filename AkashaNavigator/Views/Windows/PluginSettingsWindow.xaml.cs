@@ -242,7 +242,11 @@ public partial class PluginSettingsWindow : AnimatedWindow
         if (string.IsNullOrEmpty(pluginDirectory))
             return false;
 
-        var settingsUiPath = Path.Combine(pluginDirectory, "settings_ui.json");
-        return File.Exists(settingsUiPath);
+        var manifestResult = PluginManifest.LoadFromFile(
+            Path.Combine(pluginDirectory, AppConstants.PluginManifestFileName));
+        var settingsUiPath = PluginSettingsPathResolver.ResolveSettingsFile(
+            pluginDirectory,
+            manifestResult.IsSuccess ? manifestResult.Manifest?.Settings : null);
+        return settingsUiPath != null && File.Exists(settingsUiPath);
     }
 }

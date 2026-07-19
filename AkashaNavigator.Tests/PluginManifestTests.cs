@@ -1,5 +1,6 @@
 using System.Text.Json;
 using AkashaNavigator.Models.Plugin;
+using AkashaNavigator.Models.PluginRepository;
 using FsCheck;
 using FsCheck.Xunit;
 using Xunit;
@@ -254,6 +255,41 @@ public class PluginManifestTests
         Assert.Equal("dark", result.Manifest.DefaultConfig["theme"].GetString());
         Assert.Equal(14, result.Manifest.DefaultConfig["fontSize"].GetInt32());
         Assert.True(result.Manifest.DefaultConfig["enabled"].GetBoolean());
+    }
+
+    [Fact]
+    public void Settings_ShouldDeserializeCorrectly()
+    {
+        var json = """
+                   {
+                     "id": "test-plugin",
+                     "name": "Test Plugin",
+                     "version": "1.0.0",
+                     "main": "frontend/main.js",
+                     "settings": "frontend/settings_ui.json"
+                   }
+                   """;
+
+        var result = PluginManifest.LoadFromJson(json);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("frontend/settings_ui.json", result.Manifest!.Settings);
+    }
+
+    [Fact]
+    public void CatalogManifest_ShouldPreserveSettingsInRuntimeManifest()
+    {
+        var catalogManifest = new CatalogPluginManifest {
+            Id = "test-plugin",
+            Name = "Test Plugin",
+            Version = "1.0.0",
+            Main = "frontend/main.js",
+            Settings = "frontend/settings_ui.json"
+        };
+
+        var runtimeManifest = catalogManifest.ToRuntimeManifest();
+
+        Assert.Equal("frontend/settings_ui.json", runtimeManifest.Settings);
     }
 
     /// <summary>

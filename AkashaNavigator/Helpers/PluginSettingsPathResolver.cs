@@ -1,11 +1,43 @@
 using System;
 using System.IO;
+using AkashaNavigator.Models.PluginRepository;
 
 namespace AkashaNavigator.Helpers;
 
 internal static class PluginSettingsPathResolver
 {
     public static string? ResolveDirectory(string pluginDirectory, string? relativePath)
+    {
+        return ResolvePath(pluginDirectory, relativePath);
+    }
+
+    public static string? ResolveSettingsFile(string pluginDirectory, string? manifestSettingsPath)
+    {
+        if (string.IsNullOrWhiteSpace(pluginDirectory))
+        {
+            return null;
+        }
+
+        var relativePath = manifestSettingsPath;
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            var repositoryManifestResult =
+                JsonHelper.LoadFromFile<CatalogPluginManifest>(
+                    Path.Combine(
+                        pluginDirectory,
+                        AppConstants.PluginRepositoryManifestFileName));
+            relativePath = repositoryManifestResult.IsSuccess
+                ? repositoryManifestResult.Value?.Settings
+                : null;
+        }
+
+        relativePath = string.IsNullOrWhiteSpace(relativePath)
+            ? AppConstants.PluginSettingsUiFileName
+            : relativePath;
+        return ResolvePath(pluginDirectory, relativePath);
+    }
+
+    private static string? ResolvePath(string pluginDirectory, string? relativePath)
     {
         if (string.IsNullOrWhiteSpace(pluginDirectory))
         {

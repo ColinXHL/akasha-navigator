@@ -260,6 +260,11 @@ public static class AppConstants
     public const string PluginManifestFileName = "plugin.json";
 
     /// <summary>
+    /// 未在插件清单中显式声明时使用的设置界面文件名。
+    /// </summary>
+    public const string PluginSettingsUiFileName = "settings_ui.json";
+
+    /// <summary>
     /// 插件仓库索引文件名。
     /// </summary>
     public const string PluginRepositoryIndexFileName = "repo.json";
