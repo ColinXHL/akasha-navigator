@@ -1,15 +1,9 @@
 <UserControl x:Class="AkashaNavigator.Views.Pages.AvailablePluginsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:AkashaNavigator.ViewModels.Pages"
              xmlns:repository="clr-namespace:AkashaNavigator.Models.PluginRepository"
              Background="Transparent"
              Cursor="Arrow">
-
-    <!-- 已移除本地资源定义，使用全局样式：
-         - BoolToVisibilityConverter -> 全局 Converters.xaml
-         - InverseBoolToVisibilityConverter -> 全局 Converters.xaml
-         - LocalPrimaryButtonStyle -> 全局 PrimaryActionButtonStyle -->
 
     <Grid>
         <Grid.RowDefinitions>
@@ -19,77 +13,204 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- 标题和搜索栏 -->
+        <!-- 页面标题与全局工具 -->
         <Grid Grid.Row="0" Margin="0,0,0,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="可用插件" FontSize="18" FontWeight="SemiBold"
-                       Foreground="White" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="📦 从 ZIP 安装"
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="可用插件"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                <TextBlock Text="发现、订阅并安装官方 catalog 中的插件"
+                           Margin="0,4,0,0"
+                           FontSize="11"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+
+            <Button Grid.Column="1"
+                    Content="从 ZIP 安装"
                     Style="{StaticResource ActionButtonStyle}"
                     Margin="0,0,12,0"
+                    VerticalAlignment="Center"
                     Click="OnInstallPackageClick"/>
-            <TextBox x:Name="SearchBox" Grid.Column="2" Width="200"
-                     Style="{StaticResource SearchBoxStyle}" Tag="搜索插件..."
+
+            <TextBox x:Name="SearchBox"
+                     Grid.Column="2"
+                     Width="240"
+                     Style="{StaticResource SearchBoxStyle}"
+                     Tag="搜索插件..."
+                     VerticalAlignment="Center"
                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
         </Grid>
 
         <!-- 仓库设置 -->
-        <WrapPanel Grid.Row="1" Margin="0,0,0,12" VerticalAlignment="Center">
-            <ComboBox Width="105" Margin="0,0,8,0"
-                      SelectedValuePath="Tag"
-                      SelectedValue="{Binding SelectedRepositoryChannel}">
-                <ComboBoxItem Content="GitHub"
-                              Tag="{x:Static repository:PluginRepositoryChannel.GitHub}"/>
-                <ComboBoxItem Content="CNB"
-                              Tag="{x:Static repository:PluginRepositoryChannel.Cnb}"/>
-                <ComboBoxItem Content="自定义"
-                              Tag="{x:Static repository:PluginRepositoryChannel.Custom}"/>
-            </ComboBox>
-            <TextBox Width="250" Margin="0,0,8,0"
-                     Text="{Binding CustomRepositoryUrl, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="自定义仓库 HTTPS Git 地址"
-                     Visibility="{Binding IsCustomRepositoryChannel, Converter={StaticResource BoolToVisibilityConverter}}"/>
-            <CheckBox Content="启动时更新仓库" Margin="0,0,12,0"
-                      Foreground="#CCC" VerticalAlignment="Center"
-                      IsChecked="{Binding AutoUpdateRepository}"/>
-            <CheckBox Content="自动更新已订阅插件" Margin="0,0,12,0"
-                      Foreground="#CCC" VerticalAlignment="Center"
-                      IsChecked="{Binding AutoUpdateSubscribedPlugins}"/>
-            <Button Content="保存" Style="{StaticResource ActionButtonStyle}"
-                    Margin="0,0,8,0"
-                    Command="{Binding SaveRepositorySettingsCommand}"/>
-            <Button Content="更新仓库" Style="{StaticResource PrimaryActionButtonStyle}"
-                    Margin="0,0,8,0"
-                    Command="{Binding UpdateRepositoryCommand}"/>
-            <Button Content="重置仓库" Style="{StaticResource ActionButtonStyle}"
-                    Margin="0,0,8,0"
-                    Command="{Binding ResetRepositoryCommand}"/>
-            <Button Content="一键更新订阅" Style="{StaticResource ActionButtonStyle}"
-                    Command="{Binding UpdateAllSubscribedCommand}"/>
-        </WrapPanel>
+        <Border Grid.Row="1"
+                Margin="0,0,0,14"
+                Padding="16,14"
+                Background="{StaticResource SurfaceDarkerBrush}"
+                BorderBrush="{StaticResource BorderDarkBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-        <!-- 统计信息 -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,16">
-            <TextBlock x:Name="PluginCountText" Text="{Binding PluginCountText}" Foreground="#888" FontSize="12"/>
-            <TextBlock Text="{Binding RepositoryStatusText}" Foreground="#60A5FA"
-                       FontSize="12" Margin="16,0,0,0"/>
-        </StackPanel>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Text="插件仓库"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"/>
+                        <Border Margin="10,0,0,0"
+                                Padding="7,2"
+                                Background="{StaticResource InfoBackgroundBrush}"
+                                CornerRadius="3">
+                            <TextBlock Text="catalog"
+                                       FontSize="10"
+                                       Foreground="{StaticResource InfoLightBrush}"/>
+                        </Border>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding RepositoryStatusText}"
+                               FontSize="11"
+                               Foreground="{StaticResource InfoLightBrush}"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="124"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="仓库源"
+                               Margin="0,0,10,0"
+                               FontSize="12"
+                               Foreground="{StaticResource TextTertiaryBrush}"
+                               VerticalAlignment="Center"/>
+
+                    <ComboBox Grid.Column="1"
+                              Style="{StaticResource DarkComboBoxStyle}"
+                              ItemContainerStyle="{StaticResource DarkComboBoxItemStyle}"
+                              SelectedValuePath="Tag"
+                              SelectedValue="{Binding SelectedRepositoryChannel}">
+                        <ComboBoxItem Content="GitHub"
+                                      Tag="{x:Static repository:PluginRepositoryChannel.GitHub}"/>
+                        <ComboBoxItem Content="CNB"
+                                      Tag="{x:Static repository:PluginRepositoryChannel.Cnb}"/>
+                        <ComboBoxItem Content="自定义"
+                                      Tag="{x:Static repository:PluginRepositoryChannel.Custom}"/>
+                    </ComboBox>
+
+                    <TextBox Grid.Column="2"
+                             Margin="12,0,12,0"
+                             Style="{StaticResource DarkTextBoxStyle}"
+                             Text="{Binding CustomRepositoryUrl, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="自定义仓库 HTTPS Git 地址"
+                             Visibility="{Binding IsCustomRepositoryChannel, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <StackPanel Grid.Column="3"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button Content="保存设置"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Command="{Binding SaveRepositorySettingsCommand}"/>
+                        <Button Content="更新仓库"
+                                Style="{StaticResource PrimaryActionButtonStyle}"
+                                Margin="8,0,0,0"
+                                Command="{Binding UpdateRepositoryCommand}"/>
+                        <Button Content="重置"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Margin="8,0,0,0"
+                                Command="{Binding ResetRepositoryCommand}"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Grid.Row="2" Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <CheckBox Grid.Column="0"
+                              Content="启动时更新仓库"
+                              Style="{StaticResource DarkCheckBoxStyle}"
+                              FontSize="12"
+                              Foreground="{StaticResource TextMutedBrush}"
+                              IsChecked="{Binding AutoUpdateRepository}"
+                              ToolTip="仅刷新 catalog，不会替换本地插件"/>
+
+                    <CheckBox Grid.Column="1"
+                              Content="自动更新已订阅插件"
+                              Style="{StaticResource DarkCheckBoxStyle}"
+                              Margin="24,0,0,0"
+                              FontSize="12"
+                              Foreground="{StaticResource TextMutedBrush}"
+                              IsChecked="{Binding AutoUpdateSubscribedPlugins}"
+                              ToolTip="仓库刷新后自动安装允许自动更新的订阅插件"/>
+
+                    <TextBlock Grid.Column="2"
+                               Text="仓库刷新与插件安装相互独立"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{StaticResource TextDisabledBrush}"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- 列表摘要 -->
+        <Grid Grid.Row="2" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="PluginCountText"
+                       Grid.Column="0"
+                       Text="{Binding PluginCountText}"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12"
+                       VerticalAlignment="Center"/>
+
+            <Button Grid.Column="1"
+                    Content="更新全部订阅"
+                    Style="{StaticResource ActionButtonStyle}"
+                    Command="{Binding UpdateAllSubscribedCommand}"/>
+        </Grid>
 
         <!-- 插件列表 -->
-        <ScrollViewer Grid.Row="3" Style="{StaticResource DarkScrollViewer}"
+        <ScrollViewer Grid.Row="3"
+                      Style="{StaticResource DarkScrollViewer}"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <!-- 无插件提示 -->
-                <TextBlock x:Name="NoPluginsText" Text="没有可用的插件"
-                           Foreground="#666" FontSize="13" Margin="0,20,0,0"
+                <TextBlock x:Name="NoPluginsText"
+                           Text="没有可用的插件"
+                           Foreground="{StaticResource TextDisabledBrush}"
+                           FontSize="13"
+                           Margin="0,32,0,0"
                            HorizontalAlignment="Center"
                            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-                <!-- 插件列表 -->
                 <ItemsControl x:Name="PluginList" ItemsSource="{Binding Plugins}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -101,7 +222,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
-                                    <!-- 第一行：名称、版本、状态标签 -->
+                                    <!-- 名称、版本和状态 -->
                                     <Grid Grid.Row="0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -109,93 +230,156 @@
                                         </Grid.ColumnDefinitions>
 
                                         <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                            <TextBlock Text="🔍" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                            <TextBlock Text="{Binding Name}" Foreground="White"
-                                                       FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Version, StringFormat=' v{0}'}"
-                                                       Foreground="#888" FontSize="12"
-                                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                            <Border Width="28"
+                                                    Height="28"
+                                                    Margin="0,0,10,0"
+                                                    Background="{StaticResource InfoBackgroundBrush}"
+                                                    CornerRadius="6">
+                                                <TextBlock Text="◆"
+                                                           Foreground="{StaticResource InfoLightBrush}"
+                                                           FontSize="11"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       FontSize="15"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       FontSize="11"
+                                                       VerticalAlignment="Center"
+                                                       Margin="10,0,0,0"/>
                                         </StackPanel>
 
-                                        <!-- 可安装标签：未安装时显示 -->
-                                        <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
+                                        <Border Grid.Column="1"
+                                                Style="{StaticResource AvailableTagStyle}"
                                                 Visibility="{Binding AvailableTagVisibility}">
-                                            <TextBlock Text="可安装" Foreground="#60A5FA" FontSize="11"/>
+                                            <TextBlock Text="可安装"
+                                                       Foreground="{StaticResource InfoLightBrush}"
+                                                       FontSize="11"/>
                                         </Border>
-                                        <!-- 已安装标签：已安装时显示 -->
-                                        <Border Grid.Column="1" Style="{StaticResource InstalledTagStyle}"
+                                        <Border Grid.Column="1"
+                                                Style="{StaticResource InstalledTagStyle}"
                                                 Visibility="{Binding InstalledTagVisibility}">
-                                            <TextBlock Text="已安装" Foreground="#4ADE80" FontSize="11"/>
+                                            <TextBlock Text="已安装"
+                                                       Foreground="{StaticResource SuccessBrush}"
+                                                       FontSize="11"/>
                                         </Border>
-                                        <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
+                                        <Border Grid.Column="1"
+                                                Style="{StaticResource UpdateAvailableTagStyle}"
                                                 Visibility="{Binding UpdateTagVisibility}">
-                                            <TextBlock Text="可更新" Foreground="#FBBF24" FontSize="11"/>
+                                            <TextBlock Text="可更新"
+                                                       Foreground="{StaticResource WarningTextBrush}"
+                                                       FontSize="11"/>
                                         </Border>
-                                        <Border Grid.Column="1" Style="{StaticResource AvailableTagStyle}"
+                                        <Border Grid.Column="1"
+                                                Style="{StaticResource MissingTagStyle}"
+                                                Padding="8,3"
+                                                CornerRadius="3"
                                                 Visibility="{Binding RemovedTagVisibility}">
-                                            <TextBlock Text="仓库中已移除" Foreground="#F87171" FontSize="11"/>
+                                            <TextBlock Text="仓库中已移除"
+                                                       Foreground="#F87171"
+                                                       FontSize="11"/>
                                         </Border>
                                     </Grid>
 
-                                    <!-- 第二行：描述和作者 -->
-                                    <StackPanel Grid.Row="1" Margin="0,8,0,0">
-                                        <TextBlock Text="{Binding Description}" Foreground="#AAA" FontSize="12"
-                                                   TextWrapping="Wrap" Visibility="{Binding HasDescriptionVisibility}"/>
-                                        <TextBlock Text="{Binding Author, StringFormat='作者: {0}'}"
-                                                   Foreground="#666" FontSize="11" Margin="0,4,0,0"
-                                                   Visibility="{Binding HasAuthorVisibility}"/>
-                                        <TextBlock Text="已订阅仓库更新"
-                                                   Foreground="#A78BFA" FontSize="11" Margin="0,4,0,0"
-                                                   Visibility="{Binding SubscriptionStatusVisibility}"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,5,0,0"
-                                                    Visibility="{Binding RemoteInfoVisibility}">
-                                            <TextBlock Text="{Binding PackageSizeText, StringFormat='包大小: {0}'}"
-                                                       Foreground="#777" FontSize="11"/>
-                                            <TextBlock Text="{Binding InstalledVersionText}"
-                                                       Foreground="#777" FontSize="11" Margin="14,0,0,0"/>
-                                            <TextBlock Text="{Binding SelectedSourceText}"
-                                                       Foreground="#60A5FA" FontSize="11" Margin="14,0,0,0"/>
-                                        </StackPanel>
-                                    </StackPanel>
+                                    <!-- 插件信息与操作 -->
+                                    <Grid Grid.Row="1" Margin="38,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
 
-                                    <!-- 第三行：操作按钮 -->
-                                    <StackPanel Grid.Row="2" Margin="0,12,0,0">
-                                        <StackPanel Visibility="{Binding DownloadVisibility}">
-                                            <ProgressBar Height="5" Minimum="0" Maximum="100"
-                                                         Value="{Binding DownloadProgress}"
-                                                         Foreground="#3B82F6" Background="#252A34"/>
-                                            <TextBlock Text="{Binding DownloadStatus}" Foreground="#888"
-                                                       FontSize="11" Margin="0,5,0,0"/>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Description}"
+                                                       Foreground="{StaticResource TextTertiaryBrush}"
+                                                       FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="{Binding HasDescriptionVisibility}"/>
+                                            <WrapPanel Margin="0,5,0,0">
+                                                <TextBlock Text="{Binding Author, StringFormat='作者：{0}'}"
+                                                           Foreground="{StaticResource TextDisabledBrush}"
+                                                           FontSize="11"
+                                                           Visibility="{Binding HasAuthorVisibility}"/>
+                                                <TextBlock Text="已订阅仓库更新"
+                                                           Foreground="#A78BFA"
+                                                           FontSize="11"
+                                                           Margin="14,0,0,0"
+                                                           Visibility="{Binding SubscriptionStatusVisibility}"/>
+                                            </WrapPanel>
+                                            <WrapPanel Margin="0,5,0,0"
+                                                       Visibility="{Binding RemoteInfoVisibility}">
+                                                <TextBlock Text="{Binding PackageSizeText, StringFormat='包大小：{0}'}"
+                                                           Foreground="{StaticResource TextDisabledBrush}"
+                                                           FontSize="11"/>
+                                                <TextBlock Text="{Binding InstalledVersionText}"
+                                                           Foreground="{StaticResource TextDisabledBrush}"
+                                                           FontSize="11"
+                                                           Margin="14,0,0,0"/>
+                                                <TextBlock Text="{Binding SelectedSourceText}"
+                                                           Foreground="{StaticResource InfoLightBrush}"
+                                                           FontSize="11"
+                                                           Margin="14,0,0,0"/>
+                                            </WrapPanel>
                                         </StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                            <Button Content="📥 安装" Style="{StaticResource PrimaryActionButtonStyle}"
+
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal"
+                                                    Margin="24,0,0,0"
+                                                    VerticalAlignment="Bottom">
+                                            <Button Content="安装"
+                                                    Style="{StaticResource PrimaryActionButtonStyle}"
                                                     Command="{Binding DataContext.InstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding InstallButtonVisibility}"/>
-                                            <Button Content="⬆ 更新" Style="{StaticResource PrimaryActionButtonStyle}"
+                                            <Button Content="更新"
+                                                    Style="{StaticResource PrimaryActionButtonStyle}"
                                                     Command="{Binding DataContext.InstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding UpdateButtonVisibility}"/>
-                                            <Button Content="取消下载" Style="{StaticResource ActionButtonStyle}"
+                                            <Button Content="取消下载"
+                                                    Style="{StaticResource ActionButtonStyle}"
+                                                    Margin="8,0,0,0"
                                                     Command="{Binding DataContext.CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding CancelButtonVisibility}"/>
-                                            <Button Content="订阅" Style="{StaticResource ActionButtonStyle}"
+                                            <Button Content="订阅"
+                                                    Style="{StaticResource ActionButtonStyle}"
                                                     Margin="8,0,0,0"
                                                     Command="{Binding DataContext.SubscribeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding SubscribeButtonVisibility}"/>
-                                            <Button Content="取消订阅" Style="{StaticResource ActionButtonStyle}"
+                                            <Button Content="取消订阅"
+                                                    Style="{StaticResource ActionButtonStyle}"
                                                     Margin="8,0,0,0"
                                                     Command="{Binding DataContext.UnsubscribeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding UnsubscribeButtonVisibility}"/>
-                                            <Button Content="卸载" Style="{StaticResource ActionButtonStyle}"
+                                            <Button Content="卸载"
+                                                    Style="{StaticResource DangerActionButtonStyle}"
                                                     Margin="8,0,0,0"
                                                     Command="{Binding DataContext.UninstallCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding UninstallButtonVisibility}"/>
                                         </StackPanel>
+                                    </Grid>
+
+                                    <!-- 下载进度 -->
+                                    <StackPanel Grid.Row="2"
+                                                Margin="38,12,0,0"
+                                                Visibility="{Binding DownloadVisibility}">
+                                        <ProgressBar Height="5"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Value="{Binding DownloadProgress}"
+                                                     Foreground="{StaticResource InfoBrush}"
+                                                     Background="{StaticResource SurfaceDarkerBrush}"/>
+                                        <TextBlock Text="{Binding DownloadStatus}"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   FontSize="11"
+                                                   Margin="0,5,0,0"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

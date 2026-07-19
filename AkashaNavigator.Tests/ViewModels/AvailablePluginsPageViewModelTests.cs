@@ -63,6 +63,39 @@ public sealed class AvailablePluginsPageViewModelTests
     }
 
     [Fact]
+    public void RefreshPluginList_MovesAvailableUpdatesBeforeOtherPlugins()
+    {
+        var snapshot = CreateSnapshot(usedCache: false);
+        snapshot.Index.Plugins[0].Name = "Zulu Update";
+        snapshot.Index.Plugins[1].Name = "Alpha Current";
+        var pluginLibrary = new Mock<IPluginLibrary>();
+        pluginLibrary
+            .Setup(library => library.GetInstalledPlugins())
+            .Returns(
+                new List<InstalledPluginInfo> {
+                    new() {
+                        Id = "alpha-plugin",
+                        Name = "Zulu Update",
+                        Version = "1.0.0"
+                    },
+                    new() {
+                        Id = "beta-plugin",
+                        Name = "Alpha Current",
+                        Version = "1.0.0"
+                    }
+                });
+        var viewModel = CreateViewModel(
+            CreateRepositoryService(snapshot).Object,
+            pluginLibrary.Object);
+
+        viewModel.RefreshPluginList();
+
+        Assert.Equal("alpha-plugin", viewModel.Plugins[0].Id);
+        Assert.True(viewModel.Plugins[0].HasUpdate);
+        Assert.False(viewModel.Plugins[1].HasUpdate);
+    }
+
+    [Fact]
     public async Task OnLoadedAsync_ReportsCachedRepositoryAndDoesNotRefreshLegacyManifest()
     {
         var snapshot = CreateSnapshot(usedCache: true);

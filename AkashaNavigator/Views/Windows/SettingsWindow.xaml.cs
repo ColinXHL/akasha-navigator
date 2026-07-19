@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -47,13 +48,7 @@ public partial class SettingsWindow : AnimatedWindow
         UpdatePageVisibility(_viewModel.CurrentPage);
 
         // 订阅 ViewModel 的 PropertyChanged 事件，处理页面显示切换
-        _viewModel.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName == nameof(_viewModel.CurrentPage))
-            {
-                UpdatePageVisibility(_viewModel.CurrentPage);
-            }
-        };
+        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
         // 订阅搜索结果变化
         _viewModel.SearchResults.CollectionChanged += SearchResults_CollectionChanged;
@@ -63,6 +58,16 @@ public partial class SettingsWindow : AnimatedWindow
 
         // 加载 Profile 列表（通过 GeneralPage）
         _viewModel.RefreshProfileList();
+    }
+
+    private void ViewModel_PropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(_viewModel.CurrentPage))
+        {
+            UpdatePageVisibility(_viewModel.CurrentPage);
+        }
     }
 
     /// <summary>
@@ -180,6 +185,16 @@ public partial class SettingsWindow : AnimatedWindow
     {
         _viewModel.SaveCommand.Execute(null);
         CloseWithAnimation();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _viewModel.OpenConfigFolderRequested -= OnOpenConfigFolder;
+        _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        _viewModel.SearchResults.CollectionChanged -=
+            SearchResults_CollectionChanged;
+        _viewModel.ReleaseEventSubscriptions();
+        base.OnClosed(e);
     }
 }
 }

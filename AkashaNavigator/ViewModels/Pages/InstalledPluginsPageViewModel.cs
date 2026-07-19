@@ -176,7 +176,13 @@ public partial class InstalledPluginsPageViewModel : ObservableObject, IDisposab
         }
 
         // 转换为视图模型
-        var viewModels = plugins.Select(p => CreatePluginItemModel(p)).ToList();
+        var viewModels = plugins
+            .Select(CreatePluginItemModel)
+            .OrderByDescending(plugin => plugin.HasUpdate)
+            .ThenBy(
+                plugin => plugin.Name,
+                StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
 
         Plugins.Clear();
         foreach (var vm in viewModels)

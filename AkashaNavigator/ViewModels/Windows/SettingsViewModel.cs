@@ -395,6 +395,14 @@ public partial class SettingsViewModel : ObservableObject
     {
         _generalPageVM.RefreshSettings();
     }
+
+    /// <summary>
+    /// 释放设置页建立的全局事件订阅。
+    /// </summary>
+    public void ReleaseEventSubscriptions()
+    {
+        _generalPageVM.ReleaseEventSubscriptions();
+    }
 }
 
 /// <summary>

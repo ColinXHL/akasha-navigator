@@ -70,6 +70,31 @@ public partial class PluginCenterWindow : AnimatedWindow
             currentPage == PluginCenterPageType.InstalledPlugins ? Visibility.Visible : Visibility.Collapsed;
         _availablePluginsPage.Visibility =
             currentPage == PluginCenterPageType.AvailablePlugins ? Visibility.Visible : Visibility.Collapsed;
+
+        RefreshPage(currentPage);
+    }
+
+    /// <summary>
+    /// 刷新窗口中实际显示的 Page 实例。
+    /// PageViewModel 为 Transient，不能通过窗口 ViewModel 另行解析后刷新。
+    /// </summary>
+    private void RefreshPage(PluginCenterPageType page)
+    {
+        switch (page)
+        {
+        case PluginCenterPageType.MyProfiles:
+            _myProfilesPage.RefreshProfileList();
+            break;
+        case PluginCenterPageType.ProfileMarket:
+            _ = _profileMarketPage.RefreshProfilesAsync();
+            break;
+        case PluginCenterPageType.InstalledPlugins:
+            _installedPluginsPage.CheckAndRefreshPluginList();
+            break;
+        case PluginCenterPageType.AvailablePlugins:
+            _availablePluginsPage.RefreshPluginList();
+            break;
+        }
     }
 
     /// <summary>
@@ -116,7 +141,7 @@ public partial class PluginCenterWindow : AnimatedWindow
     /// </summary>
     public void RefreshCurrentPage()
     {
-        _viewModel.RefreshCurrentPage();
+        RefreshPage(_viewModel.CurrentPage);
     }
 
     private void DisposePages()

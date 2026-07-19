@@ -642,6 +642,7 @@ public class PluginLibrary : IPluginLibrary
         string rootDirectory,
         string relativePath)
     {
+        relativePath = relativePath?.TrimEnd('/') ?? string.Empty;
         if (string.IsNullOrWhiteSpace(relativePath) ||
             Path.IsPathRooted(relativePath) ||
             relativePath.Contains('\\') ||
@@ -1066,6 +1067,48 @@ public class PluginLibrary : IPluginLibrary
         }
 
         return parsed1.PreRelease.Length.CompareTo(parsed2.PreRelease.Length);
+    }
+
+    /// <summary>
+    /// 判断当前宿主是否满足插件声明的最低宿主版本。
+    /// </summary>
+    /// <remarks>
+    /// 插件版本排序遵循严格 SemVer；宿主兼容性额外允许同一发布线的预发布宿主
+    /// 满足不带预发布标签的最低版本，例如 1.4.0-alpha.2 可运行要求 1.4.0
+    /// 的插件。若最低版本明确包含预发布标签，则仍按完整 SemVer 比较。
+    /// </remarks>
+    public static bool IsHostVersionCompatible(
+        string? currentVersion,
+        string? minimumVersion)
+    {
+        if (!TryParseSemanticVersion(currentVersion ?? string.Empty, out var current) ||
+            !TryParseSemanticVersion(minimumVersion ?? string.Empty, out var minimum))
+        {
+            return CompareVersions(currentVersion, minimumVersion) >= 0;
+        }
+
+        var coreComparison = CompareCoreVersions(current, minimum);
+        if (coreComparison != 0)
+        {
+            return coreComparison > 0;
+        }
+
+        return minimum.PreRelease.Length == 0 ||
+               CompareVersions(currentVersion, minimumVersion) >= 0;
+    }
+
+    private static int CompareCoreVersions(
+        SemanticPluginVersion left,
+        SemanticPluginVersion right)
+    {
+        var comparison = left.Major.CompareTo(right.Major);
+        if (comparison != 0)
+            return comparison;
+
+        comparison = left.Minor.CompareTo(right.Minor);
+        return comparison != 0
+            ? comparison
+            : left.Patch.CompareTo(right.Patch);
     }
 
     private static bool TryParseSemanticVersion(string value, out SemanticPluginVersion version)
