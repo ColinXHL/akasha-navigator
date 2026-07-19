@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using AkashaNavigator.Core.Interfaces;
+using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
 using AkashaNavigator.Models.Plugin;
 
@@ -57,13 +58,18 @@ public class PluginSettingsViewModel
 
         var manifestPath = Path.Combine(pluginDirectory, AppConstants.PluginManifestFileName);
         var manifestResult = PluginManifest.LoadFromFile(manifestPath);
-        if (manifestResult.IsSuccess && manifestResult.Manifest?.DefaultConfig != null)
+        var manifest = manifestResult.IsSuccess ? manifestResult.Manifest : null;
+        if (manifest?.DefaultConfig != null)
         {
-            Config.ApplyDefaults(manifestResult.Manifest.DefaultConfig);
+            Config.ApplyDefaults(manifest.DefaultConfig);
         }
 
-        var settingsUiPath = Path.Combine(pluginDirectory, "settings_ui.json");
-        SettingsDefinition = SettingsUiDefinition.LoadFromFile(settingsUiPath);
+        var settingsUiPath = PluginSettingsPathResolver.ResolveSettingsFile(
+            pluginDirectory,
+            manifest?.Settings);
+        SettingsDefinition = settingsUiPath == null
+            ? null
+            : SettingsUiDefinition.LoadFromFile(settingsUiPath);
     }
 
     public void UpdateValue(string key, object? value)

@@ -56,6 +56,7 @@ public sealed class CatalogPluginManifest
             Description = Description,
             Author = Authors?.FirstOrDefault()?.Name,
             MinAppVersion = Host?.MinVersion,
+            Settings = Settings,
             Permissions = Permissions?.ToList() ?? new List<string>(),
             Companion = Backend == null
                 ? null

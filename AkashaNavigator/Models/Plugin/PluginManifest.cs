@@ -139,6 +139,12 @@ public class PluginManifest
     public Dictionary<string, JsonElement>? DefaultConfig { get; set; }
 
     /// <summary>
+    /// 设置界面定义文件（相对于插件目录）。
+    /// 未声明时兼容读取插件根目录的 settings_ui.json。
+    /// </summary>
+    public string? Settings { get; set; }
+
+    /// <summary>
     /// ES6 模块搜索路径列表
     /// 用于 import 语句解析模块时的搜索路径
     /// 支持相对路径（相对于插件目录）和绝对路径
