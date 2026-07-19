@@ -1,33 +1,37 @@
-## v1.4.0-alpha.2 🎉 Release Notes
+## v1.4.0-alpha.3 🎉 Release Notes
 
-**AkashaNavigator 1.4.0-alpha.2 更新发布！** 本次 Alpha 更新完善了 GitHub / CNB 双源选择，并为原神自动化插件补齐可配置快捷键与 OSD 状态提示。
+**AkashaNavigator 1.4.0-alpha.3 更新发布！** 本次 Alpha 更新完成了官方插件仓库体系迁移，并集中改善插件中心的安装、更新和状态同步体验。
 
-### ✨ 新增功能
+### ✨ 插件仓库体系
 
-**🚀 统一下载源测速**
-- 在高级设置顶部集中测试 GitHub 与 CNB 的实际安装包下载速度
-- 测速结果同时用于应用更新推荐和插件下载自动选源
-- 测速完成后自动同步应用更新源与插件下载源，并以结果卡片清晰展示速度、首字节时间和推荐源
-- 应用更新支持手动选择 GitHub 或 CNB，插件下载仍保留自动选择与失败回退
+- 接入独立的 AkashaPlugins catalog，统一支持 GitHub、CNB 和自定义 Git 仓库
+- 新增插件订阅、仓库刷新和原子安装流程，更新失败时不会留下不完整安装
+- 自动保留插件声明的用户数据和配置，支持目录形式的 `savedFiles`
+- 支持 Release 分发、完整性校验以及需要独立后端进程的 companion 插件
+- 内置插件迁移到官方 catalog，移除旧版 registry、资源更新和遗留更新路径
 
-**🎮 原神自动化快捷键**
-- 原神 Profile 默认推荐 Akasha 原神自动化插件
-- 插件设置页可独立配置自动拾取与自动剧情快捷键
-- 默认使用 `F9` 切换自动拾取、`F12` 切换自动剧情
-- 快捷键切换后显示自动消失的 OSD 状态提示
+### 🎨 插件中心
 
-### 🎨 界面与稳定性
+- 重做“可用插件”页面布局，使导航、工具栏、状态和卡片风格保持一致
+- 检查更新后将可更新插件自动置顶，便于快速定位
+- 修复“已安装插件”和“可用插件”使用不同 ViewModel 实例造成的状态不同步
+- 页面切换时刷新实际显示的页面，安装、订阅和更新状态保持一致
+- 支持从 ZIP 导入插件包，并集中管理仓库渠道和自动更新选项
 
-- 优化插件快捷键设置控件的比例、间距和层级
-- 修复 OSD 在非 UI 线程调用时无法正常显示或消失的问题
-- 下载源测速采用限时自适应读取，每个源最多读取 8 MiB，兼顾速度判断与流量消耗
-- 测速结果缓存 6 小时，并在网络或下载失败时保留备用源回退能力
+### 🛠️ 兼容性与稳定性
+
+- 修复预发布宿主被误判为低于同版本线稳定最低要求的问题
+- 统一宿主版本来源，避免插件 API 与实际应用版本不一致
+- 修复 `savedFiles` 目录标记被判定为无效路径导致插件更新失败的问题
+- 更新完成后正确保留目录内用户文件
+- 修复设置窗口关闭后旧 ViewModel 仍接收全局事件的问题
+- 补充插件安装、版本比较、页面同步和事件生命周期回归测试
 
 ### 📥 下载
 
 | 类型 | 下载 |
 |------|------|
-| 安装版 | <a href="https://github.com/ColinXHL/akasha-navigator/releases/download/v1.4.0-alpha.2/AkashaNavigator.Install.1.4.0-alpha.2.exe" title="Windows x64 安装版"><img src="https://custom-icon-badges.demolab.com/badge/.exe-0078D6?logo=windows11&logoColor=white"/></a> |
-| 便携版 | <a href="https://github.com/ColinXHL/akasha-navigator/releases/download/v1.4.0-alpha.2/AkashaNavigator_v1.4.0-alpha.2.7z" title="Portable 便携版"><img src="https://custom-icon-badges.demolab.com/badge/.7z-4CAF50?logo=7zip&logoColor=white"/></a> |
+| 安装版 | <a href="https://github.com/ColinXHL/akasha-navigator/releases/download/v1.4.0-alpha.3/AkashaNavigator.Install.1.4.0-alpha.3.exe" title="Windows x64 安装版"><img src="https://custom-icon-badges.demolab.com/badge/.exe-0078D6?logo=windows11&logoColor=white"/></a> |
+| 便携版 | <a href="https://github.com/ColinXHL/akasha-navigator/releases/download/v1.4.0-alpha.3/AkashaNavigator_v1.4.0-alpha.3.7z" title="Portable 便携版"><img src="https://custom-icon-badges.demolab.com/badge/.7z-4CAF50?logo=7zip&logoColor=white"/></a> |
 
-> 推荐使用安装版。本版本属于 Alpha 通道；首次启用自动化插件时请确认权限提示，并根据需要调整快捷键。
+> 推荐使用安装版。本版本属于 Alpha 通道；插件安装和更新前请确认权限与后端组件提示。
