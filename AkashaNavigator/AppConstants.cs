@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace AkashaNavigator
 {
 /// <summary>
@@ -11,7 +13,24 @@ public static class AppConstants
     /// <summary>
     /// 应用程序版本
     /// </summary>
-    public const string Version = "1.4.0-alpha.1";
+    public static readonly string Version = GetCurrentVersion();
+
+    private static string GetCurrentVersion()
+    {
+        var assembly = typeof(AppConstants).Assembly;
+        var informational = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informational))
+        {
+            var metadataIndex = informational.IndexOf('+');
+            return metadataIndex > 0
+                ? informational[..metadataIndex]
+                : informational;
+        }
+
+        return assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    }
 
 #endregion
 
