@@ -352,13 +352,15 @@ public sealed class PluginInstaller : IPluginInstaller
             }
         }
 
-        if (PluginLibrary.CompareVersions(
-                _hostVersionProvider(),
-                manifest.Host.MinVersion) < 0)
+        var currentHostVersion = _hostVersionProvider();
+        if (!PluginLibrary.IsHostVersionCompatible(
+                currentHostVersion,
+                manifest.Host.MinVersion))
         {
             return Error.Plugin(
                 PluginErrorCodes.HostVersionTooLow,
-                $"插件需要 AkashaNavigator {manifest.Host.MinVersion} 或更高版本",
+                $"插件需要 AkashaNavigator {manifest.Host.MinVersion} 或更高版本" +
+                $"（当前 {currentHostVersion}）",
                 pluginId: entry.Id);
         }
 
@@ -433,6 +435,9 @@ public sealed class PluginInstaller : IPluginInstaller
         }
 
         manifest.SavedFiles ??= new List<string>();
+        manifest.SavedFiles = manifest.SavedFiles
+            .Select(NormalizeSavedFilePath)
+            .ToList();
         var protectedPaths = new List<string> {
             AppConstants.PluginManifestFileName,
             AppConstants.PluginRepositoryManifestFileName,
@@ -461,6 +466,11 @@ public sealed class PluginInstaller : IPluginInstaller
         return runtimeValidation.IsValid
             ? null
             : InvalidManifest(entry.Id, "转换后的运行时清单无效");
+    }
+
+    private static string NormalizeSavedFilePath(string? relativePath)
+    {
+        return relativePath?.TrimEnd('/') ?? string.Empty;
     }
 
     private Error? ValidateReleasePackageManifest(

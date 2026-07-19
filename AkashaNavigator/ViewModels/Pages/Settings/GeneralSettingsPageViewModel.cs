@@ -20,6 +20,7 @@ public partial class GeneralSettingsPageViewModel : ObservableObject
     private readonly IWindowStateService _windowStateService;
     private readonly IEventBus _eventBus;
     private AppConfig _config;
+    private bool _eventSubscriptionsReleased;
 
     /// <summary>
     /// 可用 Profile 列表
@@ -71,6 +72,22 @@ public partial class GeneralSettingsPageViewModel : ObservableObject
             return;
 
         OpacityPercent = (int)(e.Opacity * 100);
+    }
+
+    /// <summary>
+    /// 释放由当前设置页建立的全局事件订阅。
+    /// 此 ViewModel 由根 DI 容器按 Transient 解析，因此不实现 IDisposable，
+    /// 避免容器将实例保留到应用退出。
+    /// </summary>
+    public void ReleaseEventSubscriptions()
+    {
+        if (_eventSubscriptionsReleased)
+        {
+            return;
+        }
+
+        _eventBus.Unsubscribe<OpacityChangedEvent>(OnOpacityChanged);
+        _eventSubscriptionsReleased = true;
     }
 
     /// <summary>

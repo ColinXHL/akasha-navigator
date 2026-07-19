@@ -215,7 +215,8 @@ public partial class AvailablePluginsPageViewModel : ObservableObject
                         subscription,
                         installed.GetValueOrDefault(subscription.PluginId))));
         return items
-            .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+            .OrderByDescending(item => item.HasUpdate)
+            .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
     }
 

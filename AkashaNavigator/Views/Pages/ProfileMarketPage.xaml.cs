@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Models.Plugin;
@@ -45,6 +46,14 @@ public partial class ProfileMarketPage : System.Windows.Controls.UserControl, ID
     {
         // 首次加载时获取数据
         _ = _viewModel.LoadProfilesAsync();
+    }
+
+    /// <summary>
+    /// 重新加载市场数据（公共方法供插件中心页面切换时调用）。
+    /// </summary>
+    public Task RefreshProfilesAsync()
+    {
+        return _viewModel.LoadProfilesAsync();
     }
 
     /// <summary>

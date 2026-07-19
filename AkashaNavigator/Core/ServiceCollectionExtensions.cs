@@ -244,9 +244,7 @@ public static class ServiceCollectionExtensions
         //         HotkeySettingsPageViewModel, AdvancedSettingsPageViewModel)
         services.AddTransient<SettingsViewModel>();
 
-        // PluginCenterViewModel（依赖 4 个 PageViewModel）
-        // 依赖链：PluginCenterViewModel → (MyProfilesPageViewModel, InstalledPluginsPageViewModel,
-        //         AvailablePluginsPageViewModel, ProfileMarketPageViewModel)
+        // PluginCenterViewModel（仅负责页面导航；实际页面刷新由 PluginCenterWindow 协调）
         services.AddTransient<PluginCenterViewModel>();
 
         // PioneerNoteViewModel（依赖 IPioneerNoteService）

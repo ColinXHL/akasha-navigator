@@ -25,4 +25,28 @@ public sealed class PluginVersionTests
     {
         Assert.Equal(0, PluginLibrary.CompareVersions(left, right));
     }
+
+    [Theory]
+    [InlineData("1.4.0-alpha.2", "1.4.0")]
+    [InlineData("1.4.0-beta.1", "1.4.0")]
+    [InlineData("1.4.0", "1.4.0")]
+    [InlineData("1.4.1-alpha.1", "1.4.0")]
+    [InlineData("1.4.0-alpha.2", "1.4.0-alpha.1")]
+    public void IsHostVersionCompatible_ShouldAcceptSupportedHost(
+        string current,
+        string minimum)
+    {
+        Assert.True(PluginLibrary.IsHostVersionCompatible(current, minimum));
+    }
+
+    [Theory]
+    [InlineData("1.3.9", "1.4.0")]
+    [InlineData("1.4.0-alpha.1", "1.4.0-alpha.2")]
+    [InlineData("1.4.0-alpha.2", "1.4.1")]
+    public void IsHostVersionCompatible_ShouldRejectUnsupportedHost(
+        string current,
+        string minimum)
+    {
+        Assert.False(PluginLibrary.IsHostVersionCompatible(current, minimum));
+    }
 }

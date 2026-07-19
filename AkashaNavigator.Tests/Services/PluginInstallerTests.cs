@@ -178,6 +178,49 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
+    public void InstallOrUpdateRepositoryPlugin_AllowsPreviewHostOnSameReleaseLine()
+    {
+        var entry = CreateEntry();
+        WriteCatalogPlugin(CreateManifest());
+        var subscriptions = new Mock<IPluginSubscriptionService>();
+        subscriptions
+            .Setup(service => service.Subscribe(
+                AppConstants.OfficialPluginRepositoryId,
+                entry))
+            .Returns(
+                Result<PluginSubscriptionRecord>.Success(
+                    new PluginSubscriptionRecord { PluginId = PluginId }));
+        subscriptions
+            .Setup(service => service.MarkInstalled(
+                PluginId,
+                "1.0.0",
+                new string('b', 40)))
+            .Returns(Result.Success());
+        var library = new Mock<IPluginLibrary>();
+        library
+            .Setup(service => service.InstallOrUpdateFromDirectory(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string>()))
+            .Returns(
+                Result<InstalledPluginInfo>.Success(
+                    new InstalledPluginInfo {
+                        Id = PluginId,
+                        Name = "Sample",
+                        Version = "1.0.0"
+                    }));
+        var installer = new PluginInstaller(
+            CreateRepositoryService(entry).Object,
+            subscriptions.Object,
+            library.Object,
+            () => "1.4.0-alpha.2");
+
+        var result = installer.InstallOrUpdateRepositoryPlugin(PluginId);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+    }
+
+    [Fact]
     public void InstallOrUpdateRepositoryPlugin_EndToEndPreservesUserFile()
     {
         var entry = CreateEntry();
@@ -225,6 +268,57 @@ public sealed class PluginInstallerTests : IDisposable
         var subscription = subscriptions.GetSubscription(PluginId);
         Assert.Equal("2.0.0", subscription?.InstalledVersion);
         Assert.Equal(new string('b', 40), subscription?.InstalledCommit);
+    }
+
+    [Fact]
+    public void InstallOrUpdateRepositoryPlugin_EndToEndPreservesDirectoryMarker()
+    {
+        var entry = CreateEntry();
+        var manifest = CreateManifest();
+        manifest.SavedFiles = new List<string> { "data/" };
+        WriteCatalogPlugin(manifest);
+        var installRoot = Path.Combine(
+            _repositoryDirectory,
+            "directory-marker-install");
+        var library = new PluginLibrary(
+            Path.Combine(installRoot, "installed"),
+            Path.Combine(installRoot, "library.json"),
+            Path.Combine(installRoot, "builtin"),
+            Mock.Of<ICompanionProcessManager>(),
+            CreateConsentService());
+        var subscriptions = new PluginSubscriptionService(
+            Mock.Of<ILogService>(),
+            Path.Combine(installRoot, "plugin-subscriptions.json"));
+        var installer = new PluginInstaller(
+            CreateRepositoryService(entry).Object,
+            subscriptions,
+            library,
+            () => "1.4.0-alpha.2");
+
+        var installResult =
+            installer.InstallOrUpdateRepositoryPlugin(PluginId);
+        Assert.True(installResult.IsSuccess, installResult.Error?.Message);
+        var installedDirectory = Path.Combine(
+            installRoot,
+            "installed",
+            PluginId);
+        var userDataDirectory = Path.Combine(installedDirectory, "data");
+        Directory.CreateDirectory(userDataDirectory);
+        File.WriteAllText(
+            Path.Combine(userDataDirectory, "user.json"),
+            "user data");
+
+        entry.Version = "2.0.0";
+        manifest.Version = "2.0.0";
+        WriteCatalogPlugin(manifest);
+        var updateResult =
+            installer.InstallOrUpdateRepositoryPlugin(PluginId);
+
+        Assert.True(updateResult.IsSuccess, updateResult.Error?.Message);
+        Assert.Equal(
+            "user data",
+            File.ReadAllText(
+                Path.Combine(installedDirectory, "data", "user.json")));
     }
 
     [Fact]
@@ -287,7 +381,7 @@ public sealed class PluginInstallerTests : IDisposable
                                 directory,
                                 "runtime",
                                 "worker.exe")));
-                    Assert.Equal(new[] { "data/user.json" }, savedFiles);
+                    Assert.Equal(new[] { "data" }, savedFiles);
                 })
             .Returns(
                 Result<InstalledPluginInfo>.Success(
@@ -489,7 +583,7 @@ public sealed class PluginInstallerTests : IDisposable
         manifest.Permissions = new List<string> {
             PluginPermissions.Companion
         };
-        manifest.SavedFiles = new List<string> { "data/user.json" };
+        manifest.SavedFiles = new List<string> { "data/" };
         manifest.Distribution = CreateReleaseDistribution();
         manifest.Backend = new CatalogPluginBackend {
             Type = AppConstants.CompanionBackendType,

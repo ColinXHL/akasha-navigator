@@ -45,6 +45,47 @@ public sealed class InstalledPluginsPageViewModelTests
     }
 
     [Fact]
+    public async Task OnLoadedAsync_MovesAvailableUpdatesBeforeOtherPlugins()
+    {
+        var subscriptions = new Mock<IPluginSubscriptionService>();
+        subscriptions
+            .Setup(service => service.CheckForUpdatesAsync(
+                true,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                Result<IReadOnlyList<PluginSubscriptionUpdate>>.Success(
+                    new[] {
+                        new PluginSubscriptionUpdate {
+                            PluginId = "zulu-plugin",
+                            InstalledVersion = "1.0.0",
+                            AvailableVersion = "2.0.0"
+                        }
+                    }));
+        var installed = new List<InstalledPluginInfo> {
+            new() {
+                Id = "alpha-plugin",
+                Name = "Alpha Current",
+                Version = "1.0.0"
+            },
+            new() {
+                Id = "zulu-plugin",
+                Name = "Zulu Update",
+                Version = "1.0.0"
+            }
+        };
+        var viewModel = CreateViewModel(
+            subscriptions.Object,
+            out _,
+            installed);
+
+        await viewModel.OnLoadedAsync();
+
+        Assert.Equal("zulu-plugin", viewModel.Plugins[0].Id);
+        Assert.True(viewModel.Plugins[0].HasUpdate);
+        Assert.False(viewModel.Plugins[1].HasUpdate);
+    }
+
+    [Fact]
     public async Task UpdatePluginCommand_UsesRepositoryInstaller()
     {
         var subscriptions = new Mock<IPluginSubscriptionService>();
@@ -83,12 +124,14 @@ public sealed class InstalledPluginsPageViewModelTests
 
     private static InstalledPluginsPageViewModel CreateViewModel(
         IPluginSubscriptionService subscriptions,
-        out Mock<IPluginInstaller> installer)
+        out Mock<IPluginInstaller> installer,
+        IReadOnlyList<InstalledPluginInfo>? installedPlugins = null)
     {
         var library = new Mock<IPluginLibrary>();
         library
             .Setup(service => service.GetInstalledPlugins())
             .Returns(
+                installedPlugins?.ToList() ??
                 new List<InstalledPluginInfo> {
                     new() {
                         Id = "sample-plugin",
