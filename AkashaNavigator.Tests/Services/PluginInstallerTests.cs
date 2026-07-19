@@ -181,7 +181,10 @@ public sealed class PluginInstallerTests : IDisposable
     public void InstallOrUpdateRepositoryPlugin_AllowsPreviewHostOnSameReleaseLine()
     {
         var entry = CreateEntry();
-        WriteCatalogPlugin(CreateManifest());
+        var manifest = CreateManifest();
+        WriteCatalogPlugin(manifest);
+        var previewHostVersion =
+            $"{manifest.Host.MinVersion}-alpha.2";
         var subscriptions = new Mock<IPluginSubscriptionService>();
         subscriptions
             .Setup(service => service.Subscribe(
@@ -213,7 +216,7 @@ public sealed class PluginInstallerTests : IDisposable
             CreateRepositoryService(entry).Object,
             subscriptions.Object,
             library.Object,
-            () => "1.4.0-alpha.2");
+            () => previewHostVersion);
 
         var result = installer.InstallOrUpdateRepositoryPlugin(PluginId);
 
@@ -293,7 +296,7 @@ public sealed class PluginInstallerTests : IDisposable
             CreateRepositoryService(entry).Object,
             subscriptions,
             library,
-            () => "1.4.0-alpha.2");
+            () => manifest.Host.MinVersion);
 
         var installResult =
             installer.InstallOrUpdateRepositoryPlugin(PluginId);
