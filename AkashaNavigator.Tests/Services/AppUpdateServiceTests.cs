@@ -52,4 +52,33 @@ public sealed class AppUpdateServiceTests
         Assert.True(result.IsFailure);
         Assert.Same(expectedError, result.Error);
     }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_StableWinsOverSameCorePrerelease()
+    {
+        var manifest = new UpdateManifest {
+            Stable = new AppUpdateChannelInfo {
+                Version = "999.0.0",
+                Notes = "stable release"
+            },
+            Alpha = new AppUpdateChannelInfo {
+                Version = "999.0.0-alpha.4",
+                Notes = "alpha release"
+            }
+        };
+        var manifestService = new Mock<IUpdateManifestService>();
+        manifestService
+            .Setup(service => service.RefreshAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<UpdateManifest>.Success(manifest));
+        var service = new AppUpdateService(new Mock<ILogService>().Object, manifestService.Object);
+
+        var result = await service.CheckForUpdateAsync(includePrerelease: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value?.HasUpdate);
+        Assert.Equal("999.0.0", result.Value?.TargetVersion);
+        Assert.Equal("stable release", result.Value?.Notes);
+        Assert.False(result.Value?.IsPrerelease);
+        Assert.Equal("cnb", result.Value?.SourceId);
+    }
 }

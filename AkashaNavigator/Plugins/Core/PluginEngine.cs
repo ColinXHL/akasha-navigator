@@ -326,6 +326,7 @@ public static class PluginEngine
             }
 
             engine.AddHostObject("window", windowApi);
+            options.RegisterHostObjectCleanup(windowApi.Cleanup);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: window");
         }
 
@@ -358,6 +359,7 @@ public static class PluginEngine
         {
             var httpApi = new HttpApi(pluginId, manifest.HttpAllowedUrls?.ToArray());
             engine.AddHostObject("http", httpApi);
+            options.RegisterHostObjectCleanup(httpApi.Dispose);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: http");
         }
 
@@ -377,6 +379,7 @@ public static class PluginEngine
             }
 
             engine.AddHostObject("subtitle", subtitleApi);
+            options.RegisterHostObjectCleanup(subtitleApi.Cleanup);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: subtitle");
         }
 
@@ -398,6 +401,7 @@ public static class PluginEngine
                     RequireLegacyOption(options.HotkeyService, nameof(PluginEngineOptions.HotkeyService),
                                         nameof(HotkeyApi)).GetDispatcher());
             engine.AddHostObject("hotkey", hotkeyApi);
+            options.RegisterHostObjectCleanup(hotkeyApi.Cleanup);
             LogService.Instance.Debug($"PluginEngine:{pluginId}", "Exposed: hotkey");
         }
 

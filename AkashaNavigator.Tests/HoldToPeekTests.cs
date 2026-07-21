@@ -14,10 +14,10 @@ namespace AkashaNavigator.Tests
         #region Config Defaults
 
         [Fact]
-        public void AppConfig_Default_EnableHoldToPeek_IsTrue()
+        public void AppConfig_Default_EnableHoldToPeek_IsFalse()
         {
             var config = new AppConfig();
-            Assert.True(config.EnableHoldToPeek);
+            Assert.False(config.EnableHoldToPeek);
         }
 
         [Fact]
@@ -184,13 +184,13 @@ namespace AkashaNavigator.Tests
         public void WindowSettingsPageVM_SaveSettings_SavesPeekProperties()
         {
             var vm = new WindowSettingsPageViewModel();
-            vm.EnableHoldToPeek = false;
+            vm.EnableHoldToPeek = true;
             vm.PeekOpacityPercent = 80.0;
 
             var config = new AppConfig();
             vm.SaveSettings(config);
 
-            Assert.False(config.EnableHoldToPeek);
+            Assert.True(config.EnableHoldToPeek);
             Assert.Equal(0.8, config.PeekOpacity, 2); // 80% → 0.8
         }
 
@@ -213,13 +213,13 @@ namespace AkashaNavigator.Tests
         public void WindowSettingsPageVM_ResetSettings_RestoresPeekDefaults()
         {
             var vm = new WindowSettingsPageViewModel();
-            vm.EnableHoldToPeek = false;
+            vm.EnableHoldToPeek = true;
             vm.PeekOpacityPercent = 50.0;
 
             var defaultConfig = new AppConfig();
             vm.ResetSettings(defaultConfig);
 
-            Assert.True(vm.EnableHoldToPeek);
+            Assert.False(vm.EnableHoldToPeek);
             Assert.Equal(AppConstants.DefaultPeekOpacity * 100.0, vm.PeekOpacityPercent, 1);
         }
 

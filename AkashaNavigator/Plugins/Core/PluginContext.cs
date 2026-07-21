@@ -118,7 +118,7 @@ public class PluginContext : IDisposable
         PluginDirectory = pluginDirectory ?? throw new ArgumentNullException(nameof(pluginDirectory));
         ConfigDirectory = pluginDirectory;
         _config = config;
-        _engineOptions = options;
+        _engineOptions = options ?? new PluginEngineOptions();
 
         InitializeWithPluginEngine();
     }
@@ -545,6 +545,10 @@ public class PluginContext : IDisposable
             {
                 CallOnUnload();
             }
+
+            // 先取消宿主对象对全局服务的订阅，再释放 V8 引擎，
+            // 避免旧回调在插件卸载/重载后访问已销毁的脚本引擎。
+            _engineOptions?.CleanupHostObjects();
 
             // V8 引擎需要显式释放
             _jsEngine?.Dispose();

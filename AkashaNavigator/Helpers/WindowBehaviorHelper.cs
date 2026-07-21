@@ -42,7 +42,7 @@ public class WindowBehaviorHelper
     private bool _isPeekHeld;
     private bool _isPeekActive; // 当前是否实际处于窥视透明度
     private double _peekOpacity = AppConstants.DefaultPeekOpacity;
-    private bool _enablePeek = true;
+    private bool _enablePeek;
 
 #endregion
 

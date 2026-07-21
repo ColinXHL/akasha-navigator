@@ -83,9 +83,9 @@ public class AppConfig
     public bool EnableHotkeysWhenHidden { get; set; } = false;
 
     /// <summary>
-    /// 是否启用按住窥视功能（默认 true）
+    /// 是否启用按住窥视功能（默认关闭）
     /// </summary>
-    public bool EnableHoldToPeek { get; set; } = true;
+    public bool EnableHoldToPeek { get; set; } = false;
 
     /// <summary>
     /// 窥视时的透明度（默认 0.2，范围 MinOpacity - MaxOpacity）
