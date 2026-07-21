@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
 using AkashaNavigator.Models.Config;
@@ -11,6 +12,9 @@ namespace AkashaNavigator.Plugins.Core
 /// </summary>
 public class PluginEngineOptions
 {
+    private readonly List<Action> _hostObjectCleanupActions = new();
+    private bool _hostObjectsCleanedUp;
+
     /// <summary>
     /// 当前 Profile ID
     /// </summary>
@@ -65,5 +69,50 @@ public class PluginEngineOptions
     /// </summary>
     [Obsolete("Legacy fallback mode only. Prefer HostObjectFactory.", false)]
     public AkashaNavigator.Core.OsdManager? OsdManager { get; set; }
+
+    /// <summary>
+    /// 注册由插件引擎创建、需要在 V8 引擎销毁前释放的宿主对象。
+    /// </summary>
+    internal void RegisterHostObjectCleanup(Action cleanup)
+    {
+        ArgumentNullException.ThrowIfNull(cleanup);
+
+        if (_hostObjectsCleanedUp)
+        {
+            throw new ObjectDisposedException(nameof(PluginEngineOptions));
+        }
+
+        _hostObjectCleanupActions.Add(cleanup);
+    }
+
+    /// <summary>
+    /// 以创建顺序的逆序释放宿主对象。该方法是幂等的。
+    /// </summary>
+    internal void CleanupHostObjects()
+    {
+        if (_hostObjectsCleanedUp)
+        {
+            return;
+        }
+
+        _hostObjectsCleanedUp = true;
+
+        for (var i = _hostObjectCleanupActions.Count - 1; i >= 0; i--)
+        {
+            try
+            {
+                _hostObjectCleanupActions[i]();
+            }
+            catch (Exception ex)
+            {
+                (LogService ?? Services.LogService.Instance).Error(
+                    nameof(PluginEngineOptions),
+                    ex,
+                    "清理插件宿主对象失败");
+            }
+        }
+
+        _hostObjectCleanupActions.Clear();
+    }
 }
 }

@@ -51,12 +51,7 @@ public class HotkeyApi
     /// </summary>
     internal void Cleanup()
     {
-        foreach (var registration in _registrations.Values)
-        {
-            _dispatcher.UnregisterAction(registration.ActionName);
-        }
-        _registrations.Clear();
-        _keyComboToId.Clear();
+        UnregisterAll();
     }
 
 #endregion

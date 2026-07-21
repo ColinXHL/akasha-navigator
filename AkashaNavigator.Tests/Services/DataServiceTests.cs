@@ -622,8 +622,8 @@ public class DataServiceTests : IDisposable
     public async Task MixedOperations_ConcurrentCalls_KnownConcurrencyIssues()
     {
         // Arrange
-        _dataService.AddBookmark("url1", "Title 1");
-        _dataService.AddBookmark("url2", "Title 2");
+        _dataService.AddHistory("url1", "Title 1");
+        _dataService.AddHistory("url2", "Title 2");
         var tasks = new Task[50];
         var random = new Random();
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "交互发布 AkashaNavigator"
+  short_description: "交互判断下一个版本号，再完整发布并验证更新清单与 CDN"
+  default_prompt: "Use $publish-akasha-navigator to analyze the changes, recommend whether and how to bump the version, and wait for my confirmation before publishing."

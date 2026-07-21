@@ -4,12 +4,14 @@ using System.IO;
 using AkashaNavigator.Core;
 using AkashaNavigator.Core.Interfaces;
 using AkashaNavigator.Helpers;
+using AkashaNavigator.Models.Data;
 using AkashaNavigator.Models.Plugin;
 using AkashaNavigator.Plugins.Core;
 using AkashaNavigator.Plugins.Utils;
 using AkashaNavigator.Services;
 using AkashaNavigator.Tests.TestDoubles;
 using Microsoft.ClearScript.V8;
+using Moq;
 using Xunit;
 
 namespace AkashaNavigator.Tests.Plugins;
@@ -142,6 +144,47 @@ public class PluginHostObjectFactoryTests
                                       new PluginEngineOptions());
 
         Assert.False(IsGlobalDefined(engine, "osd"));
+    }
+
+    [Fact]
+    public void PluginContextDispose_DetachesGlobalSubtitleApiBeforeDisposingEngine()
+    {
+        using var tempDir = new TempDirectory();
+        var subtitleService = new Mock<ISubtitleService>();
+        var factory = new PluginHostObjectFactory(new TestPlayerRuntimeBridge(),
+                                                  new OverlayManager(),
+                                                  new PanelManager(),
+                                                  new TestCursorDetectionService(),
+                                                  subtitleService.Object,
+                                                  new ScriptExecutionQueue(new FakeLogService()),
+                                                  new HotkeyService(),
+                                                  new OsdManager(),
+                                                  new FakeLogService(),
+                                                  new CompanionProcessManager(new FakeLogService()));
+        var options = new PluginEngineOptions { HostObjectFactory = factory };
+        var manifest = CreateManifest(PluginPermissions.Subtitle);
+        var context = PluginContext.Create(manifest,
+                                           tempDir.Path,
+                                           tempDir.Path,
+                                           new PluginConfig(manifest.Id!),
+                                           options);
+
+        subtitleService.VerifyAdd(
+            service => service.SubtitleLoaded += It.IsAny<EventHandler<SubtitleData>>(),
+            Times.Once);
+
+        context.Dispose();
+        context.Dispose();
+
+        subtitleService.VerifyRemove(
+            service => service.SubtitleLoaded -= It.IsAny<EventHandler<SubtitleData>>(),
+            Times.Once);
+        subtitleService.VerifyRemove(
+            service => service.SubtitleChanged -= It.IsAny<EventHandler<SubtitleEntry?>>(),
+            Times.Once);
+        subtitleService.VerifyRemove(
+            service => service.SubtitleCleared -= It.IsAny<EventHandler>(),
+            Times.Once);
     }
 
     private static V8ScriptEngine CreateEngineForTest()
