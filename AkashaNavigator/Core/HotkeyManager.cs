@@ -72,19 +72,6 @@ public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<strin
         _hotkeyService.Start();
     }
 
-    internal static void MergeUserBindings(HotkeyProfile? activeProfile, HotkeyProfile? newProfile)
-    {
-        if (activeProfile == null || newProfile == null)
-            return;
-
-        var replacedActions = new HashSet<string>(
-            newProfile.Bindings.Select(binding => binding.Action),
-            StringComparer.OrdinalIgnoreCase);
-
-        activeProfile.Bindings.RemoveAll(binding => replacedActions.Contains(binding.Action));
-        activeProfile.Bindings.AddRange(newProfile.Bindings);
-    }
-
     /// <summary>
     /// 更新快捷键配置
     /// </summary>
