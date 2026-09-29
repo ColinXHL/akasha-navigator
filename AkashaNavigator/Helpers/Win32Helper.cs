@@ -257,10 +257,12 @@ public static class Win32Helper
 
     // 扩展窗口样式常量
     public const int GWL_EXSTYLE = -20;
+    public const int GWL_STYLE = -16;
     public const int WS_EX_TRANSPARENT = 0x00000020;
     public const int WS_EX_LAYERED = 0x00080000;
     public const int WS_EX_TOOLWINDOW = 0x00000080;
     public const int WS_EX_NOACTIVATE = 0x08000000;
+    public const int WS_SYSMENU = 0x00080000;
 
     // SetWindowPos 标志
     private const uint SWP_NOMOVE = 0x0002;
@@ -866,6 +868,16 @@ public static class Win32Helper
         var hwnd = new WindowInteropHelper(window).Handle;
         int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
         SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW);
+    }
+
+    public static int GetWindowStyle(IntPtr hwnd)
+    {
+        return GetWindowLong(hwnd, GWL_STYLE);
+    }
+
+    public static void SetWindowStyle(IntPtr hwnd, int style)
+    {
+        SetWindowLong(hwnd, GWL_STYLE, style);
     }
 
     /// <summary>
