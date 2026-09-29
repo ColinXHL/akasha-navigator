@@ -89,17 +89,16 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
     private bool _recording;
     private System.Windows.Threading.DispatcherTimer? _lostFocusTimer;
 
-    // 所有 HotkeyTextBox 共用一个低级键盘钩子，并把输入路由给当前获得焦点的控件。
-    // 这样在两个输入框快速切换时，不会出现一个实例释放另一个实例仍在使用的 delegate/hook。
+    // HotkeyTextBox instances share one low-level hook and route input to the active recorder.
+    // This prevents delegate lifetime races while focus moves between hotkey fields.
     private static IntPtr _keyboardHook;
     private static Win32Helper.LowLevelKeyboardProc? _keyboardHookProc;
     private static HotkeyTextBox? _activeRecorder;
 
-    // 录键期间临时移除 WS_SYSMENU。记录原始位并精确恢复，避免给无边框窗口永久加上系统菜单。
+    // Preserve the exact original system-menu state while Alt recording is active.
     private static IntPtr _systemMenuHwnd;
     private static bool _systemMenuWasEnabled;
 
-    // 系统保留/修饰 VK 码
     private const uint VK_TAB = 0x09;
     private const uint VK_SHIFT = 0x10;
     private const uint VK_CONTROL = 0x11;
@@ -163,9 +162,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
 
         _recording = true;
         LostFocusTimer.Stop();
-
-        // Alt 组合键会被 WPF 的 AccessKey/系统菜单吞掉，需在系统输入流源头拦截。
-        // 钩子和系统菜单状态由所有输入框共享，快速切换输入框时只转移“当前录制者”。
         ActivateKeyboardRecording();
 
         // 切换到英文输入模式
@@ -175,9 +171,12 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
     private void OnLostFocus(object sender, RoutedEventArgs e)
     {
         UpdateDisplayText();
+
+        // 恢复之前的输入法状态
         ImeHelper.RestoreImeState(_savedImeState);
 
-        // 延迟 1s 结束录键：Alt 按下时系统可能临时转移焦点，给组合键留录入时间
+        // Alt can briefly move focus through the system-menu path. Keep recording alive long enough
+        // to receive the actual main key, then release the shared hook if this field is still active.
         LostFocusTimer.Start();
     }
 
@@ -188,9 +187,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
         DeactivateKeyboardRecording();
     }
 
-    /// <summary>
-    /// 录键状态延迟清除计时器（单实例，Tick 只订阅一次）
-    /// </summary>
     private System.Windows.Threading.DispatcherTimer LostFocusTimer
     {
         get
@@ -211,14 +207,11 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
                     }
                 };
             }
+
             return _lostFocusTimer;
         }
     }
 
-    /// <summary>
-    /// 激活当前输入框的 Alt 组合键录制。
-    /// 所有 HotkeyTextBox 共用一个 WH_KEYBOARD_LL，避免多个实例同时持有静态 delegate。
-    /// </summary>
     private void ActivateKeyboardRecording()
     {
         if (_activeRecorder != null && !ReferenceEquals(_activeRecorder, this))
@@ -228,7 +221,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
         }
 
         _activeRecorder = this;
-
         if (_keyboardHook == IntPtr.Zero)
         {
             _keyboardHookProc = KeyboardHookCallback;
@@ -242,9 +234,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
         DisableSystemMenuForRecorder(this);
     }
 
-    /// <summary>
-    /// 仅当前录制者可以释放共享钩子，并恢复进入录键前的系统菜单位。
-    /// </summary>
     private void DeactivateKeyboardRecording()
     {
         if (!ReferenceEquals(_activeRecorder, this))
@@ -262,9 +251,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
         _keyboardHookProc = null;
     }
 
-    /// <summary>
-    /// 全局键盘钩子回调：只捕获当前录制者的 Alt 组合键并吞掉最终按键。
-    /// </summary>
     private static IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
         var recorder = _activeRecorder;
@@ -302,10 +288,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
         return Win32Helper.CallNextHook(_keyboardHook, nCode, wParam, lParam);
     }
 
-    /// <summary>
-    /// Alt 组合键中可录入的主键。
-    /// 修饰键必须继续传递，等待真正的主键到来，才能正确录入 Alt+Ctrl/Shift+Key。
-    /// </summary>
     internal static bool IsRecordableCombo(uint vk) =>
         vk != VK_SHIFT &&
         vk != VK_CONTROL &&
@@ -338,14 +320,12 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
             RestoreSystemMenu();
         }
 
-        // 同一窗口内从一个 HotkeyTextBox 切换到另一个时保留最初记录的原始状态。
         if (_systemMenuHwnd == hwnd)
             return;
 
         var style = Win32Helper.GetWindowStyle(hwnd);
         _systemMenuHwnd = hwnd;
         _systemMenuWasEnabled = (style & Win32Helper.WS_SYSMENU) != 0;
-
         if (_systemMenuWasEnabled)
         {
             Win32Helper.SetWindowStyle(hwnd, style & ~Win32Helper.WS_SYSMENU);
@@ -361,7 +341,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
         var restoredStyle = _systemMenuWasEnabled
             ? style | Win32Helper.WS_SYSMENU
             : style & ~Win32Helper.WS_SYSMENU;
-
         if (restoredStyle != style)
         {
             Win32Helper.SetWindowStyle(_systemMenuHwnd, restoredStyle);
@@ -396,10 +375,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
 
             if (isSystemKey)
             {
-                // Alt 组合键可能以两种形态到达：
-                // 1) 普通键（IsSystem=False，日志实证：真实场景组合键走这里）
-                // 2) 系统键（IsSystem=True，SystemKey=实际键）
-                // 两种都要处理，此处恢复 SystemKey 解析
                 targetKey = e.SystemKey;
 
                 // 排除系统级快捷键（Alt+Tab 等）
@@ -512,7 +487,6 @@ public class HotkeyTextBox : System.Windows.Controls.TextBox
 
     /// <summary>
     /// 获取当前修饰键状态
-    /// （Alt 组合键由全局钩子处理，此处服务于 Ctrl/Shift 组合与鼠标按键）
     /// </summary>
     private static ConfigModifierKeys GetModifierKeys(bool isSystemKey)
     {
