@@ -60,35 +60,29 @@ public void Initialize(PlayerWindow playerWindow, AppConfig config, Action<strin
         // 配置窥视按键
         _hotkeyService.SetPeekConfig(config.HotkeyPeek, config.HotkeyPeekMod, config.EnableHoldToPeek);
 
-        // 不要替换整个配置，而是合并内置快捷键到现有配置
+        // 用户配置中的核心 Action 以 AppConfig 为准：先按 Action 整体移除旧绑定，
+        // 再一次性加入新绑定，避免修改快捷键后默认键仍然残留。
+        // 插件绑定（Action 以 "Plugin:" 开头）不在 AppConfig 中，因此继续保留。
         var currentConfig = _hotkeyService.GetConfig();
         var newConfig = _config.ToHotkeyConfig();
 
-        // 将新配置的绑定添加到当前配置（如果不存在）
-        var activeProfile = currentConfig.GetActiveProfile();
-        if (activeProfile != null)
-        {
-            var newProfile = newConfig.GetActiveProfile();
-            if (newProfile != null)
-            {
-                foreach (var binding in newProfile.Bindings)
-                {
-                    // 检查是否已存在相同的绑定
-                    var exists = activeProfile.Bindings.Any(b =>
-                        b.Key == binding.Key &&
-                        b.Modifiers == binding.Modifiers &&
-                        b.Action == binding.Action);
-
-                    if (!exists)
-                    {
-                        activeProfile.Bindings.Add(binding);
-                    }
-                }
-            }
-        }
+        MergeUserBindings(currentConfig.GetActiveProfile(), newConfig.GetActiveProfile());
 
         SetupHotkeyBindings();
         _hotkeyService.Start();
+    }
+
+    internal static void MergeUserBindings(HotkeyProfile? activeProfile, HotkeyProfile? newProfile)
+    {
+        if (activeProfile == null || newProfile == null)
+            return;
+
+        var replacedActions = new HashSet<string>(
+            newProfile.Bindings.Select(binding => binding.Action),
+            StringComparer.OrdinalIgnoreCase);
+
+        activeProfile.Bindings.RemoveAll(binding => replacedActions.Contains(binding.Action));
+        activeProfile.Bindings.AddRange(newProfile.Bindings);
     }
 
     /// <summary>
